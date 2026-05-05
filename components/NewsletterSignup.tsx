@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Mail } from 'lucide-react';
 
@@ -10,12 +11,13 @@ type Props = {
 
 export default function NewsletterSignup({ variant = 'section' }: Props) {
   const [email, setEmail] = useState('');
+  const [consented, setConsented] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || !consented) return;
 
     setStatus('loading');
     setErrorMsg('');
@@ -34,6 +36,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
     } else {
       setStatus('success');
       setEmail('');
+      setConsented(false);
     }
   };
 
@@ -58,7 +61,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
         {status === 'success' ? (
           <p className="text-sm text-green-700 font-medium">Thank you — you&apos;re subscribed.</p>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input
               type="email"
               value={email}
@@ -67,9 +70,29 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
               required
               className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition-colors"
             />
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consented}
+                onChange={(e) => setConsented(e.target.checked)}
+                required
+                className="mt-0.5 flex-shrink-0 accent-amber-600"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                I agree to receive the Ground View News newsletter. I can unsubscribe at any time.
+                See our{' '}
+                <Link
+                  href="/privacy-policy"
+                  className="underline text-gray-700 hover:text-amber-700 transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
             <button
               type="submit"
-              disabled={status === 'loading'}
+              disabled={status === 'loading' || !consented}
               className="w-full bg-gray-900 hover:bg-blue-900 text-white text-sm font-semibold py-2 rounded-sm transition-colors duration-150 disabled:opacity-60"
             >
               {status === 'loading' ? 'Subscribing…' : 'Subscribe'}
@@ -85,9 +108,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
     <section id="newsletter" className="py-16 bg-gray-900">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
         <div className="flex justify-center mb-4">
-          <span
-            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400"
-          >
+          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400">
             <Mail size={14} />
             Newsletter
           </span>
@@ -108,22 +129,44 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
             You&apos;re subscribed. Welcome to Ground View News.
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email address"
-              required
-              className="flex-1 bg-white/10 border border-white/20 rounded-sm px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-400 transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-white font-semibold text-sm rounded-sm transition-colors duration-150 whitespace-nowrap disabled:opacity-60"
-            >
-              {status === 'loading' ? 'Subscribing…' : 'Subscribe'}
-            </button>
+          <form onSubmit={handleSubmit} className="max-w-md mx-auto flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email address"
+                required
+                className="flex-1 bg-white/10 border border-white/20 rounded-sm px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-400 transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={status === 'loading' || !consented}
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-white font-semibold text-sm rounded-sm transition-colors duration-150 whitespace-nowrap disabled:opacity-60"
+              >
+                {status === 'loading' ? 'Subscribing…' : 'Subscribe'}
+              </button>
+            </div>
+            <label className="flex items-start gap-2 cursor-pointer text-left">
+              <input
+                type="checkbox"
+                checked={consented}
+                onChange={(e) => setConsented(e.target.checked)}
+                required
+                className="mt-0.5 flex-shrink-0 accent-amber-500"
+              />
+              <span className="text-xs text-gray-400 leading-relaxed">
+                I agree to receive the Ground View News newsletter. I can unsubscribe at any
+                time. See our{' '}
+                <Link
+                  href="/privacy-policy"
+                  className="underline text-gray-300 hover:text-amber-400 transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
           </form>
         )}
         {status === 'error' && (

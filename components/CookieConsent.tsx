@@ -6,7 +6,7 @@ import { X, Cookie } from 'lucide-react';
 
 const CONSENT_KEY = 'gvn_cookie_consent';
 
-type ConsentValue = 'accepted' | 'declined';
+type ConsentValue = 'accepted' | 'essential';
 
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -14,7 +14,6 @@ export default function CookieConsent() {
   useEffect(() => {
     const stored = localStorage.getItem(CONSENT_KEY);
     if (!stored) {
-      // Small delay so the banner animates in after page load
       const t = setTimeout(() => setVisible(true), 600);
       return () => clearTimeout(t);
     }
@@ -34,7 +33,6 @@ export default function CookieConsent() {
       aria-label="Cookie consent"
       className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up"
     >
-      {/* Backdrop gradient */}
       <div className="bg-gray-950 border-t border-white/10 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -44,26 +42,25 @@ export default function CookieConsent() {
                 <Cookie size={18} className="text-amber-400" />
               </div>
               <p className="text-sm text-gray-300 leading-relaxed">
-                We use cookies to improve your experience and understand how our site is used.
-                By clicking "Accept", you consent to our use of analytics and preference cookies.
-                See our{' '}
+                We use essential cookies to make this site work. We&rsquo;d also like to use
+                analytics cookies to understand how you use the site. See our{' '}
                 <Link
-                  href="/privacy-policy"
+                  href="/privacy-policy#cookies"
                   className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
                 >
-                  Privacy Policy
+                  Cookie Policy
                 </Link>{' '}
-                for details. Strictly necessary cookies are always active.
+                for details.
               </p>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-3 flex-shrink-0">
               <button
-                onClick={() => respond('declined')}
-                className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white border border-white/20 hover:border-white/40 rounded-sm transition-colors"
+                onClick={() => respond('essential')}
+                className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white border border-white/20 hover:border-white/40 rounded-sm transition-colors"
               >
-                Decline
+                Essential only
               </button>
               <button
                 onClick={() => respond('accepted')}
@@ -72,8 +69,8 @@ export default function CookieConsent() {
                 Accept all
               </button>
               <button
-                onClick={() => respond('declined')}
-                aria-label="Dismiss"
+                onClick={() => respond('essential')}
+                aria-label="Use essential cookies only"
                 className="p-1.5 text-gray-500 hover:text-white transition-colors"
               >
                 <X size={16} />

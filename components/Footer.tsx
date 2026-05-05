@@ -66,6 +66,14 @@ export default function Footer() {
                 <Youtube size={18} />
               </a>
             </div>
+            <p className="mt-6 text-xs text-gray-600 leading-relaxed max-w-sm">
+              Ground View News publishes independent commentary and opinion. Articles reflect the
+              views of individual authors.{' '}
+              <Link href="/disclaimer" className="underline hover:text-gray-400 transition-colors">
+                Editorial disclaimer
+              </Link>
+              .
+            </p>
           </div>
 
           {/* Sections */}
@@ -108,6 +116,14 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/disclaimer"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Editorial Disclaimer
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/advertise"
                   className="text-sm text-gray-400 hover:text-white transition-colors"
                 >
@@ -122,6 +138,14 @@ export default function Footer() {
                   Contact
                 </Link>
               </li>
+              <li>
+                <a
+                  href="mailto:editorial@groundviewnews.com"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  editorial@groundviewnews.com
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -135,14 +159,17 @@ export default function Footer() {
             <Link href="/privacy-policy" className="hover:text-gray-300 transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms-of-use" className="hover:text-gray-300 transition-colors">
-              Terms of Use
+            <Link href="/terms" className="hover:text-gray-300 transition-colors">
+              Terms &amp; Conditions
+            </Link>
+            <Link href="/disclaimer" className="hover:text-gray-300 transition-colors">
+              Editorial Disclaimer
+            </Link>
+            <Link href="/privacy-policy#cookies" className="hover:text-gray-300 transition-colors">
+              Cookie Policy
             </Link>
             <Link href="/editorial-policy" className="hover:text-gray-300 transition-colors">
               Editorial Policy
-            </Link>
-            <Link href="/advertise" className="hover:text-gray-300 transition-colors">
-              Advertise
             </Link>
             <Link href="/contact" className="hover:text-gray-300 transition-colors">
               Contact

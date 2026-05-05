@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, Menu, X } from 'lucide-react';
 import { CATEGORIES } from '@/lib/supabase';
+import CommentaryBanner from '@/components/CommentaryBanner';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -25,6 +26,7 @@ export default function Navbar() {
   }, [pathname]);
 
   return (
+    <>
     <header
       className={`sticky top-0 z-50 transition-shadow duration-200 ${
         scrolled ? 'shadow-lg' : ''
@@ -149,5 +151,7 @@ export default function Navbar() {
         </div>
       )}
     </header>
+    <CommentaryBanner />
+    </>
   );
 }

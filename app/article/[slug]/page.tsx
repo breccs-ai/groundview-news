@@ -127,6 +127,30 @@ export default async function ArticlePage({ params }: Props) {
           </div>
         </div>
 
+        {/* Article disclaimer */}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-8">
+          <div className="bg-gray-50 border border-gray-200 rounded-sm px-5 py-4">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              <strong className="text-gray-600">Editorial note:</strong> This article represents
+              the opinion and analysis of the author and does not constitute verified fact. Ground
+              View News strives for accuracy and publishes corrections when errors are identified.{' '}
+              <a
+                href="/editorial-policy"
+                className="underline hover:text-amber-700 transition-colors"
+              >
+                View our editorial policy
+              </a>
+              {' '}·{' '}
+              <a
+                href="/disclaimer"
+                className="underline hover:text-amber-700 transition-colors"
+              >
+                Editorial disclaimer
+              </a>
+            </p>
+          </div>
+        </div>
+
         {/* Related articles */}
         {relatedArticles.length > 0 && (
           <section className="border-t border-gray-100 bg-gray-50">
