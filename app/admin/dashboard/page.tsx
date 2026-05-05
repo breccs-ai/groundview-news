@@ -54,13 +54,12 @@ export default function AdminDashboard() {
 
   const handlePublish = async (article: Article) => {
     const now = new Date().toISOString();
-    const res = await fetch('/api/articles', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: article.id, status: 'published', published_at: article.published_at || now }),
-    });
+    const { error } = await supabase
+      .from('articles')
+      .update({ status: 'published', published_at: article.published_at || now })
+      .eq('id', article.id);
 
-    if (!res.ok) {
+    if (error) {
       showToast('error', 'Failed to publish article.');
       return;
     }
@@ -69,20 +68,19 @@ export default function AdminDashboard() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: article.slug }),
-    });
+    }).catch(() => {});
 
     showToast('success', `"${article.title}" published.`);
     fetchArticles();
   };
 
   const handleUnpublish = async (article: Article) => {
-    const res = await fetch('/api/articles', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: article.id, status: 'draft' }),
-    });
+    const { error } = await supabase
+      .from('articles')
+      .update({ status: 'draft' })
+      .eq('id', article.id);
 
-    if (!res.ok) {
+    if (error) {
       showToast('error', 'Failed to unpublish.');
       return;
     }
@@ -91,7 +89,7 @@ export default function AdminDashboard() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: article.slug }),
-    });
+    }).catch(() => {});
 
     showToast('success', `"${article.title}" moved to draft.`);
     fetchArticles();
@@ -104,13 +102,12 @@ export default function AdminDashboard() {
     const article = articles.find((a) => a.id === deleteId);
     setDeleteId(null);
 
-    const res = await fetch('/api/articles', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: deleteId }),
-    });
+    const { error } = await supabase
+      .from('articles')
+      .delete()
+      .eq('id', deleteId);
 
-    if (!res.ok) {
+    if (error) {
       showToast('error', 'Failed to delete article.');
       return;
     }
@@ -120,7 +117,7 @@ export default function AdminDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug: article.slug }),
-      });
+      }).catch(() => {});
     }
 
     showToast('success', 'Article deleted.');
