@@ -1,0 +1,315 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
+import AdminShell from '@/components/AdminShell';
+import { supabase } from '@/lib/supabase';
+import { getCategoryMeta } from '@/lib/supabase';
+import { formatDate } from '@/lib/utils';
+import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw } from 'lucide-react';
+
+type Article = {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
+  label: string;
+  status: string;
+  published_at: string | null;
+  created_at: string;
+  author_name: string;
+};
+
+type ToastMsg = { type: 'success' | 'error'; text: string };
+
+export default function AdminDashboard() {
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<ToastMsg | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const showToast = (type: ToastMsg['type'], text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const fetchArticles = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('articles')
+      .select('id, title, slug, category, label, status, published_at, created_at, author_name')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      showToast('error', 'Failed to load articles.');
+    } else {
+      setArticles(data as Article[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchArticles();
+  }, [fetchArticles]);
+
+  const handlePublish = async (article: Article) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('articles')
+      .update({ status: 'published', published_at: article.published_at || now })
+      .eq('id', article.id);
+
+    if (error) {
+      showToast('error', 'Failed to publish article.');
+      return;
+    }
+
+    await fetch('/api/revalidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: article.slug }),
+    });
+
+    showToast('success', `"${article.title}" published.`);
+    fetchArticles();
+  };
+
+  const handleUnpublish = async (article: Article) => {
+    const { error } = await supabase
+      .from('articles')
+      .update({ status: 'draft' })
+      .eq('id', article.id);
+
+    if (error) {
+      showToast('error', 'Failed to unpublish.');
+      return;
+    }
+
+    await fetch('/api/revalidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: article.slug }),
+    });
+
+    showToast('success', `"${article.title}" moved to draft.`);
+    fetchArticles();
+  };
+
+  const confirmDelete = (id: string) => setDeleteId(id);
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const article = articles.find((a) => a.id === deleteId);
+    const { error } = await supabase.from('articles').delete().eq('id', deleteId);
+    setDeleteId(null);
+
+    if (error) {
+      showToast('error', 'Failed to delete article.');
+      return;
+    }
+
+    if (article) {
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: article.slug }),
+      });
+    }
+
+    showToast('success', 'Article deleted.');
+    fetchArticles();
+  };
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      published: 'bg-green-100 text-green-800',
+      draft: 'bg-gray-100 text-gray-600',
+      pending: 'bg-amber-100 text-amber-800',
+    };
+    return (
+      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-sm capitalize ${map[status] || 'bg-gray-100 text-gray-600'}`}>
+        {status}
+      </span>
+    );
+  };
+
+  return (
+    <AdminShell>
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-sm shadow-lg text-sm font-medium max-w-sm ${
+            toast.type === 'success'
+              ? 'bg-green-800 text-green-100'
+              : 'bg-red-800 text-red-100'
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-sm shadow-xl p-6 max-w-sm w-full">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Delete article?</p>
+                <p className="text-xs text-gray-500 mt-1">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteId(null)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-sm text-gray-700 hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div>
+          <h1
+            className="text-2xl font-bold text-gray-900"
+            style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+          >
+            Articles
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">{articles.length} total</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchArticles}
+            className="p-2 text-gray-400 hover:text-gray-700 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <Link
+            href="/admin/articles/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-700 hover:bg-green-600 text-white font-semibold text-sm rounded-sm transition-colors"
+          >
+            <FilePlus size={15} />
+            Write New Article
+          </Link>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-gray-200 rounded-sm overflow-hidden">
+        {loading ? (
+          <div className="py-16 text-center text-sm text-gray-400">Loading articles…</div>
+        ) : articles.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-gray-500 mb-4">No articles yet.</p>
+            <Link
+              href="/admin/articles/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-sm hover:bg-blue-900 transition-colors"
+            >
+              <FilePlus size={14} />
+              Write your first article
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
+                    Title
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden md:table-cell">
+                    Category
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
+                    Status
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden lg:table-cell">
+                    Published
+                  </th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {articles.map((article) => {
+                  const cat = getCategoryMeta(article.category);
+                  return (
+                    <tr key={article.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium text-gray-900 line-clamp-1 max-w-xs">
+                            {article.title}
+                          </p>
+                          {article.author_name && (
+                            <p className="text-xs text-gray-400 mt-0.5">{article.author_name}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-sm ${cat.bg} ${cat.text}`}>
+                          {cat.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{statusBadge(article.status)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
+                        {article.published_at
+                          ? formatDate(article.published_at)
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          {article.status === 'published' ? (
+                            <button
+                              onClick={() => handleUnpublish(article)}
+                              title="Unpublish (move to draft)"
+                              className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            >
+                              <Globe size={14} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handlePublish(article)}
+                              title="Publish"
+                              className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
+                            >
+                              Publish
+                            </button>
+                          )}
+                          <Link
+                            href={`/admin/articles/edit/${article.id}`}
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </Link>
+                          <button
+                            onClick={() => confirmDelete(article.id)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </AdminShell>
+  );
+}
