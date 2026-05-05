@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Terms of Use — Ground View News',
+  title: 'Terms of Use | Ground View News',
   description: 'Terms and conditions governing use of the Ground View News website.',
 };
 
@@ -63,8 +63,8 @@ export default function TermsOfUsePage() {
 
             <Section title="2. Acceptance of Terms">
               <p>
-                By accessing or using the Website in any way — including reading articles, subscribing
-                to our newsletter, submitting a contact form, or contributing content — you confirm
+                By accessing or using the Website in any way, including reading articles, subscribing
+                to our newsletter, submitting a contact form, or contributing content, you confirm
                 that you are at least 16 years old and that you accept and agree to comply with these
                 Terms of Use in full.
               </p>
@@ -77,8 +77,8 @@ export default function TermsOfUsePage() {
 
             <Section title="3. Intellectual Property">
               <p>
-                All content on this Website — including articles, editorials, commentary, headlines,
-                photographs, graphics, logos, and the overall design — is the property of Ground View
+                All content on this Website, including articles, editorials, commentary, headlines,
+                photographs, graphics, logos, and the overall design, is the property of Ground View
                 News or its contributing authors and is protected by copyright law.
               </p>
               <p>

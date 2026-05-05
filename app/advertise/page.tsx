@@ -9,7 +9,7 @@ import { CircleCheck as CheckCircle, LayoutTemplate, AlignCenter, PanelTop } fro
 const packages = [
   { duration: '7 days', price: '£59', description: 'Ideal for short campaigns and time-sensitive announcements.' },
   { duration: '14 days', price: '£99', description: 'A fortnight of visibility across our article and category pages.', popular: true },
-  { duration: '30 days', price: '£179', description: 'One month — our most popular package for brand awareness.' },
+  { duration: '30 days', price: '£179', description: 'One month. Our most popular package for brand awareness.' },
   { duration: '60 days', price: '£299', description: 'Two months of sustained exposure to our global readership.' },
   { duration: '90 days', price: '£399', description: 'Our best value. Three months for maximum impact.' },
 ];
@@ -57,7 +57,7 @@ export default function AdvertisePage() {
     const { error } = await supabase.from('contact_messages').insert({
       name: `${form.contact_name} (${form.name})`,
       email: form.email,
-      subject: `Advertising enquiry — ${form.package_interest || 'unspecified package'}`,
+      subject: `Advertising enquiry: ${form.package_interest || 'unspecified package'}`,
       message: form.message,
     });
 
@@ -131,7 +131,7 @@ export default function AdvertisePage() {
             ))}
           </div>
           <p className="mt-6 text-sm text-gray-400">
-            All prices exclude VAT where applicable. Discounts available for non-profit and NGO organisations — enquire below.
+            All prices exclude VAT where applicable. Discounts available for non-profit and NGO organisations; enquire below.
           </p>
         </section>
 
@@ -246,8 +246,8 @@ export default function AdvertisePage() {
                 >
                   <option value="">Select a package</option>
                   {packages.map((pkg) => (
-                    <option key={pkg.duration} value={`${pkg.duration} — ${pkg.price}`}>
-                      {pkg.duration} — {pkg.price}
+                    <option key={pkg.duration} value={`${pkg.duration} (${pkg.price})`}>
+                      {pkg.duration} ({pkg.price})
                     </option>
                   ))}
                   <option value="Custom">Custom / not sure yet</option>

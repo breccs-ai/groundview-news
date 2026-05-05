@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 import { TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Mail, FileText } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Editorial Disclaimer — Ground View News',
+  title: 'Editorial Disclaimer | Ground View News',
   description:
     'Ground View News is a commentary and opinion publication. Read our editorial disclaimer, corrections policy, and source standards.',
 };
@@ -71,11 +71,11 @@ export default function DisclaimerPage() {
               <p>
                 We are <strong>not</strong> a wire service, a breaking-news publisher, or a
                 fact-checking organisation. Our writers bring expertise, perspective, and analysis to
-                events and issues — they are not neutral reporters of record, and their articles are
+                events and issues; they are not neutral reporters of record, and their articles are
                 not intended to be read as such.
               </p>
               <p>
-                Ground View News believes that commentary and opinion — clearly labelled — serves
+                Ground View News believes that commentary and opinion, clearly labelled, serves
                 a vital public function. It helps readers understand context, challenge assumptions,
                 and engage with global events from perspectives that are often underrepresented in
                 mainstream media. We are committed to publishing commentary that is well-reasoned,
@@ -96,7 +96,7 @@ export default function DisclaimerPage() {
             <div className="space-y-4 text-sm text-gray-700 leading-relaxed">
               <p>
                 Every article published on Ground View News carries a byline. The views expressed in
-                any article — including commentary, opinion, and analysis — are those of the named
+                any article, including commentary, opinion, and analysis, are those of the named
                 author. They do not necessarily represent the views of Ground View News as a
                 publication, its editorial board, or any other contributor.
               </p>
@@ -166,7 +166,7 @@ export default function DisclaimerPage() {
             </div>
           </section>
 
-          {/* Section 5 — No Liability */}
+          {/* Section 5: No Liability */}
           <section className="mb-10">
             <h2
               className="text-xl font-bold text-gray-900 mb-4"
@@ -191,7 +191,7 @@ export default function DisclaimerPage() {
             </div>
           </section>
 
-          {/* Section 6 — Corrections */}
+          {/* Section 6: Corrections */}
           <section className="mb-10">
             <div
               className="p-6 rounded-sm border border-green-200"
@@ -221,8 +221,8 @@ export default function DisclaimerPage() {
                     notice stating what was changed and when.
                   </li>
                   <li>
-                    Where an error is material — meaning it significantly changes the meaning,
-                    fairness, or impact of an article — we will publish a standalone correction
+                    Where an error is material, meaning it significantly changes the meaning,
+                    fairness, or impact of an article, we will publish a standalone correction
                     notice.
                   </li>
                   <li>
@@ -248,7 +248,7 @@ export default function DisclaimerPage() {
             </div>
           </section>
 
-          {/* Section 7 — Editorial Policy Link */}
+          {/* Section 7: Editorial Policy Link */}
           <section className="mb-10">
             <h2
               className="text-xl font-bold text-gray-900 mb-4"

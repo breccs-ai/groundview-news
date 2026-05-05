@@ -5,16 +5,16 @@ import NewsletterSignup from '@/components/NewsletterSignup';
 import { Globe, FileText, Users, Award } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'About — Ground View News',
+  title: 'About | Ground View News',
   description:
-    'Ground View News publishes independent commentary on global affairs — Africa, human rights, world politics, and the global economy.',
+    'Ground View News publishes independent commentary on global affairs: Africa, human rights, world politics, and the global economy.',
 };
 
 const values = [
   {
     icon: Globe,
     title: 'Global Perspective',
-    body: 'We report from and for the world — with particular focus on Africa, the African diaspora, and the communities whose stories are underrepresented in mainstream media.',
+    body: 'We report from and for the world, with particular focus on Africa, the African diaspora, and the communities whose stories are underrepresented in mainstream media.',
   },
   {
     icon: FileText,
@@ -24,7 +24,7 @@ const values = [
   {
     icon: Users,
     title: 'Ground-Up Journalism',
-    body: 'We believe the most important stories start at the human level — the cost borne by ordinary people, the patterns only visible from the ground, the narratives that top-down coverage misses.',
+    body: 'We believe the most important stories start at the human level: the cost borne by ordinary people, the patterns only visible from the ground, the narratives that top-down coverage misses.',
   },
   {
     icon: Award,
@@ -61,7 +61,7 @@ export default function AboutPage() {
             style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
           >
             &ldquo;Ground View News publishes independent commentary on global affairs. Our journalists write
-            from the ground up — not from press releases, not from official narratives, but from the
+            from the ground up, not from press releases, not from official narratives, but from the
             evidence, the pattern, and the human cost.&rdquo;
           </blockquote>
         </section>
@@ -87,7 +87,7 @@ export default function AboutPage() {
           </p>
           <p className="text-gray-600 text-lg leading-relaxed mb-4">
             Our commentary is analytical and editorial in character. We do not aim to be a breaking-news
-            service — we aim to be the publication that tells you what it means, and why it matters, and
+            service. We aim to be the publication that tells you what it means, and why it matters, and
             what comes next.
           </p>
           <p className="text-gray-600 text-lg leading-relaxed">

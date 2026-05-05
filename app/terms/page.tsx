@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Terms & Conditions — Ground View News',
+  title: 'Terms & Conditions | Ground View News',
   description:
     'Terms and conditions governing your use of the Ground View News website and publication.',
 };
@@ -55,7 +55,7 @@ export default function TermsPage() {
             <p>
               Ground View News (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is an
               independent digital news commentary publication operated from the Republic of Ireland.
-              The Site publishes commentary, opinion, and analysis on global affairs — including
+              The Site publishes commentary, opinion, and analysis on global affairs, including
               Africa, the African diaspora, human rights, world politics, and the global economy.
             </p>
             <p>
@@ -79,8 +79,8 @@ export default function TermsPage() {
 
           <Section title="2. Acceptance of Terms">
             <p>
-              By accessing or using the Site — including reading articles, subscribing to our
-              newsletter, submitting a contact form, or contributing content — you confirm that you
+              By accessing or using the Site, including reading articles, subscribing to our
+              newsletter, submitting a contact form, or contributing content, you confirm that you
               are at least 16 years old and that you accept these Terms &amp; Conditions in full.
             </p>
             <p>
@@ -90,7 +90,7 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="3. Nature of the Service — Editorial Disclaimer">
+          <Section title="3. Nature of the Service: Editorial Disclaimer">
             <p>
               Ground View News publishes <strong>commentary, opinion, and analysis</strong>.
               Articles on the Site represent the views and analytical judgements of the individual
@@ -140,9 +140,9 @@ export default function TermsPage() {
 
           <Section title="5. Intellectual Property">
             <p>
-              All content published on the Site — including articles, editorials, commentary,
+              All content published on the Site, including articles, editorials, commentary,
               analysis, headlines, photographs, graphics, illustrations, logos, and the site&rsquo;s
-              overall design and layout — is the property of Ground View News or its contributing
+              overall design and layout, is the property of Ground View News or its contributing
               authors and is protected by copyright law, including the Copyright and Related Rights
               Act 2000 (Ireland) and applicable international copyright conventions.
             </p>
@@ -162,8 +162,8 @@ export default function TermsPage() {
                 part without prior written permission.
               </li>
               <li>
-                Use our content for commercial purposes — including in AI training datasets,
-                content aggregators, or machine learning systems — without a separate licensing
+                Use our content for commercial purposes, including in AI training datasets,
+                content aggregators, or machine learning systems, without a separate licensing
                 agreement.
               </li>
               <li>

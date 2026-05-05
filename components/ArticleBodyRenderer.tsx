@@ -68,7 +68,7 @@ export default function ArticleBodyRenderer({ body }: Props) {
 }
 
 function sanitize(text: string): string {
-  // Basic sanitisation — allow only safe inline elements
+  // Basic sanitisation: allow only safe inline elements
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

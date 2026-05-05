@@ -7,9 +7,9 @@ import NewsletterSignup from '@/components/NewsletterSignup';
 import { getPublishedArticles } from '@/lib/supabase';
 
 export const metadata: Metadata = {
-  title: 'Ground View News — Independent Global Commentary',
+  title: 'Ground View News: Independent Global Commentary',
   description:
-    'Independent commentary on global affairs — Africa, the African diaspora, human rights, world politics, and the global economy.',
+    'Independent commentary on global affairs: Africa, the African diaspora, human rights, world politics, and the global economy.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -82,7 +82,7 @@ export default async function HomePage() {
               Ground up. Not top down.
             </p>
             <p className="text-gray-400 text-sm max-w-md text-center md:text-right">
-              Independent journalism on the stories that matter — from Africa to the global stage.
+              Independent journalism on the stories that matter, from Africa to the global stage.
             </p>
           </div>
         </div>

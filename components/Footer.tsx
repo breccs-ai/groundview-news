@@ -25,7 +25,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed max-w-sm">
-              Independent commentary on global affairs — Africa, the African diaspora, human rights,
+              Independent commentary on global affairs: Africa, the African diaspora, human rights,
               world politics, and the global economy. Ground up. Not top down.
             </p>
             <div className="flex gap-4 mt-6">

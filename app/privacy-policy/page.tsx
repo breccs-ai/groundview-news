@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Ground View News',
+  title: 'Privacy Policy | Ground View News',
   description:
     'How Ground View News collects, uses, and protects your personal data under GDPR, UK GDPR, and Irish data protection law.',
 };
@@ -94,15 +94,15 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <strong>Email address</strong> — when you subscribe to our newsletter via the
+                <strong>Email address:</strong> when you subscribe to our newsletter via the
                 signup form on the site.
               </li>
               <li>
-                <strong>Name and email address</strong> — when you submit an enquiry or message via
+                <strong>Name and email address:</strong> when you submit an enquiry or message via
                 the contact form.
               </li>
               <li>
-                <strong>Message content</strong> — the text of any enquiry or article pitch you send
+                <strong>Message content:</strong> the text of any enquiry or article pitch you send
                 via the contact form.
               </li>
             </ul>
@@ -111,23 +111,23 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <strong>IP address</strong> — collected by our hosting provider (Vercel) for
+                <strong>IP address:</strong> collected by our hosting provider (Vercel) for
                 security, fraud prevention, and infrastructure purposes.
               </li>
               <li>
-                <strong>Browser type and operating system</strong> — collected via server logs and,
+                <strong>Browser type and operating system:</strong> collected via server logs and,
                 with your consent, via analytics cookies.
               </li>
               <li>
-                <strong>Pages visited and time on site</strong> — collected with your consent via
+                <strong>Pages visited and time on site:</strong> collected with your consent via
                 analytics cookies to help us understand how the site is used.
               </li>
               <li>
-                <strong>Referring URL</strong> — the page you visited before arriving at Ground View
+                <strong>Referring URL:</strong> the page you visited before arriving at Ground View
                 News, collected with your consent via analytics.
               </li>
               <li>
-                <strong>Cookie consent preference</strong> — stored in your browser&rsquo;s
+                <strong>Cookie consent preference:</strong> stored in your browser&rsquo;s
                 localStorage to remember your choice and avoid showing the consent banner
                 repeatedly.
               </li>
@@ -245,16 +245,16 @@ export default function PrivacyPolicyPage() {
                       Remembering your cookie consent choice; admin session (admin users only).
                       These are essential for the site to function.
                     </td>
-                    <td className="px-3 py-2">No — always active</td>
+                    <td className="px-3 py-2">No, always active</td>
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-medium">Analytics</td>
                     <td className="px-3 py-2">
-                      Understanding how visitors use the site — pages visited, time on site,
+                      Understanding how visitors use the site: pages visited, time on site,
                       traffic sources. Only set if you click &ldquo;Accept all&rdquo; on the
                       cookie banner.
                     </td>
-                    <td className="px-3 py-2">Yes — consent required</td>
+                    <td className="px-3 py-2">Yes, consent required</td>
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-medium">Advertising</td>
@@ -262,7 +262,7 @@ export default function PrivacyPolicyPage() {
                       Where third-party advertising is displayed, ad providers may set cookies.
                       These are only activated where you have given consent.
                     </td>
-                    <td className="px-3 py-2">Yes — consent required</td>
+                    <td className="px-3 py-2">Yes, consent required</td>
                   </tr>
                 </tbody>
               </table>
@@ -335,7 +335,7 @@ export default function PrivacyPolicyPage() {
                   <tr>
                     <td className="px-3 py-2 font-medium">Supabase</td>
                     <td className="px-3 py-2">
-                      Database storage — subscriber email addresses, article content, contact
+                      Database storage: subscriber email addresses, article content, contact
                       form data
                     </td>
                     <td className="px-3 py-2">Email, form submissions</td>

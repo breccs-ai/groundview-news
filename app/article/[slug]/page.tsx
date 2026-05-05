@@ -16,10 +16,10 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = await getArticleBySlug(params.slug);
-  if (!article) return { title: 'Article not found — Ground View News' };
+  if (!article) return { title: 'Article not found | Ground View News' };
 
   return {
-    title: `${article.title} — Ground View News`,
+    title: `${article.title} | Ground View News`,
     description: article.excerpt || article.subtitle || '',
     openGraph: {
       title: article.title,

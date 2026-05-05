@@ -3,7 +3,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Editorial Policy — Ground View News',
+  title: 'Editorial Policy | Ground View News',
   description:
     'Our standards for accuracy, sourcing, corrections, independence, and content moderation at Ground View News.',
 };
@@ -19,7 +19,7 @@ const sections = [
   {
     title: 'Sourcing Standards',
     body: [
-      'We do not use anonymous sources without explicit editorial approval. When anonymous sourcing is granted — in exceptional circumstances where the information is of genuine public interest and cannot be obtained on record — the editorial decision is documented internally.',
+      'We do not use anonymous sources without explicit editorial approval. When anonymous sourcing is granted, in exceptional circumstances where the information is of genuine public interest and cannot be obtained on record, the editorial decision is documented internally.',
       'We require a minimum of two independent sources for contested factual claims. Single-source claims are clearly identified as such.',
     ],
   },
@@ -34,7 +34,7 @@ const sections = [
     title: 'Editorial Independence',
     body: [
       'Ground View News is editorially independent. Our editorial decisions are not influenced by advertisers, political organisations, governments, or financial backers.',
-      'Advertising and sponsorship revenue does not affect the selection or presentation of editorial content. Advertorial content — paid content presented as editorial — is not produced or published by Ground View News.',
+      'Advertising and sponsorship revenue does not affect the selection or presentation of editorial content. Advertorial content (paid content presented as editorial) is not produced or published by Ground View News.',
       'Writers are required to disclose any relevant personal, professional, or financial interests that could constitute a conflict of interest. Editors assess disclosed conflicts before commissioning or publishing.',
     ],
   },

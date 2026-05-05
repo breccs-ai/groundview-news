@@ -269,7 +269,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
                         {article.published_at
                           ? formatDate(article.published_at)
-                          : <span className="text-gray-300">—</span>}
+                          : <span className="text-gray-300">Not published</span>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">

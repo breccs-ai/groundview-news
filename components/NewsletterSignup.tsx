@@ -59,7 +59,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
           Get independent commentary on global affairs delivered to your inbox.
         </p>
         {status === 'success' ? (
-          <p className="text-sm text-green-700 font-medium">Thank you — you&apos;re subscribed.</p>
+          <p className="text-sm text-green-700 font-medium">Thank you. You are now subscribed.</p>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input
@@ -121,7 +121,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
         </h2>
         <p className="text-gray-400 text-base leading-relaxed mb-8 max-w-xl mx-auto">
           Subscribe to receive our latest commentary on Africa, world politics, human rights, and the
-          global economy — no sponsored content, no agenda.
+          global economy. No sponsored content, no agenda.
         </p>
 
         {status === 'success' ? (

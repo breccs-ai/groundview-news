@@ -53,7 +53,7 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* Desktop nav — categories */}
+            {/* Desktop nav: categories */}
             <nav className="hidden lg:flex items-center gap-1">
               {CATEGORIES.map((cat) => (
                 <Link

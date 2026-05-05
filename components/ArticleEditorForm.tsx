@@ -390,7 +390,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500">
                 Article Body
                 <span className="normal-case tracking-normal font-normal text-gray-400 ml-2">
-                  — separate paragraphs with a blank line
+                  (separate paragraphs with a blank line)
                 </span>
               </label>
               <button

@@ -17,8 +17,8 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const meta = getCategoryMeta(params.category);
   return {
-    title: `${meta.label} — Ground View News`,
-    description: `Read the latest ${meta.label} articles from Ground View News — independent global commentary.`,
+    title: `${meta.label} | Ground View News`,
+    description: `Read the latest ${meta.label} articles from Ground View News, independent global commentary.`,
   };
 }
 
