@@ -62,6 +62,10 @@ const config: Config = {
         },
       },
       keyframes: {
+        'slide-up': {
+          from: { transform: 'translateY(100%)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
         'accordion-down': {
           from: {
             height: '0',
@@ -82,6 +86,7 @@ const config: Config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'slide-up': 'slide-up 0.4s ease-out',
       },
     },
   },
