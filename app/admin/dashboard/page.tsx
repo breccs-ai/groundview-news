@@ -6,7 +6,9 @@ import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { getCategoryMeta } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw } from 'lucide-react';
+import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw, CircleCheck as CheckCircle2, Circle as XCircle } from 'lucide-react';
+
+type DbStatus = { ok: boolean; publishedCount: number; draftCount: number; error?: string } | null;
 
 type Article = {
   id: string;
@@ -27,6 +29,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<DbStatus>(null);
 
   const showToast = (type: ToastMsg['type'], text: string) => {
     setToast({ type, text });
@@ -41,9 +44,16 @@ export default function AdminDashboard() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      showToast('error', 'Failed to load articles.');
+      showToast('error', `Failed to load articles: ${error.message}`);
+      setDbStatus({ ok: false, publishedCount: 0, draftCount: 0, error: error.message });
     } else {
-      setArticles(data as Article[]);
+      const rows = data as Article[];
+      setArticles(rows);
+      setDbStatus({
+        ok: true,
+        publishedCount: rows.filter((a) => a.status === 'published').length,
+        draftCount: rows.filter((a) => a.status !== 'published').length,
+      });
     }
     setLoading(false);
   }, []);
@@ -60,7 +70,7 @@ export default function AdminDashboard() {
       .eq('id', article.id);
 
     if (error) {
-      showToast('error', 'Failed to publish article.');
+      showToast('error', `Failed to publish: ${error.message}`);
       return;
     }
 
@@ -178,6 +188,25 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* DB status banner */}
+      {dbStatus && !dbStatus.ok && (
+        <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-sm">
+          <XCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">Database error</p>
+            <p className="text-xs text-red-700 mt-0.5">{dbStatus.error}</p>
+            <p className="text-xs text-red-600 mt-1">Check that your Supabase URL and anon key are set correctly in Vercel environment variables.</p>
+          </div>
+        </div>
+      )}
+      {dbStatus && dbStatus.ok && (
+        <div className="mb-6 flex items-center gap-6 p-3 bg-green-50 border border-green-200 rounded-sm text-xs text-green-800">
+          <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-green-600" /> Database connected</span>
+          <span><strong>{dbStatus.publishedCount}</strong> published</span>
+          <span><strong>{dbStatus.draftCount}</strong> drafts</span>
         </div>
       )}
 

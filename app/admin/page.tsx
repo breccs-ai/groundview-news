@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAdminAuthenticated, setAdminSession } from '@/lib/admin-auth';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, TriangleAlert as AlertTriangle } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'misconfigured'>('idle');
+  const [errorDetail, setErrorDetail] = useState('');
 
   useEffect(() => {
     if (isAdminAuthenticated()) {
@@ -27,11 +28,17 @@ export default function AdminLoginPage() {
       body: JSON.stringify({ password }),
     });
 
+    const body = await res.json().catch(() => ({}));
+
     if (res.ok) {
       setAdminSession();
       router.push('/admin/dashboard');
+    } else if (res.status === 500) {
+      setStatus('misconfigured');
+      setErrorDetail(body.error || 'Server error. Check Vercel environment variables.');
     } else {
       setStatus('error');
+      setErrorDetail('');
     }
   };
 
@@ -100,10 +107,16 @@ export default function AdminLoginPage() {
             {status === 'error' && (
               <p className="text-xs text-red-400">Incorrect password. Please try again.</p>
             )}
+            {status === 'misconfigured' && (
+              <div className="flex items-start gap-2 p-3 bg-red-950 border border-red-700 rounded-sm">
+                <AlertTriangle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-300 leading-relaxed">{errorDetail}</p>
+              </div>
+            )}
 
             <button
               type="submit"
-              disabled={status === 'loading' || !password}
+              disabled={status === 'loading' || status === 'misconfigured' || !password}
               className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-white font-semibold text-sm rounded-sm transition-colors disabled:opacity-50"
             >
               {status === 'loading' ? 'Signing in…' : 'Sign in'}

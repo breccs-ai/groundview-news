@@ -3,11 +3,12 @@ export const ADMIN_COOKIE_VALUE = 'authenticated';
 
 export function isAdminAuthenticated(): boolean {
   if (typeof document === 'undefined') return false;
-  const cookies = document.cookie.split(';');
-  return cookies.some(
-    (c) => c.trim().startsWith(`${ADMIN_COOKIE}=`) &&
-           c.trim().split('=')[1] === ADMIN_COOKIE_VALUE
-  );
+  return document.cookie.split(';').some((c) => {
+    const eq = c.indexOf('=');
+    const name = c.slice(0, eq).trim();
+    const value = c.slice(eq + 1).trim();
+    return name === ADMIN_COOKIE && value === ADMIN_COOKIE_VALUE;
+  });
 }
 
 export function setAdminSession() {

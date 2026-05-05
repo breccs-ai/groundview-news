@@ -154,7 +154,8 @@ export default function ArticleEditorForm({ articleId }: Props) {
     }
 
     if (dbError) {
-      setSaveMsg(dbError.message || 'Failed to save.');
+      console.error('[ArticleEditorForm] save error:', dbError);
+      setSaveMsg(dbError.message || 'Failed to save. Check browser console for details.');
       setSaveStatus('error');
       setSaving(false);
       return;
