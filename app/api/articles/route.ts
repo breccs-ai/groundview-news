@@ -23,10 +23,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const supabase = getSupabase();
-  const { data, error } = await supabase.from('articles').insert(body).select().maybeSingle();
+  const { error } = await supabase.from('articles').insert(body);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(req: NextRequest) {
