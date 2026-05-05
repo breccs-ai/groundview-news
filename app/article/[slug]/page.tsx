@@ -47,11 +47,6 @@ export default async function ArticlePage({ params }: Props) {
   const related = await getPublishedArticles({ category: article.category, limit: 4 });
   const relatedArticles = related.filter((a) => a.id !== article.id).slice(0, 3);
 
-  const articleUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/article/${article.slug}`
-      : `https://groundviewnews.com/article/${article.slug}`;
-
   return (
     <>
       <Navbar />

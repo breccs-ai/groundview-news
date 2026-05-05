@@ -9,9 +9,11 @@ const CONSENT_KEY = 'gvn_cookie_consent';
 type ConsentValue = 'accepted' | 'essential';
 
 export default function CookieConsent() {
+  const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const stored = localStorage.getItem(CONSENT_KEY);
     if (!stored) {
       const t = setTimeout(() => setVisible(true), 600);
@@ -24,7 +26,7 @@ export default function CookieConsent() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  if (!mounted || !visible) return null;
 
   return (
     <div
