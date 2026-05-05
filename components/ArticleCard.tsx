@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { Article } from '@/lib/supabase';
 import CategoryBadge from './CategoryBadge';
 import { formatDate } from '@/lib/utils';
@@ -10,9 +9,12 @@ type Props = {
 };
 
 export default function ArticleCard({ article, variant = 'default' }: Props) {
+  const href = `/article/${article.slug}`;
+
   if (variant === 'compact') {
     return (
-      <Link href={`/article/${article.slug}`} className="group flex gap-4 py-4 border-b border-gray-100 last:border-0 hover:opacity-90 transition-opacity">
+      <div className="group relative flex gap-4 py-4 border-b border-gray-100 last:border-0">
+        <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
         {article.featured_image_url && (
           <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100">
             <img
@@ -23,7 +25,7 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <CategoryBadge category={article.category} label={article.label} />
+          <CategoryBadge category={article.category} label={article.label} linkable={false} />
           <h3
             className="mt-1 text-sm font-bold text-gray-900 leading-snug line-clamp-2 group-hover:text-blue-900 transition-colors"
             style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
@@ -32,14 +34,15 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
           </h3>
           <p className="mt-1 text-xs text-gray-400">{formatDate(article.published_at)}</p>
         </div>
-      </Link>
+      </div>
     );
   }
 
   if (variant === 'featured') {
     return (
-      <Link href={`/article/${article.slug}`} className="group block">
-        {article.featured_image_url && (
+      <div className="group relative">
+        <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
+        {article.featured_image_url ? (
           <div className="relative w-full aspect-[16/9] overflow-hidden bg-gray-200 rounded-sm">
             <img
               src={article.featured_image_url}
@@ -48,7 +51,7 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6">
-              <CategoryBadge category={article.category} label={article.label} size="md" />
+              <CategoryBadge category={article.category} label={article.label} size="md" linkable={false} />
               <h2
                 className="mt-2 text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight"
                 style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
@@ -67,10 +70,9 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
               </div>
             </div>
           </div>
-        )}
-        {!article.featured_image_url && (
+        ) : (
           <div className="p-6 bg-gray-50 border border-gray-200 rounded-sm">
-            <CategoryBadge category={article.category} label={article.label} size="md" />
+            <CategoryBadge category={article.category} label={article.label} size="md" linkable={false} />
             <h2
               className="mt-3 text-3xl font-bold text-gray-900 leading-tight group-hover:text-blue-900 transition-colors"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
@@ -87,13 +89,14 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
             </div>
           </div>
         )}
-      </Link>
+      </div>
     );
   }
 
   // default card
   return (
-    <Link href={`/article/${article.slug}`} className="group block">
+    <div className="group relative">
+      <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
       {article.featured_image_url && (
         <div className="relative w-full aspect-[16/9] overflow-hidden bg-gray-200 rounded-sm mb-4">
           <img
@@ -104,7 +107,7 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
         </div>
       )}
       <div className={article.featured_image_url ? '' : 'pt-4 border-t-2 border-gray-900'}>
-        <CategoryBadge category={article.category} label={article.label} />
+        <CategoryBadge category={article.category} label={article.label} linkable={false} />
         <h3
           className="mt-2 text-xl font-bold text-gray-900 leading-snug line-clamp-3 group-hover:text-blue-900 transition-colors"
           style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
@@ -122,6 +125,6 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
           <span>{formatDate(article.published_at)}</span>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
