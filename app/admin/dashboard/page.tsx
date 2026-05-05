@@ -54,12 +54,13 @@ export default function AdminDashboard() {
 
   const handlePublish = async (article: Article) => {
     const now = new Date().toISOString();
-    const { error } = await supabase
-      .from('articles')
-      .update({ status: 'published', published_at: article.published_at || now })
-      .eq('id', article.id);
+    const res = await fetch('/api/articles', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: article.id, status: 'published', published_at: article.published_at || now }),
+    });
 
-    if (error) {
+    if (!res.ok) {
       showToast('error', 'Failed to publish article.');
       return;
     }
@@ -75,12 +76,13 @@ export default function AdminDashboard() {
   };
 
   const handleUnpublish = async (article: Article) => {
-    const { error } = await supabase
-      .from('articles')
-      .update({ status: 'draft' })
-      .eq('id', article.id);
+    const res = await fetch('/api/articles', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: article.id, status: 'draft' }),
+    });
 
-    if (error) {
+    if (!res.ok) {
       showToast('error', 'Failed to unpublish.');
       return;
     }
@@ -100,10 +102,15 @@ export default function AdminDashboard() {
   const handleDelete = async () => {
     if (!deleteId) return;
     const article = articles.find((a) => a.id === deleteId);
-    const { error } = await supabase.from('articles').delete().eq('id', deleteId);
     setDeleteId(null);
 
-    if (error) {
+    const res = await fetch('/api/articles', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: deleteId }),
+    });
+
+    if (!res.ok) {
       showToast('error', 'Failed to delete article.');
       return;
     }

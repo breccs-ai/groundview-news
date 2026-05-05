@@ -137,17 +137,26 @@ export default function ArticleEditorForm({ articleId }: Props) {
       ...(!isEdit ? { slug } : {}),
     };
 
-    let error;
     const savedSlug = isEdit ? originalSlug : slug;
 
+    let res: Response;
     if (isEdit) {
-      ({ error } = await supabase.from('articles').update(payload).eq('id', articleId));
+      res = await fetch('/api/articles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: articleId, ...payload }),
+      });
     } else {
-      ({ error } = await supabase.from('articles').insert({ ...payload, slug }));
+      res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, slug }),
+      });
     }
 
-    if (error) {
-      setSaveMsg(error.message || 'Failed to save.');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setSaveMsg(err.error || 'Failed to save.');
       setSaveStatus('error');
       setSaving(false);
       return;
