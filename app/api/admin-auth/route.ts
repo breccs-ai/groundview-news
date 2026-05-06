@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
+const ADMIN_COOKIE = 'gvn_admin_session';
+const ADMIN_COOKIE_VALUE = 'authenticated';
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
@@ -15,6 +19,13 @@ export async function POST(req: NextRequest) {
   if (password !== adminPassword) {
     return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 });
   }
+
+  cookies().set(ADMIN_COOKIE, ADMIN_COOKIE_VALUE, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+    path: '/',
+  });
 
   return NextResponse.json({ ok: true });
 }

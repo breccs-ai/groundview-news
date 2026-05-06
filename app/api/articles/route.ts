@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_COOKIE = 'gvn_admin_session';
 const ADMIN_COOKIE_VALUE = 'authenticated';
 
-function isAdmin(req: NextRequest): boolean {
-  const cookie = req.cookies.get(ADMIN_COOKIE);
+function isAdmin(): boolean {
+  const cookie = cookies().get(ADMIN_COOKIE);
   return cookie?.value === ADMIN_COOKIE_VALUE;
 }
 
@@ -26,7 +27,7 @@ async function triggerRevalidate(req: NextRequest, slug?: string) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) {
+  if (!isAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!isAdmin(req)) {
+  if (!isAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -64,7 +65,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!isAdmin(req)) {
+  if (!isAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

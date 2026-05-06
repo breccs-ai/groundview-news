@@ -139,34 +139,37 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
     const savedSlug = isEdit ? originalSlug : slug;
 
-    let dbError: { message: string } | null = null;
+    let apiError: string | null = null;
     if (isEdit) {
-      const { error } = await supabase
-        .from('articles')
-        .update(payload)
-        .eq('id', articleId);
-      dbError = error;
+      const res = await fetch('/api/articles', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: articleId, ...payload }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        apiError = json.error || `Server error ${res.status}`;
+      }
     } else {
-      const { error } = await supabase
-        .from('articles')
-        .insert({ ...payload, slug });
-      dbError = error;
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, slug }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        apiError = json.error || `Server error ${res.status}`;
+      }
     }
 
-    if (dbError) {
-      console.error('[ArticleEditorForm] save error:', dbError);
-      setSaveMsg(dbError.message || 'Failed to save. Check browser console for details.');
+    if (apiError) {
+      console.error('[ArticleEditorForm] save error:', apiError);
+      setSaveMsg(apiError || 'Failed to save. Check browser console for details.');
       setSaveStatus('error');
       setSaving(false);
       return;
-    }
-
-    if (status === 'published' || publishNow) {
-      await fetch('/api/revalidate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: savedSlug }),
-      }).catch(() => {});
     }
 
     setSaving(false);
