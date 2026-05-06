@@ -5,7 +5,11 @@ export async function POST(req: NextRequest) {
   const { slug } = await req.json().catch(() => ({}));
 
   revalidatePath('/');
-  revalidatePath('/category/[category]', 'page');
+  revalidatePath('/category/africa-diaspora');
+  revalidatePath('/category/world-politics');
+  revalidatePath('/category/human-rights');
+  revalidatePath('/category/economy');
+  revalidatePath('/category/commentary');
 
   if (slug) {
     revalidatePath(`/article/${slug}`);

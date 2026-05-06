@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -37,8 +40,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
   };
 }
-
-export const dynamic = 'force-dynamic';
 
 export default async function ArticlePage({ params }: Props) {
   const article = await getArticleBySlug(params.slug);

@@ -16,6 +16,15 @@ function getSupabase() {
   );
 }
 
+async function triggerRevalidate(req: NextRequest, slug?: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+  await fetch(`${baseUrl}/api/revalidate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {});
+}
+
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,6 +35,11 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from('articles').insert(body);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  if (body.status === 'published') {
+    await triggerRevalidate(req, body.slug);
+  }
+
   return NextResponse.json({ ok: true });
 }
 
@@ -41,6 +55,11 @@ export async function PATCH(req: NextRequest) {
   const { error } = await supabase.from('articles').update(payload).eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  if (payload.status === 'published') {
+    await triggerRevalidate(req, payload.slug);
+  }
+
   return NextResponse.json({ ok: true });
 }
 

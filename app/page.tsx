@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -11,8 +14,6 @@ export const metadata: Metadata = {
   description:
     'Independent commentary on global affairs: Africa, the African diaspora, human rights, world politics, and the global economy.',
 };
-
-export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const articles = await getPublishedArticles();

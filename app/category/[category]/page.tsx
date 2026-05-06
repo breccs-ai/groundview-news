@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -21,8 +24,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: `Read the latest ${meta.label} articles from Ground View News, independent global commentary.`,
   };
 }
-
-export const dynamic = 'force-dynamic';
 
 export default async function CategoryPage({ params }: Props) {
   const { category } = params;
