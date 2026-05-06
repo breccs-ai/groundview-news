@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { supabase } from '@/lib/supabase';
 import { CircleCheck as CheckCircle, LayoutTemplate, AlignCenter, PanelTop } from 'lucide-react';
 
 const packages = [
@@ -54,14 +53,13 @@ export default function AdvertisePage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase.from('contact_messages').insert({
-      name: `${form.contact_name} (${form.name})`,
-      email: form.email,
-      subject: `Advertising enquiry: ${form.package_interest || 'unspecified package'}`,
-      message: form.message,
+    const res = await fetch('/api/advertise-enquiry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
     });
 
-    if (error) {
+    if (!res.ok) {
       setErrorMsg('Something went wrong. Please try again or email us directly.');
       setStatus('error');
     } else {
@@ -88,7 +86,7 @@ export default function AdvertisePage() {
               Reach a global, engaged audience
             </h1>
             <p className="mt-4 text-gray-400 text-base leading-relaxed max-w-xl">
-              Ground View News reaches readers across Africa, Europe, North America, and beyond.
+              Ground View News reaches a global readership across every continent.
               Our audience is educated, internationally minded, and reads in depth.
             </p>
           </div>
@@ -131,7 +129,7 @@ export default function AdvertisePage() {
             ))}
           </div>
           <p className="mt-6 text-sm text-gray-400">
-            All prices exclude VAT where applicable. Discounts available for non-profit and NGO organisations; enquire below.
+            All prices exclude VAT where applicable.
           </p>
         </section>
 

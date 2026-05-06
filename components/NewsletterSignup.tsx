@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { Mail } from 'lucide-react';
 
 type Props = {
@@ -22,12 +21,15 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase
-      .from('subscribers')
-      .insert({ email: email.trim().toLowerCase(), confirmed: false });
+    const res = await fetch('/api/newsletter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
 
-    if (error) {
-      if (error.code === '23505') {
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      if (json.error === 'already_subscribed') {
         setErrorMsg('This email is already subscribed.');
       } else {
         setErrorMsg('Something went wrong. Please try again.');
@@ -120,8 +122,8 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
           Independent analysis, in your inbox
         </h2>
         <p className="text-gray-400 text-base leading-relaxed mb-8 max-w-xl mx-auto">
-          Subscribe to receive our latest commentary on Africa, world politics, human rights, and the
-          global economy. No sponsored content, no agenda.
+          Subscribe to receive our latest commentary on world affairs, human rights, politics, and the
+          global economy. No sponsored content, no agenda, no geographic bias.
         </p>
 
         {status === 'success' ? (

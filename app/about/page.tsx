@@ -7,14 +7,14 @@ import { Globe, FileText, Users, Award } from 'lucide-react';
 export const metadata: Metadata = {
   title: 'About | Ground View News',
   description:
-    'Ground View News publishes independent commentary on global affairs: Africa, human rights, world politics, and the global economy.',
+    'Ground View News publishes independent commentary on global affairs: human rights, world politics, and the global economy. No geographic bias. Fair, evidence-based analysis.',
 };
 
 const values = [
   {
     icon: Globe,
     title: 'Global Perspective',
-    body: 'We report from and for the world, with particular focus on Africa, the African diaspora, and the communities whose stories are underrepresented in mainstream media.',
+    body: 'We report from and for the world — every region, every issue, every people. No geographic or political bias. Every story is judged on its importance and the quality of the evidence, not on its location.',
   },
   {
     icon: FileText,
@@ -80,10 +80,9 @@ export default function AboutPage() {
             What we cover
           </h2>
           <p className="text-gray-600 text-lg leading-relaxed mb-4">
-            Ground View News covers global affairs with a particular focus on Africa, the African diaspora,
-            human rights, world politics, and the international economy. We believe these subjects are
-            too often reduced to wire-service summaries or covered only when they intersect with Western
-            political interests.
+            Ground View News covers global affairs without geographic or political bias. We cover human
+            rights, world politics, the global economy, and the stories that matter to people everywhere.
+            No issue is too distant, no people too peripheral, no story too inconvenient.
           </p>
           <p className="text-gray-600 text-lg leading-relaxed mb-4">
             Our commentary is analytical and editorial in character. We do not aim to be a breaking-news
@@ -91,8 +90,8 @@ export default function AboutPage() {
             what comes next.
           </p>
           <p className="text-gray-600 text-lg leading-relaxed">
-            We draw on writers who have direct experience of the regions and issues they cover, and we
-            hold ourselves to the same standards of evidence we expect from the institutions we scrutinise.
+            We draw on writers with direct experience of the issues and regions they cover. We hold ourselves
+            to the same standards of evidence we expect from the institutions we scrutinise.
           </p>
         </section>
 

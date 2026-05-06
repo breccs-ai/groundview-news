@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { supabase } from '@/lib/supabase';
-import { CircleCheck as CheckCircle, Mail, MapPin } from 'lucide-react';
+import { CircleCheck as CheckCircle, Mail } from 'lucide-react';
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
@@ -22,14 +21,13 @@ export default function ContactPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase.from('contact_messages').insert({
-      name: form.name,
-      email: form.email,
-      subject: form.subject,
-      message: form.message,
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
     });
 
-    if (error) {
+    if (!res.ok) {
       setErrorMsg('Something went wrong. Please try again.');
       setStatus('error');
     } else {

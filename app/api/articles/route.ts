@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/email';
 
 const ADMIN_COOKIE = 'gvn_admin_session';
 const ADMIN_COOKIE_VALUE = 'authenticated';
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
 
   if (body.status === 'published') {
     await triggerRevalidate(req, body.slug);
+    await sendEmail(
+      'editorial@groundviewnews.com',
+      `New Article Published: ${body.title}`,
+      `<p><strong>Title:</strong> ${body.title}</p>
+<p><strong>Category:</strong> ${body.category || 'N/A'}</p>
+<p><strong>Author:</strong> ${body.author_name || 'N/A'}</p>
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/article/${body.slug}">https://groundviewnews.com/article/${body.slug}</a></p>`
+    );
   }
 
   return NextResponse.json({ ok: true });
@@ -59,6 +68,14 @@ export async function PATCH(req: NextRequest) {
 
   if (payload.status === 'published') {
     await triggerRevalidate(req, payload.slug);
+    await sendEmail(
+      'editorial@groundviewnews.com',
+      `New Article Published: ${payload.title}`,
+      `<p><strong>Title:</strong> ${payload.title}</p>
+<p><strong>Category:</strong> ${payload.category || 'N/A'}</p>
+<p><strong>Author:</strong> ${payload.author_name || 'N/A'}</p>
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/article/${payload.slug}">https://groundviewnews.com/article/${payload.slug}</a></p>`
+    );
   }
 
   return NextResponse.json({ ok: true });

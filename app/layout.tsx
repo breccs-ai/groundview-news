@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://groundviewnews.com'),
   title: 'Ground View News: Independent Global Commentary',
   description:
-    'Ground View News publishes independent commentary on global affairs, Africa, human rights, world politics, and the global economy.',
+    'Ground View News publishes independent commentary on global affairs, human rights, world politics, and the global economy.',
   openGraph: {
     siteName: 'Ground View News',
     type: 'website',

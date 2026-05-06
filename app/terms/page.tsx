@@ -56,7 +56,7 @@ export default function TermsPage() {
               Ground View News (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is an
               independent digital news commentary publication operated from the Republic of Ireland.
               The Site publishes commentary, opinion, and analysis on global affairs, including
-              Africa, the African diaspora, human rights, world politics, and the global economy.
+              human rights, world politics, and the global economy, without geographic or political bias.
             </p>
             <p>
               Ground View News is a <strong>commentary and opinion publication</strong>. It is not
