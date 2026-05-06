@@ -68,7 +68,7 @@ export default async function CategoryPage({ params }: Props) {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
-          {featured ? (
+          {featured && (
             <>
               {/* Featured article */}
               <article className="mb-12 pb-12 border-b border-gray-200">
@@ -162,18 +162,6 @@ export default async function CategoryPage({ params }: Props) {
                 </div>
               )}
             </>
-          ) : (
-            <div className="py-20 text-center">
-              <p
-                className="text-2xl font-bold text-gray-200 mb-3"
-                style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-              >
-                {meta.label}
-              </p>
-              <p className="text-gray-500 text-base">
-                Our first articles are coming soon. Subscribe to be notified.
-              </p>
-            </div>
           )}
         </div>
 

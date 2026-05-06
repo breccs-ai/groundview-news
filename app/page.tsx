@@ -31,7 +31,7 @@ export default async function HomePage() {
         {/* Featured article */}
         <section className="bg-white border-b border-gray-100">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 pb-12">
-            {featured ? (
+            {featured && (
               <article>
                 {/* Featured image */}
                 {featured.featured_image_url && (
@@ -85,8 +85,6 @@ export default async function HomePage() {
                   </Link>
                 </div>
               </article>
-            ) : (
-              <EmptyState />
             )}
           </div>
         </section>
@@ -160,33 +158,3 @@ export default async function HomePage() {
   );
 }
 
-function EmptyState() {
-  return (
-    <div className="py-16 text-center">
-      <div className="max-w-lg mx-auto">
-        <span
-          className="block text-7xl font-bold mb-6 select-none"
-          style={{ fontFamily: 'Playfair Display, Georgia, serif', color: '#e8edf5' }}
-          aria-hidden="true"
-        >
-          GV
-        </span>
-        <h2
-          className="text-2xl font-bold text-gray-900 mb-3"
-          style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-        >
-          Our first articles are coming soon.
-        </h2>
-        <p className="text-gray-500 text-base mb-6">
-          Subscribe to be notified when we publish.
-        </p>
-        <a
-          href="#newsletter"
-          className="inline-flex items-center px-6 py-3 bg-gray-900 text-white text-sm font-semibold rounded-sm hover:bg-blue-900 transition-colors"
-        >
-          Subscribe
-        </a>
-      </div>
-    </div>
-  );
-}
