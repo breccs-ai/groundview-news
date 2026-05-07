@@ -18,6 +18,13 @@ function getSupabase() {
   );
 }
 
+function getServiceSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
 async function triggerRevalidate(req: NextRequest, slug?: string) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
   await fetch(`${baseUrl}/api/revalidate`, {
@@ -33,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { error } = await supabase.from('articles').insert(body);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -61,7 +68,7 @@ export async function PATCH(req: NextRequest) {
   const { id, ...payload } = await req.json();
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { error } = await supabase.from('articles').update(payload).eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -89,7 +96,7 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { error } = await supabase.from('articles').delete().eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
