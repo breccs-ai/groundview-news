@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAdminAuthenticated, setAdminSession } from '@/lib/admin-auth';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 import { Eye, EyeOff, Lock, TriangleAlert as AlertTriangle } from 'lucide-react';
 
 export default function AdminLoginPage() {
@@ -24,21 +24,21 @@ export default function AdminLoginPage() {
 
     const res = await fetch('/api/admin-auth', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     });
 
     const body = await res.json().catch(() => ({}));
 
-    if (res.ok) {
-      setAdminSession();
+    if (res.ok && body.success) {
       router.push('/admin/dashboard');
     } else if (res.status === 500) {
       setStatus('misconfigured');
       setErrorDetail(body.error || 'Server error. Check Vercel environment variables.');
     } else {
       setStatus('error');
-      setErrorDetail('');
+      setErrorDetail(body.error || 'Incorrect password. Please try again.');
     }
   };
 

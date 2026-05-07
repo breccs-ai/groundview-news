@@ -11,12 +11,6 @@ export function isAdminAuthenticated(): boolean {
   });
 }
 
-export function setAdminSession() {
-  const expires = new Date();
-  expires.setHours(expires.getHours() + 8);
-  document.cookie = `${ADMIN_COOKIE}=${ADMIN_COOKIE_VALUE}; path=/; expires=${expires.toUTCString()}; SameSite=Strict`;
-}
-
 export function clearAdminSession() {
   document.cookie = `${ADMIN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }

@@ -21,13 +21,14 @@ export async function POST(req: NextRequest) {
   }
 
   cookies().set(ADMIN_COOKIE, ADMIN_COOKIE_VALUE, {
-    httpOnly: true,
+    httpOnly: false,
     sameSite: 'lax',
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24,
     path: '/',
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true });
 }
 
 export async function GET() {
