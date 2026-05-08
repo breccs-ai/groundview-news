@@ -20,12 +20,7 @@ type Article = {
 type Profile = {
   full_name: string;
   pen_name: string | null;
-  subscription_tier: string | null;
-  articles_used_this_month: number;
-};
-
-const TIER_LIMITS: Record<string, number | null> = {
-  starter: 4, standard: 12, professional: null,
+  subscription_status: string | null;
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -51,10 +46,18 @@ export default function JournalistDashboardPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/journalists/login'); return; }
 
-      const [{ data: prof }, { data: arts }] = await Promise.all([
-        supabase.from('profiles').select('full_name, pen_name, subscription_tier, articles_used_this_month').eq('id', session.user.id).maybeSingle(),
-        supabase.from('articles').select('id, title, category, status, created_at, published_at').eq('author_name', session.user.id).order('created_at', { ascending: false }),
-      ]);
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name, pen_name, subscription_status')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const authorName = (prof as any)?.pen_name || '';
+      const { data: arts } = await supabase
+        .from('articles')
+        .select('id, title, category, status, created_at, published_at')
+        .eq('author_name', authorName)
+        .order('created_at', { ascending: false });
 
       setProfile(prof as Profile || null);
       setArticles((arts as Article[]) || []);
@@ -67,8 +70,7 @@ export default function JournalistDashboardPage() {
     router.push('/journalists/login');
   };
 
-  const tierLimit = TIER_LIMITS[profile?.subscription_tier || ''];
-  const articlesRemaining = tierLimit === null ? 'Unlimited' : Math.max(0, tierLimit - (profile?.articles_used_this_month || 0));
+  const isApproved = (profile?.subscription_status || '') === 'active';
 
   return (
     <>
@@ -84,12 +86,24 @@ export default function JournalistDashboardPage() {
               {profile && <p className="text-gray-400 text-sm mt-1">Welcome, {profile.pen_name || profile.full_name}</p>}
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/journalists/submit"
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-sm transition-colors"
-                style={{ backgroundColor: '#B8860B', color: '#fff' }}>
-                <Plus size={15} />
-                Submit Article
-              </Link>
+              {isApproved ? (
+                <Link href="/journalists/submit"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-sm transition-colors"
+                  style={{ backgroundColor: '#B8860B', color: '#fff' }}>
+                  <Plus size={15} />
+                  Submit Article
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-sm bg-gray-500/40 text-white cursor-not-allowed"
+                  title="Your journalist account is awaiting approval"
+                >
+                  <Plus size={15} />
+                  Submit Article
+                </button>
+              )}
               <button onClick={handleSignOut}
                 className="inline-flex items-center px-4 py-2.5 text-sm font-semibold border border-white/30 text-gray-300 hover:text-white rounded-sm transition-colors">
                 Sign Out
@@ -102,13 +116,17 @@ export default function JournalistDashboardPage() {
           {profile && (
             <div className="mb-8 p-5 bg-gray-50 border border-gray-200 rounded-sm flex flex-wrap gap-6 text-sm">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Subscription</p>
-                <p className="font-semibold text-gray-900 capitalize">{profile.subscription_tier || 'N/A'}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Account status</p>
+                <p className="font-semibold text-gray-900 capitalize">{profile.subscription_status || 'pending_approval'}</p>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Articles this month</p>
-                <p className="font-semibold text-gray-900">{articlesRemaining} remaining</p>
-              </div>
+              {profile.subscription_status !== 'active' && (
+                <div className="max-w-xl">
+                  <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Next steps</p>
+                  <p className="text-sm text-gray-700">
+                    Your journalist account is awaiting editorial approval. You’ll receive an email within 48 hours.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

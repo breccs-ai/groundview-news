@@ -31,6 +31,7 @@ export default function JournalistSubmitPage() {
   const [userEmail, setUserEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [resultMsg, setResultMsg] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -61,12 +62,13 @@ export default function JournalistSubmitPage() {
 
     setStatus('loading');
     setErrorMsg('');
+    setResultMsg('');
 
     const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
 
     const body = { content: form.bodyText.split(/\n\n+/).filter(Boolean).map((p) => ({ type: 'paragraph', text: p })) };
 
-    const { error } = await supabase.from('articles').insert({
+    const { data, error } = await supabase.from('articles').insert({
       title: form.title,
       subtitle: form.subtitle,
       author_name: form.pen_name,
@@ -76,7 +78,7 @@ export default function JournalistSubmitPage() {
       body,
       status: 'pending',
       slug,
-    });
+    }).select('id').maybeSingle();
 
     if (error) {
       setErrorMsg('Submission failed. Please try again.');
@@ -84,11 +86,35 @@ export default function JournalistSubmitPage() {
       return;
     }
 
-    await fetch('/api/journalist/submission-notification', {
+    const articleId = (data as { id?: string } | null)?.id;
+    if (!articleId) {
+      setErrorMsg('Article saved but could not start automated review. Please contact support.');
+      setStatus('error');
+      return;
+    }
+
+    const reviewRes = await fetch('/api/articles/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: form.title, pen_name: form.pen_name, author_email: userEmail }),
-    }).catch(() => {});
+      body: JSON.stringify({ article_id: articleId }),
+    });
+    const reviewBody = await reviewRes.json().catch(() => ({}));
+
+    if (!reviewRes.ok) {
+      setErrorMsg(reviewBody.error || 'Automated review failed. Your article is still saved and will be reviewed by editors.');
+      setStatus('error');
+      return;
+    }
+
+    if (reviewBody.outcome === 'published') {
+      setResultMsg(`Your article has been published at groundviewnews.com/article/${slug}`);
+    } else if (reviewBody.outcome === 'pending') {
+      setResultMsg('Your article is under editorial review. You will hear back within 24 hours.');
+    } else {
+      const reason = reviewBody.reason ? `Reason: ${reviewBody.reason}` : '';
+      const notes = reviewBody.notes ? `Editorial notes: ${reviewBody.notes}` : '';
+      setResultMsg(`Your article was not accepted. ${reason} ${notes}`.trim());
+    }
 
     setStatus('success');
   };
@@ -106,7 +132,7 @@ export default function JournalistSubmitPage() {
               Article submitted
             </h1>
             <p className="text-gray-600 mb-6">
-              Your article has been submitted for editorial review. You will hear back within five working days.
+              {resultMsg || 'Your article has been submitted for editorial review. You will hear back within 24 hours.'}
             </p>
             <button onClick={() => router.push('/journalists/dashboard')}
               className="inline-flex items-center px-6 py-3 text-sm font-semibold text-white rounded-sm transition-colors"
