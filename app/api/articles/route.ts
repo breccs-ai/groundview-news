@@ -33,7 +33,7 @@ function uniqueSlugPart(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Journalist submit-for-review: route status by editorial_category before DB write. */
+/** PATCH submit-for-review: route status by editorial_category before DB write. */
 function applyJournalistEditorialRouting(payload: Record<string, unknown>) {
   const ec = normalizeEditorialCategory(payload.editorial_category);
   payload.editorial_category = ec;
@@ -47,6 +47,13 @@ function applyJournalistEditorialRouting(payload: Record<string, unknown>) {
     payload.status = 'pending';
   }
 }
+
+/** Same bypass list as journalist POST — kept for PATCH parity with POST ordering logic. */
+const EDITORIAL_BYPASS_CATEGORIES = [
+  'human-rights-reporting',
+  'conflict-reporting',
+  'political-commentary',
+] as const;
 
 export async function GET(req: NextRequest) {
   try {
@@ -106,10 +113,35 @@ export async function POST(req: NextRequest) {
       if (!aid || typeof aid !== 'string' || aid !== actor.user.id) {
         return NextResponse.json({ error: 'author_id must match the signed-in user.' }, { status: 403 });
       }
+
+      // STEP 1 — Resolve editorial_category from the request body first (before any moderation-related routing).
+      const editorialCategory = normalizeEditorialCategory(payload.editorial_category);
+      payload.editorial_category = editorialCategory;
+
+      // STEP 2 — Bypass list check BEFORE any automated moderation runs later in the pipeline.
+      const bypassModeration = (EDITORIAL_BYPASS_CATEGORIES as readonly string[]).includes(editorialCategory);
+
+      const submitStatuses = ['pending', 'pending_editorial'];
+      const statusStr = payload.status;
+      const isSubmitForReview =
+        typeof statusStr === 'string' && submitStatuses.includes(statusStr);
+
+      // STEP 3–4 — Set initial article status from editorial category before moderation:
+      // If bypass: human editorial queue only (never send through automated moderation in review).
+      // If not bypass: pending → existing automated moderation runs in POST /api/articles/review after insert.
+      if (isSubmitForReview) {
+        if (bypassModeration) {
+          payload.status = 'pending_editorial';
+        } else {
+          payload.status = 'pending';
+        }
+      }
+
       const email =
         actor.user.email && typeof actor.user.email === 'string' ? actor.user.email : '';
       payload.author_email = email || payload.author_email;
-      applyJournalistEditorialRouting(payload);
+      // STEP 5 — featured_image_url: supplied by client on payload (no server-side image generation in this handler).
+      // STEP 6 — insert block below runs after status + editorial_category are finalized above.
     } else {
       const ec = normalizeEditorialCategory(payload.editorial_category);
       payload.editorial_category = ec;
@@ -154,6 +186,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        // STEP 7 — Response after successful Supabase insert.
         return NextResponse.json({ ok: true, id: row.id, slug: row.slug });
       }
 
