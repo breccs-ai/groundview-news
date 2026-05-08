@@ -12,6 +12,8 @@ export type Article = {
   slug: string;
   author_name: string;
   category: string;
+  /** Editorial submission type (review routing); DB default `general`. */
+  editorial_category?: string;
   label: string;
   body: ArticleBody;
   excerpt: string;

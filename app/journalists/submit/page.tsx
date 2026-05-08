@@ -14,6 +14,7 @@ import {
   storedBodyToEditorMarkdown,
   wordCountMarkdownExcludingSyntax,
 } from '@/lib/article-markdown';
+import { EDITORIAL_CATEGORY_OPTIONS, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import { X, Eye, Save } from 'lucide-react';
 
 const LABEL_OPTIONS = ['Commentary', 'Opinion', 'In Depth', 'Analysis', 'Editorial'];
@@ -26,6 +27,7 @@ type FormState = {
   subtitle: string;
   pen_name: string;
   category: string;
+  editorial_category: string;
   label: string;
   excerpt: string;
   featured_image_url: string;
@@ -37,6 +39,7 @@ const EMPTY_FORM: FormState = {
   subtitle: '',
   pen_name: '',
   category: '',
+  editorial_category: 'general',
   label: '',
   excerpt: '',
   featured_image_url: '',
@@ -66,6 +69,7 @@ function JournalistSubmitInner() {
     | { kind: 'idle' }
     | { kind: 'published'; slug: string }
     | { kind: 'review' }
+    | { kind: 'pending_editorial' }
     | { kind: 'rejected'; reason: string; notes: string };
 
   const [publishOutcome, setPublishOutcome] = useState<PublishOutcome>({ kind: 'idle' });
@@ -133,6 +137,10 @@ function JournalistSubmitInner() {
           subtitle: article.subtitle || '',
           pen_name: article.author_name || pn || '',
           category: article.category || '',
+          editorial_category:
+            typeof (article as { editorial_category?: string }).editorial_category === 'string'
+              ? (article as { editorial_category?: string }).editorial_category!
+              : 'general',
           label: article.label || '',
           excerpt: article.excerpt || '',
           featured_image_url: article.featured_image_url || '',
@@ -174,6 +182,7 @@ function JournalistSubmitInner() {
       subtitle: form.subtitle.trim(),
       author_name: form.pen_name.trim(),
       category: form.category,
+      editorial_category: form.editorial_category,
       label: form.label,
       excerpt: form.excerpt.trim(),
       featured_image_url: form.featured_image_url.trim(),
@@ -186,6 +195,7 @@ function JournalistSubmitInner() {
     form.subtitle,
     form.pen_name,
     form.category,
+    form.editorial_category,
     form.label,
     form.excerpt,
     form.featured_image_url,
@@ -244,6 +254,7 @@ function JournalistSubmitInner() {
     const errs: string[] = [];
     if (!form.title.trim()) errs.push('Title is required.');
     if (!form.category) errs.push('Category is required.');
+    if (!form.editorial_category) errs.push('Editorial category is required.');
     if (!form.label) errs.push('Label is required.');
     const ex = form.excerpt.trim();
     if (!ex) errs.push('Excerpt is required.');
@@ -264,12 +275,15 @@ function JournalistSubmitInner() {
       const headers = jsonAuthHeaders(accessToken);
       let id = articleId;
       let finalSlug = '';
+      const submitStatus = requiresHumanEditorialReview(form.editorial_category)
+        ? 'pending_editorial'
+        : 'pending';
 
       if (id) {
         const res = await fetch('/api/articles', {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({ id, ...payload, status: 'pending' }),
+          body: JSON.stringify({ id, ...payload, status: submitStatus }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -281,7 +295,7 @@ function JournalistSubmitInner() {
         const res = await fetch('/api/articles', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ ...payload, status: 'pending' }),
+          body: JSON.stringify({ ...payload, status: submitStatus }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -303,6 +317,12 @@ function JournalistSubmitInner() {
         return;
       }
 
+      if (submitStatus === 'pending_editorial') {
+        setPublishOutcome({ kind: 'pending_editorial' });
+        setPreviewOpen(false);
+        return;
+      }
+
       const rev = await fetch('/api/articles/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -320,8 +340,12 @@ function JournalistSubmitInner() {
 
       if (reviewJson.outcome === 'published') {
         setPublishOutcome({ kind: 'published', slug: slug || 'article' });
-      } else if (reviewJson.outcome === 'pending') {
-        setPublishOutcome({ kind: 'review' });
+      } else if (reviewJson.outcome === 'pending' || reviewJson.outcome === 'pending_editorial') {
+        setPublishOutcome(
+          reviewJson.outcome === 'pending_editorial'
+            ? { kind: 'pending_editorial' }
+            : { kind: 'review' },
+        );
       } else {
         setPublishOutcome({
           kind: 'rejected',
@@ -385,6 +409,14 @@ function JournalistSubmitInner() {
             <div className="border border-amber-200 bg-amber-50 text-amber-950 px-5 py-4 rounded-sm">
               <p className="font-semibold">Your article is under editorial review.</p>
               <p className="text-sm mt-1">You will hear back within 24 hours.</p>
+            </div>
+          )}
+          {publishOutcome.kind === 'pending_editorial' && (
+            <div className="border border-amber-200 bg-amber-50 text-amber-950 px-5 py-4 rounded-sm">
+              <p className="font-semibold">Your article is queued for human editorial review.</p>
+              <p className="text-sm mt-1">
+                It was not processed by automated moderation. You will hear back from an editor within 24 hours.
+              </p>
             </div>
           )}
           {publishOutcome.kind === 'rejected' && (
@@ -458,25 +490,49 @@ function JournalistSubmitInner() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    name="category"
-                    value={form.category}
-                    onChange={handleChange}
-                    required
-                    className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm bg-white"
-                  >
-                    <option value="">Select category</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c.slug} value={c.slug}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
+                      Category *
+                    </label>
+                    <select
+                      name="category"
+                      value={form.category}
+                      onChange={handleChange}
+                      required
+                      className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm bg-white"
+                    >
+                      <option value="">Select category</option>
+                      {CATEGORIES.map((c) => (
+                        <option key={c.slug} value={c.slug}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
+                      Editorial Category *
+                    </label>
+                    <select
+                      name="editorial_category"
+                      value={form.editorial_category}
+                      onChange={handleChange}
+                      required
+                      className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm bg-white"
+                    >
+                      {EDITORIAL_CATEGORY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                      This determines how your article is reviewed. Conflict and human rights articles go to editorial review rather than automated moderation.
+                    </p>
+                  </div>
                 </div>
 
                 <div>

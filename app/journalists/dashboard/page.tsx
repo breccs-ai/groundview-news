@@ -24,10 +24,11 @@ type Profile = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:   { label: 'Pending Review', color: 'bg-amber-100 text-amber-800' },
-  published: { label: 'Published',      color: 'bg-green-100 text-green-800' },
-  draft:     { label: 'Draft',          color: 'bg-gray-100 text-gray-700' },
-  rejected:  { label: 'Not accepted',   color: 'bg-red-100 text-red-700' },
+  pending:            { label: 'Pending Review', color: 'bg-amber-100 text-amber-800' },
+  pending_editorial:  { label: 'Under Editorial Review', color: 'bg-yellow-100 text-yellow-900' },
+  published:          { label: 'Published',      color: 'bg-green-100 text-green-800' },
+  draft:              { label: 'Draft',          color: 'bg-gray-100 text-gray-700' },
+  rejected:           { label: 'Not accepted',   color: 'bg-red-100 text-red-700' },
 };
 
 function fmtDate(d: string | null) {

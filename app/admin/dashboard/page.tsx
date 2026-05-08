@@ -24,6 +24,8 @@ type Article = {
 
 type ToastMsg = { type: 'success' | 'error'; text: string };
 
+type ArticleQueueTab = 'all' | 'automated' | 'editorial';
+
 type PendingJournalist = {
   id: string;
   full_name: string;
@@ -44,6 +46,7 @@ export default function AdminDashboard() {
   const [dbStatus, setDbStatus] = useState<DbStatus>(null);
   const [rejecting, setRejecting] = useState<PendingJournalist | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [articleQueueTab, setArticleQueueTab] = useState<ArticleQueueTab>('all');
 
   const showToast = (type: ToastMsg['type'], text: string) => {
     setToast({ type, text });
@@ -108,6 +111,26 @@ export default function AdminDashboard() {
     }
     showToast('success', action === 'approve' ? 'Journalist approved.' : 'Journalist rejected.');
     fetchPendingJournalists();
+  };
+
+  const handleRejectArticle = async (article: Article) => {
+    const { error } = await supabase.from('articles').update({ status: 'rejected' }).eq('id', article.id);
+
+    if (error) {
+      showToast('error', `Failed to reject: ${error.message}`);
+      return;
+    }
+
+    // TODO: trigger rejection email here — notify the journalist (e.g. reuse sendOutcomeEmail via a small API route).
+
+    await fetch('/api/revalidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: article.slug }),
+    }).catch(() => {});
+
+    showToast('success', `"${article.title}" rejected.`);
+    fetchArticles();
   };
 
   const handlePublish = async (article: Article) => {
@@ -187,13 +210,34 @@ export default function AdminDashboard() {
       published: 'bg-green-100 text-green-800',
       draft: 'bg-gray-100 text-gray-600',
       pending: 'bg-amber-100 text-amber-800',
+      pending_editorial: 'bg-amber-100 text-amber-900',
+      quarantined: 'bg-orange-100 text-orange-900',
+      rejected: 'bg-red-100 text-red-800',
     };
+    const labels: Record<string, string> = {
+      pending_editorial: 'Pending Editorial Review',
+      quarantined: 'Quarantined',
+    };
+    const text = labels[status] || status.replace(/_/g, ' ');
     return (
       <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-sm capitalize ${map[status] || 'bg-gray-100 text-gray-600'}`}>
-        {status}
+        {text}
       </span>
     );
   };
+
+  const filteredArticles = articles.filter((article) => {
+    if (articleQueueTab === 'all') return true;
+    if (articleQueueTab === 'automated') {
+      return article.status === 'pending' || article.status === 'quarantined';
+    }
+    return article.status === 'pending_editorial';
+  });
+
+  const automatedQueueCount = articles.filter(
+    (a) => a.status === 'pending' || a.status === 'quarantined',
+  ).length;
+  const editorialQueueCount = articles.filter((a) => a.status === 'pending_editorial').length;
 
   return (
     <AdminShell>
@@ -404,6 +448,41 @@ export default function AdminDashboard() {
             Articles
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">{articles.length} total</p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => setArticleQueueTab('all')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
+                articleQueueTab === 'all'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              All articles
+            </button>
+            <button
+              type="button"
+              onClick={() => setArticleQueueTab('automated')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
+                articleQueueTab === 'automated'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              Automated moderation ({automatedQueueCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setArticleQueueTab('editorial')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
+                articleQueueTab === 'editorial'
+                  ? 'bg-amber-800 text-white border-amber-800'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              Pending Editorial Review ({editorialQueueCount})
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -438,6 +517,10 @@ export default function AdminDashboard() {
               Write your first article
             </Link>
           </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="py-16 text-center text-sm text-gray-500">
+            No articles match this filter.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -459,7 +542,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {articles.map((article) => {
+                {filteredArticles.map((article) => {
                   const cat = getCategoryMeta(article.category);
                   return (
                     <tr key={article.id} className="hover:bg-gray-50 transition-colors">
@@ -485,38 +568,79 @@ export default function AdminDashboard() {
                           : <span className="text-gray-300">Not published</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          {article.status === 'published' ? (
-                            <button
-                              onClick={() => handleUnpublish(article)}
-                              title="Unpublish (move to draft)"
-                              className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                            >
-                              <Globe size={14} />
-                            </button>
+                        <div className="flex items-center gap-1 justify-end flex-wrap">
+                          {articleQueueTab === 'editorial' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handlePublish(article)}
+                                title="Approve and publish"
+                                className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectArticle(article)}
+                                title="Reject article"
+                                className="px-2.5 py-1 text-xs font-semibold bg-red-700 text-white rounded-sm hover:bg-red-600 transition-colors"
+                              >
+                                Reject
+                              </button>
+                              <Link
+                                href={`/admin/articles/edit/${article.id}`}
+                                className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil size={14} />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => confirmDelete(article.id)}
+                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
                           ) : (
-                            <button
-                              onClick={() => handlePublish(article)}
-                              title="Publish"
-                              className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
-                            >
-                              Publish
-                            </button>
+                            <>
+                              {article.status === 'published' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnpublish(article)}
+                                  title="Unpublish (move to draft)"
+                                  className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                >
+                                  <Globe size={14} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePublish(article)}
+                                  title="Publish"
+                                  className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
+                                >
+                                  Publish
+                                </button>
+                              )}
+                              <Link
+                                href={`/admin/articles/edit/${article.id}`}
+                                className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil size={14} />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => confirmDelete(article.id)}
+                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
                           )}
-                          <Link
-                            href={`/admin/articles/edit/${article.id}`}
-                            className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={14} />
-                          </Link>
-                          <button
-                            onClick={() => confirmDelete(article.id)}
-                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </div>
                       </td>
                     </tr>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
+import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,6 +31,21 @@ function slugBase(title: string): string {
 
 function uniqueSlugPart(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Journalist submit-for-review: route status by editorial_category before DB write. */
+function applyJournalistEditorialRouting(payload: Record<string, unknown>) {
+  const ec = normalizeEditorialCategory(payload.editorial_category);
+  payload.editorial_category = ec;
+
+  const st = payload.status;
+  if (st !== 'pending' && st !== 'pending_editorial') return;
+
+  if (requiresHumanEditorialReview(ec)) {
+    payload.status = 'pending_editorial';
+  } else {
+    payload.status = 'pending';
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -93,6 +109,10 @@ export async function POST(req: NextRequest) {
       const email =
         actor.user.email && typeof actor.user.email === 'string' ? actor.user.email : '';
       payload.author_email = email || payload.author_email;
+      applyJournalistEditorialRouting(payload);
+    } else {
+      const ec = normalizeEditorialCategory(payload.editorial_category);
+      payload.editorial_category = ec;
     }
 
     const supabase = getServiceSupabase();
@@ -181,7 +201,7 @@ export async function PATCH(req: NextRequest) {
     if (actor.kind === 'journalist') {
       const { data: existing, error: fetchErr } = await supabase
         .from('articles')
-        .select('author_id')
+        .select('author_id, editorial_category')
         .eq('id', id)
         .maybeSingle();
 
@@ -191,6 +211,13 @@ export async function PATCH(req: NextRequest) {
       }
       payload.author_id = actor.user.id;
       if (actor.user.email) payload.author_email = actor.user.email;
+      if (payload.editorial_category === undefined || payload.editorial_category === null) {
+        payload.editorial_category = (existing as { editorial_category?: string }).editorial_category ?? 'general';
+      }
+      applyJournalistEditorialRouting(payload as Record<string, unknown>);
+    } else {
+      const ec = normalizeEditorialCategory((payload as Record<string, unknown>).editorial_category);
+      (payload as Record<string, unknown>).editorial_category = ec;
     }
 
     const { error } = await supabase.from('articles').update(payload).eq('id', id);

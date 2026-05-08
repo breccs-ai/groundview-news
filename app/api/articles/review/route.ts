@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/lib/article-markdown';
 import { CATEGORIES } from '@/lib/supabase';
+import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 
-type ReviewOutcome = 'published' | 'pending' | 'rejected';
+type ReviewOutcome = 'published' | 'pending' | 'pending_editorial' | 'rejected';
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,6 +57,26 @@ export async function POST(req: NextRequest) {
     }
     if (!article) {
       return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+    }
+
+    const editorialCategory = normalizeEditorialCategory(
+      (article as Record<string, unknown>).editorial_category,
+    );
+    if (requiresHumanEditorialReview(editorialCategory)) {
+      const { error: upErr } = await supabase
+        .from('articles')
+        .update({ status: 'pending_editorial', editorial_category: editorialCategory })
+        .eq('id', article_id);
+      if (upErr) {
+        console.error('[articles/review] pending_editorial update failed:', upErr.message);
+        return NextResponse.json({ error: upErr.message }, { status: 400 });
+      }
+      return NextResponse.json({
+        ok: true,
+        outcome: 'pending_editorial' satisfies ReviewOutcome,
+        message: 'Your article is queued for human editorial review.',
+        slug: String((article as Record<string, unknown>).slug || ''),
+      });
     }
 
     const title = String(article.title || '').trim();
