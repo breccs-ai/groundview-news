@@ -43,18 +43,23 @@ export default function JournalistRegisterPage() {
       return;
     }
 
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      email: form.email,
-      full_name: form.full_name,
-      pen_name: form.pen_name,
-      bio: form.bio,
-      role: 'journalist',
-      subscription_tier: form.tier,
+    const profileRes = await fetch('/api/journalist/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: data.user.id,
+        email: form.email,
+        full_name: form.full_name,
+        pen_name: form.pen_name,
+        bio: form.bio,
+        subscription_tier: form.tier,
+      }),
     });
 
-    if (profileError) {
-      setErrorMsg('Account created but profile setup failed. Please contact support@groundviewnews.com.');
+    const profileBody = await profileRes.json().catch(() => ({}));
+
+    if (!profileRes.ok) {
+      setErrorMsg(profileBody.error || 'Account created but profile setup failed. Please contact support@groundviewnews.com.');
       setStatus('error');
       return;
     }
