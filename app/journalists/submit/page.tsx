@@ -9,8 +9,11 @@ import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import { supabase } from '@/lib/supabase';
 import { CATEGORIES } from '@/lib/supabase';
-import { bodyTextToJson, bodyJsonToText } from '@/lib/admin-auth';
-import type { ArticleBody } from '@/lib/supabase';
+import {
+  markdownBodyPayload,
+  storedBodyToEditorMarkdown,
+  wordCountMarkdownExcludingSyntax,
+} from '@/lib/article-markdown';
 import { X, Eye, Save } from 'lucide-react';
 
 const LABEL_OPTIONS = ['Commentary', 'Opinion', 'In Depth', 'Analysis', 'Editorial'];
@@ -40,10 +43,6 @@ const EMPTY_FORM: FormState = {
   bodyText: '',
 };
 
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
 function JournalistSubmitInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,6 +60,7 @@ function JournalistSubmitInner() {
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
 
   type PublishOutcome =
     | { kind: 'idle' }
@@ -73,16 +73,14 @@ function JournalistSubmitInner() {
   const editingId = searchParams.get('id');
   const isEditing = Boolean(editingId);
 
-  const authHeader = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-
-  const previewBody = useMemo(
-    () => bodyTextToJson(form.bodyText) as ArticleBody,
-    [form.bodyText]
-  );
+  const jsonAuthHeaders = (token: string): Record<string, string> => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  });
 
   const previewWordCount = useMemo(
-    () => countWords(bodyJsonToText(previewBody)),
-    [previewBody]
+    () => wordCountMarkdownExcludingSyntax(form.bodyText),
+    [form.bodyText]
   );
 
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(previewWordCount / 200)), [previewWordCount]);
@@ -138,7 +136,7 @@ function JournalistSubmitInner() {
           label: article.label || '',
           excerpt: article.excerpt || '',
           featured_image_url: article.featured_image_url || '',
-          bodyText: bodyJsonToText(article.body),
+          bodyText: storedBodyToEditorMarkdown(article.body),
         });
         setLoadingBoot(false);
       };
@@ -171,7 +169,6 @@ function JournalistSubmitInner() {
   };
 
   const buildPayload = useCallback(() => {
-    const bodyObj = bodyTextToJson(form.bodyText);
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
@@ -180,7 +177,7 @@ function JournalistSubmitInner() {
       label: form.label,
       excerpt: form.excerpt.trim(),
       featured_image_url: form.featured_image_url.trim(),
-      body: bodyObj,
+      body: markdownBodyPayload(form.bodyText),
       author_id: userId!,
     };
   }, [
@@ -201,13 +198,14 @@ function JournalistSubmitInner() {
     try {
       const payload = buildPayload();
       /** Route handler uses SUPABASE_SERVICE_ROLE_KEY for DB writes — the key stays server-side only. */
+      const headers = jsonAuthHeaders(accessToken);
 
       let id = articleId;
 
       if (id) {
         const res = await fetch('/api/articles', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers,
           body: JSON.stringify({ id, ...payload, status: 'draft' }),
         });
         const json = await res.json().catch(() => ({}));
@@ -219,7 +217,7 @@ function JournalistSubmitInner() {
       } else {
         const res = await fetch('/api/articles', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers,
           body: JSON.stringify({ ...payload, status: 'draft' }),
         });
         const json = await res.json().catch(() => ({}));
@@ -251,7 +249,7 @@ function JournalistSubmitInner() {
     if (!ex) errs.push('Excerpt is required.');
     if (ex.length > 200) errs.push('Excerpt must be 200 characters or less.');
 
-    const wc = countWords(bodyJsonToText(bodyTextToJson(form.bodyText)));
+    const wc = wordCountMarkdownExcludingSyntax(form.bodyText);
     if (wc < 300) errs.push('Article body must be at least 300 words to publish.');
 
     setFieldErrors(errs);
@@ -263,13 +261,14 @@ function JournalistSubmitInner() {
 
     try {
       const payload = buildPayload();
+      const headers = jsonAuthHeaders(accessToken);
       let id = articleId;
       let finalSlug = '';
 
       if (id) {
         const res = await fetch('/api/articles', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers,
           body: JSON.stringify({ id, ...payload, status: 'pending' }),
         });
         const json = await res.json().catch(() => ({}));
@@ -281,7 +280,7 @@ function JournalistSubmitInner() {
       } else {
         const res = await fetch('/api/articles', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
+          headers,
           body: JSON.stringify({ ...payload, status: 'pending' }),
         });
         const json = await res.json().catch(() => ({}));
@@ -542,28 +541,57 @@ function JournalistSubmitInner() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Article body</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500">Article body</h2>
+                <div className="flex rounded-sm border border-gray-300 overflow-hidden text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setBodyUiMode('write')}
+                    className={`px-3 py-1.5 transition-colors ${bodyUiMode === 'write' ? 'bg-[#0f1f3d] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    Write
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBodyUiMode('preview')}
+                    className={`px-3 py-1.5 border-l border-gray-300 transition-colors ${
+                      bodyUiMode === 'preview' ? 'bg-[#0f1f3d] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
 
-              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-sm px-3 py-2">
-                Formatting:&nbsp;
-                <span style={{ fontFamily: 'Georgia, serif' }}>
-                  ## Subheading | ### Smaller heading | &gt; Pull quote | --- Section break | - Bullet point
-                </span>
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-sm px-3 py-2 break-words">
+                <span className="font-semibold">Markdown cheatsheet: </span>
+                # Heading 1 | ## Heading 2 | ### Heading 3 | **bold** | *italic* | &gt; blockquote | -
+                bullet | 1. numbered | --- divider | [link](url) | ![image](url)
               </p>
 
-              <textarea
-                name="bodyText"
-                value={form.bodyText}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-sm px-3 py-3 text-[15px] leading-relaxed focus:outline-none focus:border-amber-600 resize-y"
-                style={{ minHeight: 400 }}
-                placeholder="Your article..."
-                required={false}
-              />
+              {bodyUiMode === 'write' ? (
+                <textarea
+                  name="bodyText"
+                  value={form.bodyText}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-sm px-3 py-3 text-[15px] leading-relaxed focus:outline-none focus:border-amber-600 resize-y"
+                  style={{ minHeight: 400 }}
+                  placeholder={'Write Markdown here.\n\n## Section heading\n\n> Pull quote\n\n![Illustration](https://…)'}
+                  required={false}
+                />
+              ) : (
+                <div className="min-h-[400px] max-h-[70vh] overflow-y-auto border border-gray-300 rounded-sm px-4 py-6 bg-gray-50/60">
+                  {form.bodyText.trim() ? (
+                    <ArticleBodyRenderer body={{ markdown: form.bodyText }} />
+                  ) : (
+                    <p className="text-gray-400 text-sm italic">Nothing to preview yet.</p>
+                  )}
+                </div>
+              )}
 
               <p className="text-sm text-gray-500">
-                <strong>{previewWordCount}</strong> words
-                <span className="text-xs text-gray-400 ml-2">(minimum 300 to publish)</span>
+                <strong>{previewWordCount}</strong> words{' '}
+                <span className="text-xs text-gray-400">(excluding Markdown punctuation; minimum 300 to publish)</span>
               </p>
             </section>
 
@@ -660,7 +688,7 @@ function JournalistSubmitInner() {
             )}
 
             <div className="max-w-[720px] mx-auto px-0 sm:px-0">
-              <ArticleBodyRenderer body={previewBody} />
+              <ArticleBodyRenderer body={{ markdown: form.bodyText }} />
             </div>
           </div>
         </div>

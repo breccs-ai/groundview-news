@@ -20,14 +20,22 @@ export type Article = {
   created_at: string;
 };
 
+/** Legacy block-based body (pre–full Markdown). Still supported for rendering migration. */
 export type ArticleBodyBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'heading'; level?: number; text: string }
-  | { type: 'image'; url: string; caption?: string };
+  | { type: 'image'; url: string; caption?: string }
+  | { type: string; text?: string; level?: number; items?: string[]; url?: string; caption?: string };
 
-export type ArticleBody = {
-  content?: ArticleBodyBlock[];
-} | string | null;
+/** jsonb body: standard storage is `{ markdown: string }`; legacy `{ content: [...] }` remains readable. */
+export type ArticleBody =
+  | string
+  | null
+  | {
+      markdown?: string;
+      content?: ArticleBodyBlock[];
+      [key: string]: unknown;
+    };
 
 export type Category = {
   slug: string;

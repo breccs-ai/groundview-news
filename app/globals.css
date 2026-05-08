@@ -58,11 +58,11 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  .article-body {
+  .article-markdown-body {
     font-family: Georgia, 'Times New Roman', serif;
   }
 
-  .article-body p:first-of-type::first-letter {
+  .article-markdown-body p.markdown-first-p::first-letter {
     font-size: 4rem;
     font-family: 'Playfair Display', serif;
     float: left;

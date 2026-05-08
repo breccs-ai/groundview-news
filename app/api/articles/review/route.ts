@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
-import { bodyJsonToText } from '@/lib/admin-auth';
+import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/lib/article-markdown';
 import { CATEGORIES } from '@/lib/supabase';
 
 type ReviewOutcome = 'published' | 'pending' | 'rejected';
@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
     const title = String(article.title || '').trim();
     const slug = String(article.slug || '').trim();
     const category = String(article.category || '').trim();
-    const bodyText = bodyJsonToText(article.body);
-    const wordCountVal = countWords(bodyText);
+    const bodyText = markdownPlainTextForApis(article.body);
+    const wordCountVal = wordCountMarkdownExcludingSyntax(bodyText);
 
     if (!title) {
       return await applyRejection({
@@ -228,10 +228,6 @@ export async function POST(req: NextRequest) {
 
 function isValidCategory(category: string): boolean {
   return CATEGORIES.some((c) => c.slug === category);
-}
-
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function clampInt(n: number, min: number, max: number): number {

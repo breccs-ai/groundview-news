@@ -1,171 +1,308 @@
-import { ArticleBody, ArticleBodyBlock } from '@/lib/supabase';
+'use client';
+
+import { useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import type { Components } from 'react-markdown';
+import type { ArticleBody } from '@/lib/supabase';
+import { storedBodyToEditorMarkdown } from '@/lib/article-markdown';
 
 type Props = {
   body: ArticleBody;
 };
 
-export default function ArticleBodyRenderer({ body }: Props) {
-  if (!body) {
-    return <p className="text-gray-400 italic">No content available.</p>;
-  }
+const GEORGIA = { fontFamily: "Georgia, 'Times New Roman', serif" };
+const PLAYFAIR = { fontFamily: "'Playfair Display', Georgia, serif" };
 
-  // If body is a string, render as plain text paragraphs
-  if (typeof body === 'string') {
-    return (
-      <div className="article-body mx-auto max-w-[720px]">
-        {body.split('\n\n').map((para, i) => (
-          <p
-            key={i}
-            className="text-[16px] md:text-[18px] leading-[1.8] text-[#1a1a1a] mb-6"
-            style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+function buildMarkdownComponents(getParagraphIndex: () => number): Components {
+  return {
+    h1: ({ children, ...props }) => (
+      <h1
+        {...props}
+        style={{
+          ...PLAYFAIR,
+          fontSize: '32px',
+          fontWeight: 700,
+          color: '#0a0a0a',
+          marginTop: '2.5rem',
+          marginBottom: '1rem',
+        }}
+      >
+        {children}
+      </h1>
+    ),
+    h2: ({ children, ...props }) => (
+      <h2
+        {...props}
+        style={{
+          ...PLAYFAIR,
+          fontSize: '26px',
+          fontWeight: 700,
+          color: '#0a0a0a',
+          borderBottom: '2px solid #D4AF37',
+          paddingBottom: '0.5rem',
+          marginTop: '2.5rem',
+          marginBottom: '1rem',
+        }}
+      >
+        {children}
+      </h2>
+    ),
+    h3: ({ children, ...props }) => (
+      <h3
+        {...props}
+        style={{
+          ...PLAYFAIR,
+          fontSize: '21px',
+          fontWeight: 600,
+          color: '#0a0a0a',
+          marginTop: '2rem',
+          marginBottom: '0.75rem',
+        }}
+      >
+        {children}
+      </h3>
+    ),
+    h4: ({ children, ...props }) => (
+      <h4
+        {...props}
+        style={{
+          ...PLAYFAIR,
+          fontSize: '18px',
+          fontWeight: 600,
+          color: '#0a0a0a',
+          marginTop: '1.5rem',
+          marginBottom: '0.5rem',
+        }}
+      >
+        {children}
+      </h4>
+    ),
+    p: ({ children, ...props }) => {
+      const idx = getParagraphIndex();
+      const isFirst = idx === 0;
+      return (
+        <p
+          {...props}
+          className={isFirst ? 'markdown-first-p' : undefined}
+          style={{
+            ...GEORGIA,
+            fontSize: '18px',
+            lineHeight: 1.8,
+            color: '#1a1a1a',
+            marginBottom: '1.5rem',
+          }}
+        >
+          {children}
+        </p>
+      );
+    },
+    blockquote: ({ children, ...props }) => (
+      <blockquote
+        {...props}
+        style={{
+          borderLeft: '4px solid #D4AF37',
+          paddingLeft: '1.5rem',
+          fontStyle: 'italic',
+          fontSize: '20px',
+          color: '#444',
+          margin: '2rem 0',
+          ...GEORGIA,
+        }}
+      >
+        {children}
+      </blockquote>
+    ),
+    ul: ({ children, ...props }) => (
+      <ul
+        {...props}
+        style={{
+          listStyle: 'disc',
+          paddingLeft: '1.5rem',
+          marginBottom: '1.5rem',
+          fontSize: '18px',
+          lineHeight: 1.8,
+          ...GEORGIA,
+          color: '#1a1a1a',
+        }}
+      >
+        {children}
+      </ul>
+    ),
+    ol: ({ children, ...props }) => (
+      <ol
+        {...props}
+        style={{
+          listStyle: 'decimal',
+          paddingLeft: '1.5rem',
+          marginBottom: '1.5rem',
+          fontSize: '18px',
+          lineHeight: 1.8,
+          ...GEORGIA,
+          color: '#1a1a1a',
+        }}
+      >
+        {children}
+      </ol>
+    ),
+    li: ({ children, ...props }) => (
+      <li {...props} style={{ marginBottom: '0.5rem' }}>
+        {children}
+      </li>
+    ),
+    strong: ({ children, ...props }) => (
+      <strong {...props} style={{ fontWeight: 700, color: '#0a0a0a' }}>
+        {children}
+      </strong>
+    ),
+    em: ({ children, ...props }) => (
+      <em {...props} style={{ fontStyle: 'italic' }}>
+        {children}
+      </em>
+    ),
+    a: ({ children, href, ...props }) => {
+      const external = typeof href === 'string' && /^https?:\/\//i.test(href);
+      return (
+        <a
+          {...props}
+          href={href ?? '#'}
+          {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          style={{ color: '#D4AF37' }}
+          className="underline-offset-2 hover:underline"
+        >
+          {children}
+        </a>
+      );
+    },
+    hr: (props) => (
+      <hr
+        {...props}
+        style={{ borderTop: '1px solid #D4AF37', margin: '2rem 0', borderLeft: 'none', borderRight: 'none', borderBottom: 'none' }}
+      />
+    ),
+    img: (props) => {
+      const { alt, src } = props as { alt?: string; src?: string };
+      return (
+        <img
+          src={src ?? ''}
+          alt={alt ?? ''}
+          style={{ maxWidth: '100%', borderRadius: 8, margin: '2rem 0', height: 'auto' }}
+          loading="lazy"
+        />
+      );
+    },
+    code: (props) => {
+      const { inline, children, ...rest } = props as {
+        inline?: boolean;
+        children?: ReactNode;
+        className?: string;
+      };
+      if (inline) {
+        return (
+          <code
+            {...rest}
+            style={{
+              background: '#f4f4f4',
+              padding: '2px 6px',
+              borderRadius: 4,
+              fontFamily: 'ui-monospace, monospace',
+              fontSize: '14px',
+            }}
           >
-            {para}
-          </p>
-        ))}
+            {children}
+          </code>
+        );
+      }
+      return (
+        <code
+          {...rest}
+          style={{
+            display: 'block',
+            background: 'transparent',
+            color: 'inherit',
+            fontFamily: 'ui-monospace, monospace',
+            fontSize: '14px',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {children}
+        </code>
+      );
+    },
+    pre: ({ children, ...props }) => (
+      <pre
+        {...props}
+        style={{
+          background: '#1a1a1a',
+          color: '#f4f4f4',
+          padding: '1.5rem',
+          borderRadius: 8,
+          overflowX: 'auto',
+          margin: '2rem 0',
+        }}
+      >
+        {children}
+      </pre>
+    ),
+    table: ({ children, ...props }) => (
+      <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+        <table {...props} style={{ width: '100%', borderCollapse: 'collapse', ...GEORGIA }}>
+          {children}
+        </table>
       </div>
-    );
-  }
+    ),
+    th: ({ children, ...props }) => (
+      <th
+        {...props}
+        style={{ borderBottom: '1px solid #ccc', padding: '0.5rem', textAlign: 'left', fontWeight: 600 }}
+      >
+        {children}
+      </th>
+    ),
+    td: ({ children, ...props }) => (
+      <td {...props} style={{ borderBottom: '1px solid #eee', padding: '0.5rem' }}>
+        {children}
+      </td>
+    ),
+  };
+}
 
-  // If body has a content array, render blocks
-  if (body.content && Array.isArray(body.content)) {
-    return (
-      <div className="article-body mx-auto max-w-[720px]">
-        {body.content.map((block: ArticleBodyBlock, i: number) => {
-          if (block.type === 'paragraph') {
-            return (
-              <p
-                key={i}
-                className="text-[16px] md:text-[18px] leading-[1.8] text-[#1a1a1a] mb-6"
-                style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
-                dangerouslySetInnerHTML={{ __html: sanitize(block.text) }}
-              />
-            );
-          }
-          if (block.type === 'heading') {
-            const level = block.level || 2;
-            if (level === 3) {
-              return (
-                <h3
-                  key={i}
-                  className="text-[21px] font-semibold mt-8 mb-3 text-[#0a0a0a] leading-snug"
-                  style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-                >
-                  {block.text}
-                </h3>
-              );
-            }
-            return (
-              <h2
-                key={i}
-                className="text-[26px] font-bold mt-10 mb-4 text-[#0a0a0a] leading-snug border-b-2 pb-2"
-                style={{ fontFamily: 'Playfair Display, Georgia, serif', borderBottomColor: '#D4AF37' }}
-              >
-                {block.text}
-              </h2>
-            );
-          }
-          if ((block as any).type === 'quote') {
-            const q = (block as any).text as string | undefined;
-            if (!q) return null;
-            return (
-              <blockquote
-                key={i}
-                className="my-8 pl-6 italic text-[20px] text-[#444]"
-                style={{ borderLeft: '4px solid #D4AF37' }}
-              >
-                {q}
-              </blockquote>
-            );
-          }
-          if ((block as any).type === 'divider') {
-            return (
-              <div
-                key={i}
-                className="my-8 text-center text-[24px]"
-                style={{ color: '#D4AF37' }}
-              >
-                • • •
-              </div>
-            );
-          }
-          if ((block as any).type === 'list') {
-            const ordered = Boolean((block as any).ordered);
-            const items = Array.isArray((block as any).items) ? ((block as any).items as string[]) : [];
-            if (items.length === 0) return null;
+type MarkdownInnerProps = {
+  markdown: string;
+  wrapperClassName?: string;
+};
 
-            if (ordered) {
-              return (
-                <ol
-                  key={i}
-                  className="mb-6 pl-6 list-decimal"
-                  style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
-                >
-                  {items.map((it, idx) => (
-                    <li key={idx} className="text-[18px] leading-[1.8] text-[#1a1a1a]">
-                      {it}
-                    </li>
-                  ))}
-                </ol>
-              );
-            }
+export function MarkdownBodyContent({ markdown, wrapperClassName }: MarkdownInnerProps) {
+  const paragraphIndexRef = useRef(0);
+  paragraphIndexRef.current = 0;
 
-            return (
-              <ul
-                key={i}
-                className="mb-6 space-y-2"
-                style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
-              >
-                {items.map((it, idx) => (
-                  <li key={idx} className="flex items-start gap-3 text-[18px] leading-[1.8] text-[#1a1a1a]">
-                    <span
-                      className="mt-[0.55rem] h-2 w-2 rounded-[2px] flex-shrink-0"
-                      style={{ backgroundColor: '#D4AF37' }}
-                      aria-hidden="true"
-                    />
-                    <span>{it}</span>
-                  </li>
-                ))}
-              </ul>
-            );
-          }
-          if (block.type === 'image') {
-            return (
-              <figure key={i} className="my-8">
-                <img
-                  src={block.url}
-                  alt={block.caption || ''}
-                  className="w-full"
-                  style={{ borderRadius: 8 }}
-                />
-                {block.caption && (
-                  <figcaption className="mt-2 text-center italic text-[14px]" style={{ color: '#666' }}>
-                    {block.caption}
-                  </figcaption>
-                )}
-              </figure>
-            );
-          }
-          return null;
-        })}
-      </div>
-    );
-  }
+  const components = useMemo(
+    () =>
+      buildMarkdownComponents(() => {
+        const idx = paragraphIndexRef.current;
+        paragraphIndexRef.current += 1;
+        return idx;
+      }),
+    [markdown],
+  );
 
-  // Fallback: render JSON as string
   return (
-    <div className="article-body">
-      <p>{JSON.stringify(body)}</p>
+    <div className={`article-markdown-body mx-auto max-w-[720px] ${wrapperClassName || ''}`}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>
+        {markdown}
+      </ReactMarkdown>
     </div>
   );
 }
 
-function sanitize(text: string): string {
-  // Basic sanitisation: allow only safe inline elements
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+export default function ArticleBodyRenderer({ body }: Props) {
+  const markdown = storedBodyToEditorMarkdown(body as unknown).trim();
+
+  if (!markdown) {
+    return <p className="text-gray-400 italic mx-auto max-w-[720px]">No content available.</p>;
+  }
+
+  return <MarkdownBodyContent markdown={markdown} />;
 }

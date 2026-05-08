@@ -3,14 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { slugify, CATEGORY_OPTIONS, LABEL_OPTIONS, STATUS_OPTIONS } from '@/lib/admin-auth';
 import {
-  slugify,
-  bodyTextToJson,
-  bodyJsonToText,
-  CATEGORY_OPTIONS,
-  LABEL_OPTIONS,
-  STATUS_OPTIONS,
-} from '@/lib/admin-auth';
+  markdownBodyPayload,
+  storedBodyToEditorMarkdown,
+  wordCountMarkdownExcludingSyntax,
+} from '@/lib/article-markdown';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import CategoryBadge from '@/components/CategoryBadge';
 import type { ArticleBody } from '@/lib/supabase';
@@ -57,6 +55,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [saveMsg, setSaveMsg] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
 
   useEffect(() => {
     if (!isEdit) return;
@@ -82,7 +81,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
         label: data.label || '',
         excerpt: data.excerpt || '',
         featured_image_url: data.featured_image_url || '',
-        bodyText: bodyJsonToText(data.body),
+        bodyText: storedBodyToEditorMarkdown(data.body),
         status: data.status || 'draft',
       });
       setLoading(false);
@@ -120,7 +119,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
     const slug = isEdit ? originalSlug : slugify(form.title) + '-' + Date.now().toString(36);
     const status = publishNow ? 'published' : form.status;
-    const body = bodyTextToJson(form.bodyText);
+    const body = markdownBodyPayload(form.bodyText);
     const now = new Date().toISOString();
 
     const payload = {
@@ -200,7 +199,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     );
   }
 
-  const previewBody = bodyTextToJson(form.bodyText) as ArticleBody;
+  const previewArticleBody = { markdown: form.bodyText } as ArticleBody;
   const displayLabel =
     form.label ||
     CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
@@ -282,7 +281,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
             {/* Article body */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
               {form.bodyText ? (
-                <ArticleBodyRenderer body={previewBody} />
+                <ArticleBodyRenderer body={previewArticleBody} />
               ) : (
                 <p className="text-gray-300 italic">No body content yet.</p>
               )}
@@ -390,43 +389,70 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
           {/* Body */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500">
-                Article Body
+                Article Body (Markdown)
               </label>
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(true)}
-                className="text-xs text-gray-400 hover:text-blue-700 flex items-center gap-1 transition-colors"
-              >
-                <Eye size={12} />
-                Preview
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBodyUiMode('write')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-sm border transition-colors ${
+                    bodyUiMode === 'write'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'border-gray-300 text-gray-600 hover:border-gray-500'
+                  }`}
+                >
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBodyUiMode('preview')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-sm border transition-colors ${
+                    bodyUiMode === 'preview'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'border-gray-300 text-gray-600 hover:border-gray-500'
+                  }`}
+                >
+                  Live preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(true)}
+                  className="text-xs text-gray-400 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                >
+                  <Eye size={12} />
+                  Full preview
+                </button>
+              </div>
             </div>
-            <div className="mb-3 rounded-sm border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              <p className="font-semibold mb-1">Formatting guide:</p>
-              <ul className="space-y-0.5">
-                <li>- Separate paragraphs with a blank line</li>
-                <li>- Start a line with ## for a subheading (H2)</li>
-                <li>- Start a line with ### for a smaller subheading (H3)</li>
-                <li>- Start a line with &gt; for a pull quote</li>
-                <li>- Start a line with --- for a section divider</li>
-                <li>- Start a line with - for a bullet point</li>
-              </ul>
-            </div>
-            <textarea
-              name="bodyText"
-              value={form.bodyText}
-              onChange={handleField}
-              rows={22}
-              className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-800 transition-colors resize-y"
-              placeholder={'Write your first paragraph here.\n\n## Subheading\n\n> Pull quote\n\n---\n\n- Bullet one\n- Bullet two'}
-            />
-            {form.bodyText && (
-              <p className="mt-1 text-xs text-gray-400">
-                {form.bodyText.split(/\n\n+/).filter(Boolean).length} paragraphs
-              </p>
+            <p className="mb-3 text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-sm px-3 py-2 break-words">
+              <span className="font-semibold">Markdown: </span>
+              # Heading 1 | ## Heading 2 | ### Heading 3 | **bold** | *italic* | &gt; blockquote | -
+              bullet | 1. numbered | --- divider | [link](url) | ![image](url)
+            </p>
+            {bodyUiMode === 'write' ? (
+              <textarea
+                name="bodyText"
+                value={form.bodyText}
+                onChange={handleField}
+                rows={22}
+                className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-800 transition-colors resize-y min-h-[400px]"
+                placeholder={'Start with lead paragraphs.\n\n## Section heading\n\n> Pull quote'}
+              />
+            ) : (
+              <div className="min-h-[400px] max-h-[70vh] overflow-y-auto border border-gray-200 rounded-sm px-4 py-6 bg-gray-50/50">
+                {form.bodyText.trim() ? (
+                  <ArticleBodyRenderer body={{ markdown: form.bodyText }} />
+                ) : (
+                  <p className="text-gray-400 text-sm italic">Nothing to preview yet.</p>
+                )}
+              </div>
             )}
+            <p className="mt-2 text-xs text-gray-500">
+              Word count <span className="font-semibold text-gray-800">{wordCountMarkdownExcludingSyntax(form.bodyText)}</span>{' '}
+              <span className="text-gray-400">(excludes Markdown punctuation)</span>
+            </p>
           </div>
 
           {/* Excerpt */}
