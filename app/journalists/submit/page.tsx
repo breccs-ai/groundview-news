@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 import { CATEGORIES } from '@/lib/supabase';
+import { bodyTextToJson } from '@/lib/admin-auth';
 import { CircleCheck as CheckCircle } from 'lucide-react';
 
 const LABEL_OPTIONS = ['Analysis', 'Opinion', 'Commentary', 'Investigation', 'Report', 'Interview'];
@@ -66,7 +67,7 @@ export default function JournalistSubmitPage() {
 
     const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
 
-    const body = { content: form.bodyText.split(/\n\n+/).filter(Boolean).map((p) => ({ type: 'paragraph', text: p })) };
+    const body = bodyTextToJson(form.bodyText);
 
     const { data, error } = await supabase.from('articles').insert({
       title: form.title,
@@ -207,9 +208,20 @@ export default function JournalistSubmitPage() {
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">
                 Article Body * <span className="normal-case font-normal text-gray-400">(separate paragraphs with a blank line)</span>
               </label>
+              <div className="mb-3 rounded-sm border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="font-semibold mb-1">Formatting guide:</p>
+                <ul className="space-y-0.5">
+                  <li>- Separate paragraphs with a blank line</li>
+                  <li>- Start a line with ## for a subheading (H2)</li>
+                  <li>- Start a line with ### for a smaller subheading (H3)</li>
+                  <li>- Start a line with &gt; for a pull quote</li>
+                  <li>- Start a line with --- for a section divider</li>
+                  <li>- Start a line with - for a bullet point</li>
+                </ul>
+              </div>
               <textarea name="bodyText" value={form.bodyText} onChange={handleChange} required rows={20}
                 className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors resize-y"
-                placeholder="Write your article here. Use blank lines to separate paragraphs." />
+                placeholder={'Write your article here.\n\n## Subheading\n\n> Pull quote\n\n---\n\n- Bullet one\n- Bullet two'} />
             </div>
 
             {status === 'error' && <p className="text-sm text-red-600">{errorMsg}</p>}

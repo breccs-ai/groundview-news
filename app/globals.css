@@ -58,12 +58,18 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  .article-body p {
-    font-family: 'Inter', sans-serif;
-    font-size: 1.125rem;
-    line-height: 1.8;
-    color: #1a2332;
-    margin-bottom: 1.5rem;
+  .article-body {
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .article-body p:first-of-type::first-letter {
+    font-size: 4rem;
+    font-family: 'Playfair Display', serif;
+    float: left;
+    line-height: 0.8;
+    margin-right: 0.5rem;
+    margin-top: 0.1rem;
+    color: #D4AF37;
   }
 
   .article-body h2 {

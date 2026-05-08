@@ -393,9 +393,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500">
                 Article Body
-                <span className="normal-case tracking-normal font-normal text-gray-400 ml-2">
-                  (separate paragraphs with a blank line)
-                </span>
               </label>
               <button
                 type="button"
@@ -406,13 +403,24 @@ export default function ArticleEditorForm({ articleId }: Props) {
                 Preview
               </button>
             </div>
+            <div className="mb-3 rounded-sm border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <p className="font-semibold mb-1">Formatting guide:</p>
+              <ul className="space-y-0.5">
+                <li>- Separate paragraphs with a blank line</li>
+                <li>- Start a line with ## for a subheading (H2)</li>
+                <li>- Start a line with ### for a smaller subheading (H3)</li>
+                <li>- Start a line with &gt; for a pull quote</li>
+                <li>- Start a line with --- for a section divider</li>
+                <li>- Start a line with - for a bullet point</li>
+              </ul>
+            </div>
             <textarea
               name="bodyText"
               value={form.bodyText}
               onChange={handleField}
               rows={22}
               className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-800 transition-colors resize-y"
-              placeholder={'Write your first paragraph here.\n\nAdd a blank line between paragraphs.\n\nEach paragraph will be saved as a separate block.'}
+              placeholder={'Write your first paragraph here.\n\n## Subheading\n\n> Pull quote\n\n---\n\n- Bullet one\n- Bullet two'}
             />
             {form.bodyText && (
               <p className="mt-1 text-xs text-gray-400">

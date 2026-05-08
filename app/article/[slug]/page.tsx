@@ -105,7 +105,7 @@ export default async function ArticlePage({ params }: Props) {
         )}
 
         {/* Article body */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-12">
+        <div className="max-w-[720px] mx-auto px-6 md:px-0 pb-12">
           <ArticleBodyRenderer body={article.body} />
 
           {/* Bottom share */}
