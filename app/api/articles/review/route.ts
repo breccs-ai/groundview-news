@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Add to moderation queue if table exists in your DB (safe: failures won't block the core flow)
-    await supabase.from('moderation_queue').insert({ article_id, status: 'pending', ai_assessment: assessment }).catch(() => {});
+    try { await supabase.from('moderation_queue').insert({ article_id, status: 'pending', ai_assessment: assessment }); } catch (_) {}
 
     await sendOutcomeEmail({
       to: getAuthorEmail(article),

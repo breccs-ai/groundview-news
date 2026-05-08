@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
   }
 
   const inserts: any[] = [];
-  for (const [journalistId, agg] of byJournalist.entries()) {
+  for (const [journalistId, agg] of Array.from(byJournalist.entries())) {
     if (totalWeightedViews <= 0) continue;
     const viewShare = agg.weightedViews / totalWeightedViews;
     const amountEarned = journalistPool * viewShare;
