@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
       if (!error && row?.id) {
         const bodyPayload = incoming as Record<string, unknown>;
 
-        if (bodyPayload.status === 'published') {
+        if (payload.status === 'published') {
           await triggerRevalidate(req, row.slug);
           await sendEmail(
             'editorial@groundviewnews.com',
@@ -182,12 +182,13 @@ export async function POST(req: NextRequest) {
             `<p><strong>Title:</strong> ${bodyPayload.title}</p>
 <p><strong>Category:</strong> ${bodyPayload.category || 'N/A'}</p>
 <p><strong>Author:</strong> ${bodyPayload.author_name || 'N/A'}</p>
-<p><strong>Link:</strong> <a href="https://groundviewnews.com/article/${row.slug}">https://groundviewnews.com/article/${row.slug}</a></p>`
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${row.slug}">https://groundviewnews.com/articles/${row.slug}</a></p>`
           );
         }
 
         // STEP 7 — Response after successful Supabase insert.
-        return NextResponse.json({ ok: true, id: row.id, slug: row.slug });
+        const statusOut = typeof payload.status === 'string' ? payload.status : undefined;
+        return NextResponse.json({ ok: true, id: row.id, slug: row.slug, status: statusOut });
       }
 
       console.error('[articles POST] insert attempt failed:', error?.message, error?.code);
@@ -269,11 +270,12 @@ export async function PATCH(req: NextRequest) {
         `<p><strong>Title:</strong> ${p.title}</p>
 <p><strong>Category:</strong> ${p.category || 'N/A'}</p>
 <p><strong>Author:</strong> ${p.author_name || 'N/A'}</p>
-<p><strong>Link:</strong> <a href="https://groundviewnews.com/article/${slug}">https://groundviewnews.com/article/${slug}</a></p>`
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${slug}">https://groundviewnews.com/articles/${slug}</a></p>`
       );
     }
 
-    return NextResponse.json({ ok: true });
+    const statusOut = typeof payload.status === 'string' ? payload.status : undefined;
+    return NextResponse.json({ ok: true, status: statusOut });
   } catch (e) {
     console.error('[articles PATCH]', e);
     return NextResponse.json({ error: 'Server error.' }, { status: 500 });

@@ -1,5 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
+/**
+ * Article stats columns — run in Supabase SQL Editor if not already applied:
+ *
+ * ```sql
+ * ALTER TABLE articles ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
+ * ALTER TABLE articles ADD COLUMN IF NOT EXISTS shares jsonb DEFAULT '{"twitter": 0, "facebook": 0, "linkedin": 0, "whatsapp": 0, "total": 0}'::jsonb;
+ * ```
+ */
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
@@ -18,6 +27,10 @@ export type Article = {
   body: ArticleBody;
   excerpt: string;
   featured_image_url: string;
+  /** Page-view counter; increment via RPC from client once per session. */
+  views?: number | null;
+  /** Per-platform share counts + total; see `parseArticleShares` in lib/article-shares.ts */
+  shares?: unknown;
   published_at: string;
   created_at: string;
 };

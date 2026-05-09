@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -67,12 +66,17 @@ function JournalistSubmitInner() {
 
   type PublishOutcome =
     | { kind: 'idle' }
-    | { kind: 'published'; slug: string }
-    | { kind: 'review' }
-    | { kind: 'pending_editorial' }
     | { kind: 'rejected'; reason: string; notes: string };
 
   const [publishOutcome, setPublishOutcome] = useState<PublishOutcome>({ kind: 'idle' });
+
+  type SubmissionSuccessTier = 'published' | 'pending_editorial' | 'quarantined';
+
+  const [submissionSuccess, setSubmissionSuccess] = useState<null | {
+    tier: SubmissionSuccessTier;
+    slug: string;
+  }>(null);
+  const [redirectSeconds, setRedirectSeconds] = useState(5);
 
   const editingId = searchParams.get('id');
   const isEditing = Boolean(editingId);
@@ -90,11 +94,45 @@ function JournalistSubmitInner() {
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(previewWordCount / 200)), [previewWordCount]);
 
   useEffect(() => {
-    document.body.style.overflow = previewOpen ? 'hidden' : '';
+    document.body.style.overflow = previewOpen || submissionSuccess ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [previewOpen]);
+  }, [previewOpen, submissionSuccess]);
+
+  const fetchArticleRecord = useCallback(
+    async (articleId: string) => {
+      if (!accessToken) return null;
+      const res = await fetch(`/api/articles?id=${encodeURIComponent(articleId)}`, {
+        headers: jsonAuthHeaders(accessToken),
+      });
+      const j = await res.json().catch(() => ({}));
+      return j.article as { status?: string; slug?: string } | null;
+    },
+    [accessToken],
+  );
+
+  useEffect(() => {
+    if (!submissionSuccess) return;
+    const { tier, slug } = submissionSuccess;
+
+    setRedirectSeconds(5);
+    let remaining = 5;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      setRedirectSeconds(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(timer);
+        if (tier === 'published') {
+          router.push(`/articles/${slug}`);
+        } else {
+          router.push('/journalists/dashboard');
+        }
+      }
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [submissionSuccess, router]);
 
   useEffect(() => {
     (async () => {
@@ -174,6 +212,7 @@ function JournalistSubmitInner() {
     setForm((prev) => ({ ...prev, [name]: v }));
     setDraftSavedAt(null);
     setPublishOutcome({ kind: 'idle' });
+    setSubmissionSuccess(null);
   };
 
   const buildPayload = useCallback(() => {
@@ -268,6 +307,7 @@ function JournalistSubmitInner() {
 
     setLoadingPublish(true);
     setPublishOutcome({ kind: 'idle' });
+    setSubmissionSuccess(null);
     setBootError('');
 
     try {
@@ -288,9 +328,10 @@ function JournalistSubmitInner() {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           setBootError(json.error || 'Could not submit for review.');
-          setLoadingPublish(false);
           return;
         }
+        const row = await fetchArticleRecord(id);
+        finalSlug = row?.slug || '';
       } else {
         const res = await fetch('/api/articles', {
           method: 'POST',
@@ -300,25 +341,32 @@ function JournalistSubmitInner() {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           setBootError(json.error || 'Could not submit for review.');
-          setLoadingPublish(false);
           return;
         }
-        id = json.id;
-        finalSlug = json.slug || '';
-        if (id) {
-          setArticleId(id);
-          router.replace(`/journalists/submit?id=${encodeURIComponent(id)}`, { scroll: false });
+        const postId = typeof json.id === 'string' ? json.id : undefined;
+        finalSlug = typeof json.slug === 'string' ? json.slug : '';
+        if (postId) {
+          id = postId;
+          setArticleId(postId);
         }
       }
 
       if (!id) {
         setBootError('Submission failed — missing article id.');
-        setLoadingPublish(false);
         return;
       }
 
+      const articlePk = id;
+
+      const resolveSlug = async () => {
+        if (finalSlug) return finalSlug;
+        const row = await fetchArticleRecord(articlePk);
+        return row?.slug || '';
+      };
+
       if (submitStatus === 'pending_editorial') {
-        setPublishOutcome({ kind: 'pending_editorial' });
+        const slug = await resolveSlug();
+        setSubmissionSuccess({ tier: 'pending_editorial', slug });
         setPreviewOpen(false);
         return;
       }
@@ -326,34 +374,42 @@ function JournalistSubmitInner() {
       const rev = await fetch('/api/articles/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ article_id: id }),
+        body: JSON.stringify({ article_id: articlePk }),
       });
 
       const reviewJson = await rev.json().catch(() => ({}));
       if (!rev.ok) {
         setBootError(reviewJson.error || 'Automated review failed.');
-        setLoadingPublish(false);
         return;
       }
 
-      const slug = String(reviewJson.slug || finalSlug || '');
-
-      if (reviewJson.outcome === 'published') {
-        setPublishOutcome({ kind: 'published', slug: slug || 'article' });
-      } else if (reviewJson.outcome === 'pending' || reviewJson.outcome === 'pending_editorial') {
-        setPublishOutcome(
-          reviewJson.outcome === 'pending_editorial'
-            ? { kind: 'pending_editorial' }
-            : { kind: 'review' },
-        );
-      } else {
+      if (reviewJson.outcome === 'rejected') {
         setPublishOutcome({
           kind: 'rejected',
           reason: String(reviewJson.reason || ''),
           notes: String(reviewJson.notes || ''),
         });
+        setPreviewOpen(false);
+        return;
       }
 
+      const articleRow = await fetchArticleRecord(articlePk);
+      const slug = String(reviewJson.slug || articleRow?.slug || finalSlug || '');
+      const st = articleRow?.status;
+
+      if (reviewJson.outcome === 'published' || st === 'published') {
+        setSubmissionSuccess({ tier: 'published', slug });
+        setPreviewOpen(false);
+        return;
+      }
+
+      if (st === 'quarantined') {
+        setSubmissionSuccess({ tier: 'quarantined', slug });
+        setPreviewOpen(false);
+        return;
+      }
+
+      setSubmissionSuccess({ tier: 'pending_editorial', slug });
       setPreviewOpen(false);
     } finally {
       setLoadingPublish(false);
@@ -397,28 +453,6 @@ function JournalistSubmitInner() {
         <div className="max-w-3xl mx-auto px-6 md:px-0 py-10 space-y-8">
           {bootError && <p className="text-sm text-red-600 border border-red-200 bg-red-50 px-4 py-3 rounded-sm">{bootError}</p>}
 
-          {publishOutcome.kind === 'published' && (
-            <div className="border border-green-200 bg-green-50 text-green-900 px-5 py-4 rounded-sm space-y-2">
-              <p className="font-semibold">Your article has been published!</p>
-              <Link href={`/article/${publishOutcome.slug}`} className="text-green-900 underline hover:text-green-700">
-                View your article →
-              </Link>
-            </div>
-          )}
-          {publishOutcome.kind === 'review' && (
-            <div className="border border-amber-200 bg-amber-50 text-amber-950 px-5 py-4 rounded-sm">
-              <p className="font-semibold">Your article is under editorial review.</p>
-              <p className="text-sm mt-1">You will hear back within 24 hours.</p>
-            </div>
-          )}
-          {publishOutcome.kind === 'pending_editorial' && (
-            <div className="border border-amber-200 bg-amber-50 text-amber-950 px-5 py-4 rounded-sm">
-              <p className="font-semibold">Your article is queued for human editorial review.</p>
-              <p className="text-sm mt-1">
-                It was not processed by automated moderation. You will hear back from an editor within 24 hours.
-              </p>
-            </div>
-          )}
           {publishOutcome.kind === 'rejected' && (
             <div className="border border-red-200 bg-red-50 rounded-sm px-5 py-4 space-y-3">
               <p className="font-semibold text-red-900">Your article was not accepted</p>
@@ -746,6 +780,45 @@ function JournalistSubmitInner() {
             <div className="max-w-[720px] mx-auto px-0 sm:px-0">
               <ArticleBodyRenderer body={{ markdown: form.bodyText }} />
             </div>
+          </div>
+        </div>
+      )}
+
+      {submissionSuccess && (
+        <div className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-white px-4 py-12">
+          <div
+            className={`w-full max-w-3xl rounded-sm border px-8 py-10 text-center shadow-sm ${
+              submissionSuccess.tier === 'published'
+                ? 'border-green-300 bg-green-50 text-green-950'
+                : submissionSuccess.tier === 'quarantined'
+                  ? 'border-red-300 bg-red-50 text-red-950'
+                  : 'border-amber-300 bg-amber-50 text-amber-950'
+            }`}
+          >
+            <p
+              className="text-xl font-semibold"
+              style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+            >
+              Your article has been submitted successfully.
+            </p>
+            {submissionSuccess.tier === 'published' && (
+              <p className="mt-5 text-base leading-relaxed">
+                Your article is now live. Redirecting you to your article in {redirectSeconds}{' '}
+                second{redirectSeconds === 1 ? '' : 's'}.
+              </p>
+            )}
+            {submissionSuccess.tier === 'pending_editorial' && (
+              <p className="mt-5 text-base leading-relaxed">
+                Your article is under editorial review. You will be notified when it goes live. Redirecting you to your
+                dashboard in {redirectSeconds} second{redirectSeconds === 1 ? '' : 's'}.
+              </p>
+            )}
+            {submissionSuccess.tier === 'quarantined' && (
+              <p className="mt-5 text-base leading-relaxed">
+                Your article has been flagged for review. Our editorial team will be in touch. Redirecting you to your
+                dashboard in {redirectSeconds} second{redirectSeconds === 1 ? '' : 's'}.
+              </p>
+            )}
           </div>
         </div>
       )}

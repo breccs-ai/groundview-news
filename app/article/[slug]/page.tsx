@@ -9,8 +9,10 @@ import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import ArticleCard from '@/components/ArticleCard';
 import NewsletterSignup from '@/components/NewsletterSignup';
-import ShareButtons from '@/components/ShareButtons';
+import ArticleReadersLine from '@/components/ArticleReadersLine';
+import ArticleShareSection from '@/components/ArticleShareSection';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
+import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
 
 type Props = {
@@ -45,6 +47,8 @@ export default async function ArticlePage({ params }: Props) {
   const article = await getArticleBySlug(params.slug);
   if (!article) notFound();
 
+  const sharesParsed = parseArticleShares(article.shares);
+
   const related = await getPublishedArticles({ category: article.category, limit: 4 });
   const relatedArticles = related.filter((a) => a.id !== article.id).slice(0, 3);
 
@@ -70,24 +74,23 @@ export default async function ArticlePage({ params }: Props) {
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: '#0f1f3d' }}
-              >
-                {article.author_name ? article.author_name[0].toUpperCase() : 'G'}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ backgroundColor: '#0f1f3d' }}
+                >
+                  {article.author_name ? article.author_name[0].toUpperCase() : 'G'}
+                </div>
+                <div>
+                  {article.author_name && (
+                    <p className="text-sm font-semibold text-gray-900">{article.author_name}</p>
+                  )}
+                  <p className="text-xs text-gray-400">{formatDate(article.published_at)}</p>
+                </div>
               </div>
-              <div>
-                {article.author_name && (
-                  <p className="text-sm font-semibold text-gray-900">{article.author_name}</p>
-                )}
-                <p className="text-xs text-gray-400">{formatDate(article.published_at)}</p>
-              </div>
+              <ArticleReadersLine slug={article.slug} initialViews={article.views ?? 0} />
             </div>
-            <ShareButtons
-              title={article.title}
-              url={`https://groundviewnews.com/article/${article.slug}`}
-            />
           </div>
         </div>
 
@@ -108,17 +111,17 @@ export default async function ArticlePage({ params }: Props) {
         <div className="max-w-[720px] mx-auto px-6 md:px-0 pb-12">
           <ArticleBodyRenderer body={article.body} />
 
-          {/* Bottom share */}
-          <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between flex-wrap gap-4">
+          <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
             <div>
               <CategoryBadge category={article.category} label={article.label} />
               {article.author_name && (
-                <p className="mt-1 text-xs text-gray-400">By {article.author_name}</p>
+                <p className="mt-2 text-xs text-gray-400">By {article.author_name}</p>
               )}
             </div>
-            <ShareButtons
+            <ArticleShareSection
+              slug={article.slug}
               title={article.title}
-              url={`https://groundviewnews.com/article/${article.slug}`}
+              initialShares={sharesParsed}
             />
           </div>
         </div>
