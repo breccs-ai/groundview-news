@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { slugify, CATEGORY_OPTIONS, LABEL_OPTIONS, STATUS_OPTIONS } from '@/lib/admin-auth';
+import { CATEGORY_OPTIONS, LABEL_OPTIONS, STATUS_OPTIONS } from '@/lib/admin-auth';
+import { generateSlug } from '@/lib/slug';
 import {
   markdownBodyPayload,
   storedBodyToEditorMarkdown,
@@ -117,7 +118,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaving(true);
     setSaveStatus('idle');
 
-    const slug = isEdit ? originalSlug : slugify(form.title) + '-' + Date.now().toString(36);
+    const slug = isEdit ? originalSlug : generateSlug(form.title);
     const status = publishNow ? 'published' : form.status;
     const body = markdownBodyPayload(form.bodyText);
     const now = new Date().toISOString();
@@ -133,10 +134,8 @@ export default function ArticleEditorForm({ articleId }: Props) {
       body,
       status,
       ...(publishNow || status === 'published' ? { published_at: now } : {}),
-      ...(!isEdit ? { slug } : {}),
+      // slug is generated server-side for new articles (consistent behavior)
     };
-
-    const savedSlug = isEdit ? originalSlug : slug;
 
     let apiError: string | null = null;
     if (isEdit) {
@@ -155,7 +154,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, slug }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
@@ -367,7 +366,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
             />
             {form.title && (
               <p className="mt-2 text-xs text-gray-400">
-                Slug: <span className="font-mono">{slugify(form.title)}</span>
+                Slug: <span className="font-mono">{generateSlug(form.title)}</span>
               </p>
             )}
           </div>

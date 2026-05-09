@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
+import { generateSlug, generateUniqueSlug } from '@/lib/slug';
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,19 +19,6 @@ async function triggerRevalidate(req: NextRequest, slug?: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slug }),
   }).catch(() => {});
-}
-
-function slugBase(title: string): string {
-  const s = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 80);
-  return s || 'article';
-}
-
-function uniqueSlugPart(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /** PATCH submit-for-review: route status by editorial_category before DB write. */
@@ -150,14 +138,9 @@ export async function POST(req: NextRequest) {
     const supabase = getServiceSupabase();
     if (!supabase) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
 
-    const providedSlug =
-      typeof payload.slug === 'string' && payload.slug.trim() ? payload.slug.trim() : '';
-
-    let baseSlug =
-      providedSlug || slugBase(String(payload.title || 'article'));
-
-    let slug =
-      providedSlug || `${slugBase(String(payload.title || 'article'))}-${uniqueSlugPart()}`;
+    const title = String(payload.title || '').trim();
+    const baseSlug = generateSlug(title) || 'article';
+    let slug = baseSlug;
     payload.slug = slug;
 
     delete payload.id;
@@ -199,7 +182,7 @@ export async function POST(req: NextRequest) {
           error.message.toLowerCase().includes('slug'));
 
       if (isDup) {
-        slug = `${baseSlug}-${uniqueSlugPart()}`;
+        slug = generateUniqueSlug(title);
         payload.slug = slug;
         continue;
       }

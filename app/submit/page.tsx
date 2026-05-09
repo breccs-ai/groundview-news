@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase, CATEGORIES } from '@/lib/supabase';
 import { CircleCheck as CheckCircle, Info } from 'lucide-react';
+import { generateSlug, generateUniqueSlug } from '@/lib/slug';
 
 type BlockType = 'paragraph' | 'heading' | 'image';
 
@@ -70,14 +71,6 @@ export default function SubmitPage() {
     });
   };
 
-  const slugify = (title: string) =>
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .slice(0, 80);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
@@ -89,23 +82,32 @@ export default function SubmitPage() {
       return;
     }
 
-    const slug = slugify(form.title) + '-' + Date.now().toString(36);
+    const baseSlug = generateSlug(form.title) || 'article';
+    let slug = baseSlug;
     const body = {
       content: blocks.map(({ id: _id, ...rest }) => rest),
     };
 
-    const { error } = await supabase.from('articles').insert({
-      title: form.title,
-      subtitle: form.subtitle,
-      author_name: form.author_name,
-      category: form.category,
-      label: CATEGORIES.find((c) => c.slug === form.category)?.label || form.category,
-      excerpt: form.excerpt,
-      featured_image_url: form.featured_image_url,
-      slug,
-      body,
-      status: 'draft',
-    });
+    const doInsert = async (trySlug: string) =>
+      await supabase.from('articles').insert({
+        title: form.title,
+        subtitle: form.subtitle,
+        author_name: form.author_name,
+        category: form.category,
+        label: CATEGORIES.find((c) => c.slug === form.category)?.label || form.category,
+        excerpt: form.excerpt,
+        featured_image_url: form.featured_image_url,
+        slug: trySlug,
+        body,
+        status: 'draft',
+      });
+
+    let { error } = await doInsert(slug);
+    if (error?.code === '23505') {
+      slug = generateUniqueSlug(form.title);
+      const retry = await doInsert(slug);
+      error = retry.error;
+    }
 
     if (error) {
       setErrorMsg(error.message || 'Something went wrong. Please try again.');
