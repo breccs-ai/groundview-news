@@ -32,12 +32,41 @@ export const CATEGORY_OPTIONS = [
   { value: 'commentary', label: 'Commentary' },
 ];
 
+/** Values must match DB `articles_label_check` / editorial dropdowns. */
 export const LABEL_OPTIONS = [
   'Commentary',
   'Opinion',
   'In Depth',
   'Analysis',
   'Editorial',
-];
+  'News',
+  'Interview',
+  'Feature',
+] as const;
+
+export type ArticleLabel = (typeof LABEL_OPTIONS)[number];
+
+/** Allowed `articles.category` slug values. */
+export const ARTICLE_CATEGORY_SLUGS = [
+  'africa-diaspora',
+  'world-politics',
+  'human-rights',
+  'economy',
+  'commentary',
+] as const;
+
+export function normalizeArticleLabel(input: string | undefined | null): ArticleLabel {
+  const t = typeof input === 'string' ? input.trim() : '';
+  if (!t) return 'Commentary';
+  return (LABEL_OPTIONS as readonly string[]).includes(t)
+    ? (t as ArticleLabel)
+    : 'Commentary';
+}
+
+export function normalizeArticleCategory(input: string | undefined | null): string {
+  const t = typeof input === 'string' ? input.trim() : '';
+  if (!t) return 'commentary';
+  return (ARTICLE_CATEGORY_SLUGS as readonly string[]).includes(t) ? t : 'commentary';
+}
 
 export const STATUS_OPTIONS = ['draft', 'pending', 'pending_editorial', 'published'];

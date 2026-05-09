@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CATEGORY_OPTIONS, LABEL_OPTIONS, STATUS_OPTIONS } from '@/lib/admin-auth';
+import {
+  CATEGORY_OPTIONS,
+  LABEL_OPTIONS,
+  STATUS_OPTIONS,
+  normalizeArticleCategory,
+  normalizeArticleLabel,
+} from '@/lib/admin-auth';
 import { generateSlug } from '@/lib/slug';
 import {
   markdownBodyPayload,
@@ -35,8 +41,8 @@ const EMPTY_FORM: ArticleForm = {
   title: '',
   subtitle: '',
   author_name: 'Ground View Editor',
-  category: '',
-  label: '',
+  category: 'commentary',
+  label: 'Commentary',
   excerpt: '',
   featured_image_url: '',
   bodyText: '',
@@ -101,8 +107,12 @@ export default function ArticleEditorForm({ articleId }: Props) {
       title: String(data.title || ''),
       subtitle: String(data.subtitle || ''),
       author_name: String(data.author_name || 'Ground View Editor'),
-      category: String(data.category || ''),
-      label: String(data.label || ''),
+      category: normalizeArticleCategory(
+        typeof data.category === 'string' ? data.category : undefined
+      ),
+      label: normalizeArticleLabel(
+        typeof data.label === 'string' ? data.label : undefined
+      ),
       excerpt: String(data.excerpt || ''),
       featured_image_url: String(data.featured_image_url || ''),
       bodyText: storedBodyToEditorMarkdown(data.body),
@@ -133,15 +143,14 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
   const buildContentPayload = () => {
     const body = markdownBodyPayload(form.bodyText);
+    const category = normalizeArticleCategory(form.category);
+    const label = normalizeArticleLabel(form.label);
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
       author_name: form.author_name.trim() || 'Ground View Editor',
-      category: form.category,
-      label:
-        form.label ||
-        CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
-        '',
+      category,
+      label,
       excerpt: form.excerpt.trim(),
       featured_image_url: form.featured_image_url.trim(),
       body,
@@ -153,11 +162,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
     if (!articleId) return;
     if (!form.title.trim()) {
       setSaveMsg('Title is required.');
-      setSaveStatus('error');
-      return;
-    }
-    if (!form.category) {
-      setSaveMsg('Category is required.');
       setSaveStatus('error');
       return;
     }
@@ -293,11 +297,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
       setSaveStatus('error');
       return;
     }
-    if (!form.category) {
-      setSaveMsg('Category is required.');
-      setSaveStatus('error');
-      return;
-    }
 
     setSaving(true);
     setSaveStatus('idle');
@@ -305,16 +304,15 @@ export default function ArticleEditorForm({ articleId }: Props) {
     const status = publishNow ? 'published' : form.status;
     const body = markdownBodyPayload(form.bodyText);
     const now = new Date().toISOString();
+    const category = normalizeArticleCategory(form.category);
+    const label = normalizeArticleLabel(form.label);
 
     const payload = {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
       author_name: form.author_name.trim() || 'Ground View Editor',
-      category: form.category,
-      label:
-        form.label ||
-        CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
-        '',
+      category,
+      label,
       excerpt: form.excerpt.trim(),
       featured_image_url: form.featured_image_url.trim(),
       body,
@@ -735,7 +733,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
               required
               className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 bg-white transition-colors"
             >
-              <option value="">Select category</option>
               {CATEGORY_OPTIONS.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -754,7 +751,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
               onChange={handleField}
               className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 bg-white transition-colors"
             >
-              <option value="">None</option>
               {LABEL_OPTIONS.map((l) => (
                 <option key={l} value={l}>
                   {l}

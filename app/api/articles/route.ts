@@ -209,8 +209,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
+    console.log('[articles PATCH] incoming body:', JSON.stringify(body));
+
     const { id, ...payload } = body as { id?: string } & Record<string, unknown>;
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    const p = payload as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(p, 'label')) {
+      const v = p.label;
+      if (v === '' || v === undefined || v === null) {
+        p.label = 'Commentary';
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(p, 'category')) {
+      const v = p.category;
+      if (v === '' || v === undefined || v === null) {
+        p.category = 'commentary';
+      }
+    }
 
     const supabase = getServiceSupabase();
     if (!supabase) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
@@ -241,7 +257,6 @@ export async function PATCH(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    const p = payload as Record<string, unknown>;
     const slug =
       typeof p.slug === 'string' && p.slug ? p.slug : undefined;
 
