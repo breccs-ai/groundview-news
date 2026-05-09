@@ -199,11 +199,12 @@ function JournalistSubmitInner() {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setBootError(json.error || 'Could not load draft.');
+          router.replace('/journalists/dashboard');
           setLoadingBoot(false);
           return;
         }
         const article = json.article as {
+          author_id?: string;
           title?: string;
           subtitle?: string;
           category?: string;
@@ -214,6 +215,11 @@ function JournalistSubmitInner() {
           author_name?: string;
           id?: string;
         };
+        if (!article.author_id || article.author_id !== session.user.id) {
+          router.replace('/journalists/dashboard');
+          setLoadingBoot(false);
+          return;
+        }
         setArticleId(article.id || draftId);
         setForm({
           title: article.title || '',
@@ -483,7 +489,11 @@ function JournalistSubmitInner() {
               className="text-2xl md:text-3xl font-bold text-white"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
             >
-              {isEditing ? 'Editing draft' : 'Submit an article'}
+              {isEditing && form.title.trim()
+                ? `Editing: ${form.title}`
+                : isEditing
+                  ? 'Editing draft'
+                  : 'Submit an article'}
             </h1>
             {draftSavedAt && (
               <p className="text-sm text-green-300 mt-2">
@@ -758,7 +768,7 @@ function JournalistSubmitInner() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm border border-gray-400 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Save size={16} />
-                {loadingDraftSave ? 'Saving…' : 'Save draft'}
+                {loadingDraftSave ? 'Saving…' : articleId ? 'Save changes' : 'Save draft'}
               </button>
 
               <button
