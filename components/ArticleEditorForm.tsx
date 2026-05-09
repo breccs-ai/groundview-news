@@ -76,6 +76,10 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const [saveMsg, setSaveMsg] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
+  const [imageGenLoading, setImageGenLoading] = useState(false);
+  const [imageGenNotice, setImageGenNotice] = useState<{ ok: boolean; text: string } | null>(
+    null
+  );
 
   const loadArticle = useCallback(async () => {
     if (!articleId) return;
@@ -139,6 +143,47 @@ export default function ArticleEditorForm({ articleId }: Props) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setSaveStatus('idle');
+  };
+
+  const generateFeaturedImage = async () => {
+    setImageGenNotice(null);
+    if (!form.title.trim()) {
+      setImageGenNotice({
+        ok: false,
+        text: 'Image generation failed. Please try again.',
+      });
+      return;
+    }
+    setImageGenLoading(true);
+    try {
+      const res = await fetch('/api/articles/generate-image', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title,
+          excerpt: form.excerpt,
+          category: normalizeArticleCategory(form.category),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.imageUrl) {
+        setImageGenNotice({
+          ok: false,
+          text: 'Image generation failed. Please try again.',
+        });
+        return;
+      }
+      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
+      setImageGenNotice({ ok: true, text: 'Image generated successfully' });
+    } catch {
+      setImageGenNotice({
+        ok: false,
+        text: 'Image generation failed. Please try again.',
+      });
+    } finally {
+      setImageGenLoading(false);
+    }
   };
 
   const buildContentPayload = () => {
@@ -777,14 +822,33 @@ export default function ArticleEditorForm({ articleId }: Props) {
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Featured Image URL
             </label>
-            <input
-              type="url"
-              name="featured_image_url"
-              value={form.featured_image_url}
-              onChange={handleField}
-              className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
-              placeholder="https://images.pexels.com/…"
-            />
+            <div className="flex flex-wrap gap-2 items-stretch sm:items-center">
+              <input
+                type="url"
+                name="featured_image_url"
+                value={form.featured_image_url}
+                onChange={handleField}
+                className="flex-1 min-w-[12rem] border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
+                placeholder="https://images.pexels.com/…"
+              />
+              <button
+                type="button"
+                onClick={() => generateFeaturedImage()}
+                disabled={imageGenLoading}
+                className="inline-flex shrink-0 items-center justify-center px-4 py-2 text-sm font-semibold rounded-sm text-[#1a1a1a] bg-[#d4af37] hover:bg-[#c9a227] transition-colors disabled:opacity-60 disabled:pointer-events-none"
+              >
+                {imageGenLoading ? 'Generating image...' : 'Generate Image'}
+              </button>
+            </div>
+            {imageGenNotice && (
+              <p
+                className={`mt-2 text-xs font-medium ${
+                  imageGenNotice.ok ? 'text-green-700' : 'text-red-600'
+                }`}
+              >
+                {imageGenNotice.text}
+              </p>
+            )}
             {form.featured_image_url && (
               <div className="mt-3 w-full aspect-video overflow-hidden rounded-sm bg-gray-100">
                 <img

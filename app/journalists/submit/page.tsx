@@ -56,6 +56,10 @@ function JournalistSubmitInner() {
   const [loadingBoot, setLoadingBoot] = useState(true);
   const [loadingDraftSave, setLoadingDraftSave] = useState(false);
   const [loadingPublish, setLoadingPublish] = useState(false);
+  const [imageGenLoading, setImageGenLoading] = useState(false);
+  const [imageGenNotice, setImageGenNotice] = useState<{ ok: boolean; text: string } | null>(
+    null
+  );
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [bootError, setBootError] = useState('');
@@ -85,6 +89,47 @@ function JournalistSubmitInner() {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   });
+
+  const generateFeaturedImage = async () => {
+    if (!accessToken) return;
+    setImageGenNotice(null);
+    if (!form.title.trim()) {
+      setImageGenNotice({
+        ok: false,
+        text: 'Image generation failed. Please try again.',
+      });
+      return;
+    }
+    setImageGenLoading(true);
+    try {
+      const res = await fetch('/api/articles/generate-image', {
+        method: 'POST',
+        headers: jsonAuthHeaders(accessToken),
+        body: JSON.stringify({
+          title: form.title,
+          excerpt: form.excerpt,
+          category: form.category || 'commentary',
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.imageUrl) {
+        setImageGenNotice({
+          ok: false,
+          text: 'Image generation failed. Please try again.',
+        });
+        return;
+      }
+      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
+      setImageGenNotice({ ok: true, text: 'Image generated successfully' });
+    } catch {
+      setImageGenNotice({
+        ok: false,
+        text: 'Image generation failed. Please try again.',
+      });
+    } finally {
+      setImageGenLoading(false);
+    }
+  };
 
   const previewWordCount = useMemo(
     () => wordCountMarkdownExcludingSyntax(form.bodyText),
@@ -605,14 +650,34 @@ function JournalistSubmitInner() {
                 <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
                   Featured Image URL (optional)
                 </label>
-                <input
-                  type="url"
-                  name="featured_image_url"
-                  value={form.featured_image_url}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm"
-                  placeholder="https://…"
-                />
+                <div className="flex flex-wrap gap-2 items-stretch sm:items-center">
+                  <input
+                    type="url"
+                    name="featured_image_url"
+                    value={form.featured_image_url}
+                    onChange={handleChange}
+                    className="flex-1 min-w-[12rem] border border-gray-300 rounded-sm px-3 py-2.5 text-sm"
+                    placeholder="https://…"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => generateFeaturedImage()}
+                    disabled={imageGenLoading || !accessToken}
+                    className="inline-flex shrink-0 items-center justify-center px-4 py-2.5 rounded-sm text-sm font-semibold text-[#1a1a1a] disabled:opacity-60 disabled:pointer-events-none"
+                    style={{ backgroundColor: GOLD }}
+                  >
+                    {imageGenLoading ? 'Generating image...' : 'Generate Image'}
+                  </button>
+                </div>
+                {imageGenNotice && (
+                  <p
+                    className={`mt-2 text-xs font-medium ${
+                      imageGenNotice.ok ? 'text-green-700' : 'text-red-600'
+                    }`}
+                  >
+                    {imageGenNotice.text}
+                  </p>
+                )}
               </div>
 
               <div>
