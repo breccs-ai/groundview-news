@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import AdminArticleEditFab from '@/components/AdminArticleEditFab';
 import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
@@ -14,6 +16,7 @@ import ArticleShareSection from '@/components/ArticleShareSection';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
+import { ADMIN_COOKIE, ADMIN_COOKIE_VALUE } from '@/lib/admin-auth';
 
 type Props = {
   params: { slug: string };
@@ -46,6 +49,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ArticlePage({ params }: Props) {
   const article = await getArticleBySlug(params.slug);
   if (!article) notFound();
+
+  const cookieStore = cookies();
+  const showAdminEditFab =
+    cookieStore.get(ADMIN_COOKIE)?.value === ADMIN_COOKIE_VALUE;
 
   const sharesParsed = parseArticleShares(article.shares);
 
@@ -174,6 +181,8 @@ export default async function ArticlePage({ params }: Props) {
       </main>
 
       <Footer />
+
+      {showAdminEditFab && <AdminArticleEditFab articleId={article.id} />}
     </>
   );
 }

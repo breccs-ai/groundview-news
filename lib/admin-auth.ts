@@ -40,4 +40,4 @@ export const LABEL_OPTIONS = [
   'Editorial',
 ];
 
-export const STATUS_OPTIONS = ['draft', 'pending', 'published'];
+export const STATUS_OPTIONS = ['draft', 'pending', 'pending_editorial', 'published'];

@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { CATEGORY_OPTIONS, LABEL_OPTIONS, STATUS_OPTIONS } from '@/lib/admin-auth';
 import { generateSlug } from '@/lib/slug';
 import {
@@ -14,7 +13,7 @@ import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import CategoryBadge from '@/components/CategoryBadge';
 import type { ArticleBody } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { Save, Globe, ArrowLeft, Eye, X } from 'lucide-react';
+import { Save, Globe, ArrowLeft, Eye, X, Trash2 } from 'lucide-react';
 
 type ArticleForm = {
   title: string;
@@ -44,12 +43,26 @@ const EMPTY_FORM: ArticleForm = {
   status: 'draft',
 };
 
+function statusOptionLabel(s: string): string {
+  if (s === 'pending_editorial') return 'Pending editorial';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+async function triggerClientRevalidate(slug: string) {
+  await fetch('/api/revalidate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {});
+}
+
 export default function ArticleEditorForm({ articleId }: Props) {
   const router = useRouter();
   const isEdit = !!articleId;
 
   const [form, setForm] = useState<ArticleForm>(EMPTY_FORM);
   const [originalSlug, setOriginalSlug] = useState('');
+  const [loadedPublishedAt, setLoadedPublishedAt] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -58,41 +71,56 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
 
+  const loadArticle = useCallback(async () => {
+    if (!articleId) return;
+    const res = await fetch(`/api/articles?id=${encodeURIComponent(articleId)}`, {
+      credentials: 'include',
+    });
+    const json = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      setLoadError('Unauthorized. Sign in to the admin panel and try again.');
+      setLoading(false);
+      return;
+    }
+    if (!res.ok || !json.article) {
+      setLoadError(json.error || 'Article not found.');
+      setLoading(false);
+      return;
+    }
+
+    const data = json.article as Record<string, unknown>;
+    setOriginalSlug(String(data.slug || ''));
+    setLoadedPublishedAt(
+      typeof data.published_at === 'string' ? data.published_at : null
+    );
+
+    const rawStatus = typeof data.status === 'string' ? data.status : 'draft';
+
+    setForm({
+      title: String(data.title || ''),
+      subtitle: String(data.subtitle || ''),
+      author_name: String(data.author_name || 'Ground View Editor'),
+      category: String(data.category || ''),
+      label: String(data.label || ''),
+      excerpt: String(data.excerpt || ''),
+      featured_image_url: String(data.featured_image_url || ''),
+      bodyText: storedBodyToEditorMarkdown(data.body),
+      status: rawStatus,
+    });
+    setLoading(false);
+  }, [articleId]);
+
   useEffect(() => {
     if (!isEdit) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .eq('id', articleId)
-        .maybeSingle();
+    loadArticle();
+  }, [isEdit, loadArticle]);
 
-      if (error || !data) {
-        setLoadError('Article not found.');
-        setLoading(false);
-        return;
-      }
-
-      setOriginalSlug(data.slug);
-      setForm({
-        title: data.title || '',
-        subtitle: data.subtitle || '',
-        author_name: data.author_name || 'Ground View Editor',
-        category: data.category || '',
-        label: data.label || '',
-        excerpt: data.excerpt || '',
-        featured_image_url: data.featured_image_url || '',
-        bodyText: storedBodyToEditorMarkdown(data.body),
-        status: data.status || 'draft',
-      });
-      setLoading(false);
-    })();
-  }, [articleId, isEdit]);
-
-  // Lock body scroll when preview is open
   useEffect(() => {
     document.body.style.overflow = previewOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [previewOpen]);
 
   const handleField = (
@@ -103,7 +131,26 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaveStatus('idle');
   };
 
-  const save = async (publishNow?: boolean) => {
+  const buildContentPayload = () => {
+    const body = markdownBodyPayload(form.bodyText);
+    return {
+      title: form.title.trim(),
+      subtitle: form.subtitle.trim(),
+      author_name: form.author_name.trim() || 'Ground View Editor',
+      category: form.category,
+      label:
+        form.label ||
+        CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
+        '',
+      excerpt: form.excerpt.trim(),
+      featured_image_url: form.featured_image_url.trim(),
+      body,
+    };
+  };
+
+  /** Edit only: save fields without changing publication status or timestamps. */
+  const saveChanges = async () => {
+    if (!articleId) return;
     if (!form.title.trim()) {
       setSaveMsg('Title is required.');
       setSaveStatus('error');
@@ -118,7 +165,143 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaving(true);
     setSaveStatus('idle');
 
-    const slug = isEdit ? originalSlug : generateSlug(form.title);
+    const content = buildContentPayload();
+    const res = await fetch('/api/articles', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: articleId, ...content }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      setSaveMsg(json.error || `Server error ${res.status}`);
+      setSaveStatus('error');
+      return;
+    }
+
+    await triggerClientRevalidate(originalSlug);
+    const ts = new Date().toLocaleString();
+    setSaveMsg(`Article updated successfully — ${ts}`);
+    setSaveStatus('saved');
+  };
+
+  const publishArticle = async () => {
+    if (!articleId) return;
+    setSaving(true);
+    setSaveStatus('idle');
+    const now = new Date().toISOString();
+    const published_at = loadedPublishedAt || now;
+
+    const res = await fetch('/api/articles', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: articleId,
+        status: 'published',
+        published_at,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      setSaveMsg(json.error || `Server error ${res.status}`);
+      setSaveStatus('error');
+      return;
+    }
+
+    setLoadedPublishedAt(published_at);
+    setForm((prev) => ({ ...prev, status: 'published' }));
+    await triggerClientRevalidate(originalSlug);
+    const ts = new Date().toLocaleString();
+    setSaveMsg(`Published — ${ts}`);
+    setSaveStatus('saved');
+  };
+
+  const unpublishArticle = async () => {
+    if (!articleId) return;
+    setSaving(true);
+    setSaveStatus('idle');
+
+    const res = await fetch('/api/articles', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: articleId,
+        status: 'draft',
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      setSaveMsg(json.error || `Server error ${res.status}`);
+      setSaveStatus('error');
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, status: 'draft' }));
+    await triggerClientRevalidate(originalSlug);
+    const ts = new Date().toLocaleString();
+    setSaveMsg(`Unpublished (draft) — ${ts}`);
+    setSaveStatus('saved');
+  };
+
+  const deleteArticle = async () => {
+    if (!articleId) return;
+    if (
+      !window.confirm(
+        'Delete this article permanently? This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    setSaveStatus('idle');
+
+    const res = await fetch('/api/articles', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: articleId }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      setSaveMsg(json.error || `Server error ${res.status}`);
+      setSaveStatus('error');
+      return;
+    }
+
+    await triggerClientRevalidate(originalSlug);
+    router.push('/admin/dashboard');
+  };
+
+  const saveNewArticle = async (publishNow?: boolean) => {
+    if (!form.title.trim()) {
+      setSaveMsg('Title is required.');
+      setSaveStatus('error');
+      return;
+    }
+    if (!form.category) {
+      setSaveMsg('Category is required.');
+      setSaveStatus('error');
+      return;
+    }
+
+    setSaving(true);
+    setSaveStatus('idle');
+
     const status = publishNow ? 'published' : form.status;
     const body = markdownBodyPayload(form.bodyText);
     const now = new Date().toISOString();
@@ -128,49 +311,34 @@ export default function ArticleEditorForm({ articleId }: Props) {
       subtitle: form.subtitle.trim(),
       author_name: form.author_name.trim() || 'Ground View Editor',
       category: form.category,
-      label: form.label || CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label || '',
+      label:
+        form.label ||
+        CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
+        '',
       excerpt: form.excerpt.trim(),
       featured_image_url: form.featured_image_url.trim(),
       body,
       status,
       ...(publishNow || status === 'published' ? { published_at: now } : {}),
-      // slug is generated server-side for new articles (consistent behavior)
     };
 
-    let apiError: string | null = null;
-    if (isEdit) {
-      const res = await fetch('/api/articles', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: articleId, ...payload }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        apiError = json.error || `Server error ${res.status}`;
-      }
-    } else {
-      const res = await fetch('/api/articles', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        apiError = json.error || `Server error ${res.status}`;
-      }
-    }
+    const res = await fetch('/api/articles', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-    if (apiError) {
-      console.error('[ArticleEditorForm] save error:', apiError);
-      setSaveMsg(apiError || 'Failed to save. Check browser console for details.');
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      console.error('[ArticleEditorForm] save error:', json.error);
+      setSaveMsg(json.error || `Server error ${res.status}`);
       setSaveStatus('error');
-      setSaving(false);
       return;
     }
 
-    setSaving(false);
     setSaveStatus('saved');
     setSaveMsg(publishNow ? 'Published!' : 'Saved.');
     setTimeout(() => router.push('/admin/dashboard'), 1000);
@@ -189,6 +357,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
       <div className="py-16 text-center">
         <p className="text-sm text-red-600 mb-4">{loadError}</p>
         <button
+          type="button"
           onClick={() => router.push('/admin/dashboard')}
           className="text-sm text-gray-500 hover:text-gray-700"
         >
@@ -204,12 +373,16 @@ export default function ArticleEditorForm({ articleId }: Props) {
     CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label ||
     '';
 
+  const isPublished = form.status === 'published';
+
+  const statusSelectOptions = STATUS_OPTIONS.includes(form.status)
+    ? STATUS_OPTIONS
+    : [...STATUS_OPTIONS, form.status];
+
   return (
     <div>
-      {/* Live preview drawer */}
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-y-auto">
-          {/* Preview toolbar */}
           <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-3 bg-gray-950 border-b border-gray-800">
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">
@@ -220,6 +393,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </span>
             </div>
             <button
+              type="button"
               onClick={() => setPreviewOpen(false)}
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
             >
@@ -228,9 +402,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
             </button>
           </div>
 
-          {/* Rendered article */}
           <main className="bg-white flex-1">
-            {/* Article header */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-6">
               <div className="mb-4">
                 <CategoryBadge category={form.category} label={displayLabel} size="md" />
@@ -264,7 +436,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </div>
             </div>
 
-            {/* Featured image */}
             {form.featured_image_url && (
               <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
                 <div className="relative w-full aspect-[16/8] overflow-hidden rounded-sm bg-gray-100">
@@ -277,7 +448,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </div>
             )}
 
-            {/* Article body */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
               {form.bodyText ? (
                 <ArticleBodyRenderer body={previewArticleBody} />
@@ -296,10 +466,10 @@ export default function ArticleEditorForm({ articleId }: Props) {
         </div>
       )}
 
-      {/* Editor header */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => router.push('/admin/dashboard')}
             className="text-gray-400 hover:text-gray-700 transition-colors"
           >
@@ -313,43 +483,95 @@ export default function ArticleEditorForm({ articleId }: Props) {
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-end">
           {saveStatus === 'saved' && (
-            <span className="text-xs text-green-700 font-medium">{saveMsg}</span>
+            <span className="text-xs text-green-700 font-medium max-w-[min(100vw-2rem,280px)] text-right">
+              {saveMsg}
+            </span>
           )}
           {saveStatus === 'error' && (
-            <span className="text-xs text-red-600 font-medium">{saveMsg}</span>
+            <span className="text-xs text-red-600 font-medium max-w-[min(100vw-2rem,280px)] text-right">
+              {saveMsg}
+            </span>
           )}
+
           <button
+            type="button"
             onClick={() => setPreviewOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 hover:text-gray-900 transition-colors"
           >
             <Eye size={14} />
-            Preview
+            PREVIEW
           </button>
-          <button
-            onClick={() => save(false)}
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50"
-          >
-            <Save size={14} />
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            onClick={() => save(true)}
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
-          >
-            <Globe size={14} />
-            {saving ? 'Publishing…' : 'Publish'}
-          </button>
+
+          {isEdit ? (
+            <>
+              <button
+                type="button"
+                onClick={() => saveChanges()}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-800 bg-gray-900 text-white text-sm font-semibold rounded-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                <Save size={14} />
+                {saving ? 'Saving…' : 'SAVE CHANGES'}
+              </button>
+              {isPublished ? (
+                <button
+                  type="button"
+                  onClick={() => unpublishArticle()}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-amber-700 text-amber-900 text-sm font-semibold rounded-sm hover:bg-amber-50 transition-colors disabled:opacity-50"
+                >
+                  UNPUBLISH
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => publishArticle()}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
+                >
+                  <Globe size={14} />
+                  {saving ? 'Publishing…' : 'PUBLISH'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => deleteArticle()}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 text-sm font-semibold rounded-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                DELETE
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => saveNewArticle(false)}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50"
+              >
+                <Save size={14} />
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => saveNewArticle(true)}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
+              >
+                <Globe size={14} />
+                {saving ? 'Publishing…' : 'Publish'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Main content */}
         <div className="xl:col-span-2 space-y-6">
-          {/* Title */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Headline *
@@ -366,12 +588,14 @@ export default function ArticleEditorForm({ articleId }: Props) {
             />
             {form.title && (
               <p className="mt-2 text-xs text-gray-400">
-                Slug: <span className="font-mono">{generateSlug(form.title)}</span>
+                Slug:{' '}
+                <span className="font-mono">
+                  {isEdit ? originalSlug || generateSlug(form.title) : generateSlug(form.title)}
+                </span>
               </p>
             )}
           </div>
 
-          {/* Subtitle */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Subtitle / Standfirst
@@ -386,7 +610,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
             />
           </div>
 
-          {/* Body */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500">
@@ -449,12 +672,14 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </div>
             )}
             <p className="mt-2 text-xs text-gray-500">
-              Word count <span className="font-semibold text-gray-800">{wordCountMarkdownExcludingSyntax(form.bodyText)}</span>{' '}
+              Word count{' '}
+              <span className="font-semibold text-gray-800">
+                {wordCountMarkdownExcludingSyntax(form.bodyText)}
+              </span>{' '}
               <span className="text-gray-400">(excludes Markdown punctuation)</span>
             </p>
           </div>
 
-          {/* Excerpt */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Excerpt
@@ -473,9 +698,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
           </div>
         </div>
 
-        {/* Sidebar metadata */}
         <div className="space-y-5">
-          {/* Status */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Status
@@ -484,17 +707,23 @@ export default function ArticleEditorForm({ articleId }: Props) {
               name="status"
               value={form.status}
               onChange={handleField}
-              className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 bg-white transition-colors"
+              disabled={isEdit}
+              className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 bg-white transition-colors disabled:bg-gray-50 disabled:text-gray-600"
             >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s} className="capitalize">
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
+              {statusSelectOptions.map((s) => (
+                <option key={s} value={s}>
+                  {statusOptionLabel(s)}
                 </option>
               ))}
             </select>
+            {isEdit && (
+              <p className="mt-2 text-xs text-gray-500">
+                Use <span className="font-semibold">Publish</span> or{' '}
+                <span className="font-semibold">Unpublish</span> to change status.
+              </p>
+            )}
           </div>
 
-          {/* Category */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Category *
@@ -515,7 +744,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
             </select>
           </div>
 
-          {/* Label */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Label
@@ -535,7 +763,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
             </select>
           </div>
 
-          {/* Author */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Author Name
@@ -550,7 +777,6 @@ export default function ArticleEditorForm({ articleId }: Props) {
             />
           </div>
 
-          {/* Featured image */}
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
               Featured Image URL
@@ -574,31 +800,79 @@ export default function ArticleEditorForm({ articleId }: Props) {
             )}
           </div>
 
-          {/* Save / publish */}
           <div className="flex flex-col gap-3">
             <button
+              type="button"
               onClick={() => setPreviewOpen(true)}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 transition-colors"
             >
               <Eye size={14} />
               Preview article
             </button>
-            <button
-              onClick={() => save(true)}
-              disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
-            >
-              <Globe size={14} />
-              {saving ? 'Publishing…' : 'Publish now'}
-            </button>
-            <button
-              onClick={() => save(false)}
-              disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 transition-colors disabled:opacity-50"
-            >
-              <Save size={14} />
-              {saving ? 'Saving…' : 'Save draft'}
-            </button>
+
+            {isEdit ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => saveChanges()}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
+                >
+                  <Save size={14} />
+                  {saving ? 'Saving…' : 'SAVE CHANGES'}
+                </button>
+                {isPublished ? (
+                  <button
+                    type="button"
+                    onClick={() => unpublishArticle()}
+                    disabled={saving}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-amber-700 text-amber-900 text-sm font-semibold rounded-sm hover:bg-amber-50 transition-colors disabled:opacity-50"
+                  >
+                    UNPUBLISH
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => publishArticle()}
+                    disabled={saving}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
+                  >
+                    <Globe size={14} />
+                    {saving ? 'Publishing…' : 'PUBLISH'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => deleteArticle()}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-red-300 text-red-700 text-sm font-semibold rounded-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                  DELETE
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => saveNewArticle(true)}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-sm transition-colors disabled:opacity-50"
+                >
+                  <Globe size={14} />
+                  {saving ? 'Publishing…' : 'Publish now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveNewArticle(false)}
+                  disabled={saving}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 text-sm font-semibold text-gray-700 rounded-sm hover:border-gray-500 transition-colors disabled:opacity-50"
+                >
+                  <Save size={14} />
+                  {saving ? 'Saving…' : 'Save draft'}
+                </button>
+              </>
+            )}
           </div>
 
           {saveStatus === 'error' && (
