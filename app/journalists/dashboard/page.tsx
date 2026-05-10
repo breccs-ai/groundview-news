@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import { supabase, getCategoryMeta } from '@/lib/supabase';
+import { hasJournalistRole } from '@/lib/profile-roles';
 import { Plus, Eye, Pencil, ChevronDown } from 'lucide-react';
 
 const GOLD = '#D4AF37';
@@ -119,12 +120,11 @@ export default function JournalistDashboardPage() {
 
     const { data: prof } = await supabase
       .from('profiles')
-      .select('full_name, pen_name, subscription_status, subscription_tier, created_at, role')
+      .select('full_name, pen_name, subscription_status, subscription_tier, created_at, roles, role')
       .eq('id', user.id)
       .maybeSingle();
 
-    const role = (prof as { role?: string } | null)?.role;
-    if (role !== 'journalist') {
+    if (!hasJournalistRole(prof as { roles?: string[] | null; role?: string | null })) {
       setPortalBlocked(true);
       setProfile((prof as ProfileRow) || null);
       setArticles([]);

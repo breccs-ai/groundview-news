@@ -6,10 +6,12 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
+import { hasAdvertiserRole } from '@/lib/profile-roles';
 import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronRight } from 'lucide-react';
 
-const NEED_ADVERTISER_MSG =
-  'Please log in with your advertiser account at /advertise/login';
+const ADD_ADVERTISER_ROLE_MSG =
+  'Add advertiser role to your account to create and manage ads.';
+const NEED_LOGIN_ADVERTISER_MSG = 'Please log in with your advertiser account at /advertise/login.';
 
 const PACKAGES = [
   { days: 7,  pence: 5900,  label: '7 days',  price: '£59',  description: 'Ideal for short campaigns and announcements.' },
@@ -47,7 +49,9 @@ export default function NewAdPage() {
   const [adId, setAdId] = useState<string | null>(draftId);
   const [userId, setUserId] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
-  const [portalBlocked, setPortalBlocked] = useState(false);
+  const [canAdvertiserSave, setCanAdvertiserSave] = useState(true);
+  const [addRoleBusy, setAddRoleBusy] = useState(false);
+  const [addRoleError, setAddRoleError] = useState('');
 
   const [moderating, setModerating] = useState(false);
   const [modError, setModError] = useState('');
@@ -72,11 +76,11 @@ export default function NewAdPage() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('roles, role')
       .eq('id', user.id)
       .maybeSingle();
 
-    if (profile?.role !== 'advertiser') return null;
+    if (!hasAdvertiserRole(profile)) return null;
 
     setUserId(user.id);
     return user.id;
@@ -95,15 +99,17 @@ export default function NewAdPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('roles, role')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (profile?.role !== 'advertiser') {
-        setPortalBlocked(true);
+      if (!hasAdvertiserRole(profile)) {
+        setCanAdvertiserSave(false);
         setBooting(false);
         return;
       }
+
+      setCanAdvertiserSave(true);
 
       setUserId(user.id);
 
@@ -154,7 +160,7 @@ export default function NewAdPage() {
   const saveDraft = async (): Promise<string | null> => {
     const uid = await getAdvertiserUserIdForSave();
     if (!uid) {
-      setSubmitError(NEED_ADVERTISER_MSG);
+      setSubmitError(canAdvertiserSave ? NEED_LOGIN_ADVERTISER_MSG : ADD_ADVERTISER_ROLE_MSG);
       return null;
     }
 
@@ -198,9 +204,13 @@ export default function NewAdPage() {
 
   /** Persist ad with status `pending` before moderation + checkout (checkout accepts pending / pending_review). */
   const saveAdPending = async (uid: string): Promise<string | null> => {
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-    if (profile?.role !== 'advertiser') {
-      setSubmitError(NEED_ADVERTISER_MSG);
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('roles, role')
+      .eq('id', uid)
+      .maybeSingle();
+    if (!hasAdvertiserRole(profile)) {
+      setSubmitError(ADD_ADVERTISER_ROLE_MSG);
       return null;
     }
 
@@ -279,7 +289,7 @@ export default function NewAdPage() {
 
     const uid = await getAdvertiserUserIdForSave();
     if (!uid) {
-      setSubmitError(NEED_ADVERTISER_MSG);
+      setSubmitError(canAdvertiserSave ? NEED_LOGIN_ADVERTISER_MSG : ADD_ADVERTISER_ROLE_MSG);
       return;
     }
 
@@ -374,49 +384,49 @@ export default function NewAdPage() {
 
   const isProcessing = moderating || submitting;
 
+  const handleAddAdvertiserRole = async () => {
+    setAddRoleError('');
+    setAddRoleBusy(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.id || !user.email) {
+        setAddRoleError('You need to be signed in to add advertiser access.');
+        return;
+      }
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const res = await fetch('/api/advertiser/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          email: user.email,
+          full_name: (prof as { full_name?: string } | null)?.full_name || '',
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddRoleError(typeof body.error === 'string' ? body.error : 'Could not add advertiser access.');
+        return;
+      }
+      setCanAdvertiserSave(true);
+      setSubmitError('');
+    } finally {
+      setAddRoleBusy(false);
+    }
+  };
+
   if (booting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
       </div>
-    );
-  }
-
-  if (portalBlocked) {
-    return (
-      <>
-        <Navbar />
-        <main className="bg-white min-h-screen">
-          <div style={{ backgroundColor: '#0f1f3d' }} className="py-10">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
-              <p className="text-sm text-gray-300">
-                Wrong portal for this account.{' '}
-                <Link href="/advertise/login" className="text-amber-400 underline font-semibold">
-                  Sign in with an advertiser account
-                </Link>
-              </p>
-              <button
-                type="button"
-                onClick={() => handleSignOut()}
-                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-4">
-            <p className="text-gray-900 font-medium">{NEED_ADVERTISER_MSG}</p>
-            <p className="text-sm text-gray-600">
-              Journalist sessions cannot create ads. Visit{' '}
-              <Link href="/advertise/login" className="text-amber-800 underline font-semibold">
-                /advertise/login
-              </Link>{' '}
-              after signing out, or register a dedicated advertiser account.
-            </p>
-          </div>
-        </main>
-        <Footer />
-      </>
     );
   }
 
@@ -456,12 +466,52 @@ export default function NewAdPage() {
           </div>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-          {submitError === NEED_ADVERTISER_MSG && (
+          {!canAdvertiserSave && (
+            <div className="text-sm text-amber-950 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 mb-6 space-y-3" role="region">
+              <p className="font-medium">{ADD_ADVERTISER_ROLE_MSG}</p>
+              <p className="text-xs text-amber-900/90">
+                You can apply access on this account without signing out, or{' '}
+                <Link href="/advertise/register" className="font-semibold underline">
+                  open the advertiser signup flow
+                </Link>
+                .
+              </p>
+              {addRoleError && (
+                <p className="text-xs text-red-700" role="alert">
+                  {addRoleError}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={addRoleBusy}
+                onClick={() => handleAddAdvertiserRole()}
+                className="px-4 py-2 text-sm font-semibold rounded-sm text-white bg-gray-900 hover:bg-blue-900 disabled:opacity-60"
+              >
+                {addRoleBusy ? 'Adding…' : 'Add advertiser role to this account'}
+              </button>
+            </div>
+          )}
+          {(submitError === ADD_ADVERTISER_ROLE_MSG || submitError === NEED_LOGIN_ADVERTISER_MSG) && (
             <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 mb-6" role="alert">
-              {NEED_ADVERTISER_MSG}{' '}
-              <Link href="/advertise/login" className="font-semibold underline">
-                Advertiser login
-              </Link>
+              {submitError === NEED_LOGIN_ADVERTISER_MSG ? (
+                <>
+                  {NEED_LOGIN_ADVERTISER_MSG}{' '}
+                  <Link href="/advertise/login" className="font-semibold underline">
+                    Advertiser login
+                  </Link>
+                </>
+              ) : (
+                <>
+                  {ADD_ADVERTISER_ROLE_MSG}{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleAddAdvertiserRole()}
+                    className="font-semibold underline text-left"
+                  >
+                    Add advertiser role now
+                  </button>
+                </>
+              )}
             </p>
           )}
           {/* Step 1: Content */}

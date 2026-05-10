@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -19,8 +19,9 @@ const EXPERTISE_OPTIONS = [
 
 type ExpertiseOption = (typeof EXPERTISE_OPTIONS)[number];
 
-export default function JournalistRegisterPage() {
+function JournalistRegisterInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({
     full_name: '',
     pen_name: '',
@@ -32,6 +33,13 @@ export default function JournalistRegisterPage() {
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [successDetail, setSuccessDetail] = useState<{ existing: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    const h = searchParams.get('emailHint')?.trim();
+    if (!h) return;
+    setForm((p) => (p.email ? p : { ...p, email: h }));
+  }, [searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -51,10 +59,44 @@ export default function JournalistRegisterPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    const emailTrim = form.email.trim();
+    const password = form.password;
 
-    if (error || !data.user) {
-      setErrorMsg(error?.message || 'Registration failed. Please try again.');
+    const signUp = await supabase.auth.signUp({ email: emailTrim, password });
+
+    let uid: string | undefined;
+
+    if (signUp.error) {
+      const em = signUp.error.message.toLowerCase();
+      const duplicate =
+        em.includes('registered') ||
+        em.includes('already') ||
+        em.includes('exists') ||
+        em.includes('user already');
+      if (duplicate) {
+        const signedIn = await supabase.auth.signInWithPassword({
+          email: emailTrim,
+          password,
+        });
+        if (signedIn.error || !signedIn.data.user) {
+          setErrorMsg(
+            'An account with this email already exists. Sign in with your password first, then add contributor access from your dashboard.',
+          );
+          setStatus('error');
+          return;
+        }
+        uid = signedIn.data.user.id;
+      } else {
+        setErrorMsg(signUp.error.message || 'Registration failed. Please try again.');
+        setStatus('error');
+        return;
+      }
+    } else {
+      uid = signUp.data.user?.id;
+    }
+
+    if (!uid) {
+      setErrorMsg('Registration failed. Please try again.');
       setStatus('error');
       return;
     }
@@ -63,8 +105,8 @@ export default function JournalistRegisterPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: data.user.id,
-        email: form.email,
+        id: uid,
+        email: emailTrim,
         full_name: form.full_name,
         pen_name: form.pen_name,
         bio: form.bio,
@@ -75,12 +117,21 @@ export default function JournalistRegisterPage() {
     const profileBody = await profileRes.json().catch(() => ({}));
 
     if (!profileRes.ok) {
-      setErrorMsg(profileBody.error || 'Account created but profile setup failed. Please contact support@groundviewnews.com.');
+      setErrorMsg(
+        typeof profileBody.error === 'string'
+          ? profileBody.error
+          : 'Application could not be saved. Please contact support@groundviewnews.com.',
+      );
       setStatus('error');
       return;
     }
 
+    setSuccessDetail({
+      existing: Boolean(profileBody.existing),
+      message: typeof profileBody.message === 'string' ? profileBody.message : '',
+    });
     setStatus('success');
+    window.setTimeout(() => router.replace('/dashboard'), profileBody.existing ? 2200 : 1200);
   };
 
   return (
@@ -103,18 +154,22 @@ export default function JournalistRegisterPage() {
           {status === 'success' ? (
             <div className="bg-green-50 border border-green-200 rounded-sm p-6">
               <p className="text-sm font-semibold text-green-900" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
-                Your application has been received.
+                {successDetail?.existing && successDetail.message
+                  ? successDetail.message
+                  : 'Your application has been received.'}
               </p>
               <p className="text-sm text-green-800 mt-2">
-                Our editorial team will review your profile and you will receive an email within 48 hours.
+                {successDetail?.existing
+                  ? 'We notified our editorial desk. Redirecting…'
+                  : 'Our editorial team will review your profile and you will receive an email within 48 hours.'}
               </p>
               <div className="mt-5 flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => router.push('/journalists/login')}
+                  onClick={() => router.push('/dashboard')}
                   className="px-4 py-2.5 bg-gray-900 hover:bg-blue-900 text-white font-semibold text-sm rounded-sm transition-colors"
                 >
-                  Go to login
+                  Open dashboard
                 </button>
                 <Link href="/" className="text-sm text-amber-700 hover:text-amber-900 underline">
                   Back to homepage
@@ -198,5 +253,19 @@ export default function JournalistRegisterPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function JournalistRegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <JournalistRegisterInner />
+    </Suspense>
   );
 }

@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import { supabase } from '@/lib/supabase';
+import { hasJournalistRole } from '@/lib/profile-roles';
 import { CATEGORIES } from '@/lib/supabase';
 import {
   markdownBodyPayload,
@@ -21,6 +22,8 @@ const LABEL_OPTIONS = ['Commentary', 'Opinion', 'In Depth', 'Analysis', 'Editori
 
 const GOLD = '#D4AF37';
 const NAVY = '#0f1f3d';
+
+const NEED_JOURNALIST_ROLE_MSG = 'Add journalist role to your account to save and submit articles.';
 
 type FormState = {
   title: string;
@@ -64,7 +67,8 @@ function JournalistSubmitInner() {
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [bootError, setBootError] = useState('');
-  const [journalistPortalBlocked, setJournalistPortalBlocked] = useState(false);
+  const [canSubmitAsJournalist, setCanSubmitAsJournalist] = useState(true);
+  const [accountEmailHint, setAccountEmailHint] = useState('');
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -195,16 +199,23 @@ function JournalistSubmitInner() {
         return;
       }
 
+      setAccountEmailHint(session.user.email?.trim() || '');
+
       const { data: profile } = await supabase
         .from('profiles')
-        .select('pen_name, role')
+        .select('pen_name, roles, role')
         .eq('id', session.user.id)
         .maybeSingle();
-      const profileRow = profile as { pen_name?: string | null; role?: string | null } | null;
-      if ((profileRow?.role || '') !== 'journalist') {
-        setJournalistPortalBlocked(true);
-        setLoadingBoot(false);
-        return;
+      const profileRow = profile as {
+        pen_name?: string | null;
+        roles?: string[] | null;
+        role?: string | null;
+      } | null;
+      const hasJournalist = hasJournalistRole(profileRow);
+      if (!hasJournalist) {
+        setCanSubmitAsJournalist(false);
+      } else {
+        setCanSubmitAsJournalist(true);
       }
 
       setUserId(session.user.id);
@@ -313,6 +324,10 @@ function JournalistSubmitInner() {
 
   const saveDraft = async () => {
     if (!accessToken || !userId) return;
+    if (!canSubmitAsJournalist) {
+      setBootError(NEED_JOURNALIST_ROLE_MSG);
+      return;
+    }
     setLoadingDraftSave(true);
     try {
       const payload = buildPayload();
@@ -359,6 +374,10 @@ function JournalistSubmitInner() {
 
   const runPublishReview = async () => {
     if (!accessToken || !userId) return;
+    if (!canSubmitAsJournalist) {
+      setBootError(NEED_JOURNALIST_ROLE_MSG);
+      return;
+    }
 
     const errs: string[] = [];
     if (!form.title.trim()) errs.push('Title is required.');
@@ -494,39 +513,6 @@ function JournalistSubmitInner() {
     );
   }
 
-  if (journalistPortalBlocked) {
-    return (
-      <>
-        <Navbar />
-        <main className="bg-white min-h-screen">
-          <div style={{ backgroundColor: NAVY }} className="py-10">
-            <div className="max-w-3xl mx-auto px-6 md:px-0 flex flex-wrap items-start justify-between gap-4">
-              <p className="text-sm text-gray-300">
-                Wrong portal for this account.{' '}
-                <Link href="/journalists/login" className="underline font-semibold" style={{ color: GOLD }}>
-                  Sign in with a journalist account
-                </Link>
-              </p>
-              <button
-                type="button"
-                onClick={() => handleSignOut()}
-                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-          <div className="max-w-3xl mx-auto px-6 md:px-0 py-12 space-y-4">
-            <p className="text-gray-900 font-medium">
-              This email is registered as an advertiser account. Please use your journalist account.
-            </p>
-          </div>
-        </main>
-        <Footer />
-      </>
-    );
-  }
-
   return (
     <>
       <Navbar />
@@ -567,6 +553,24 @@ function JournalistSubmitInner() {
         </div>
 
         <div className="max-w-3xl mx-auto px-6 md:px-0 py-10 space-y-8">
+          {!canSubmitAsJournalist && (
+            <div className="text-sm text-amber-950 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 space-y-3" role="region">
+              <p className="font-medium">{NEED_JOURNALIST_ROLE_MSG}</p>
+              <p className="text-xs text-amber-900/90">
+                Complete the contributor application while signed in. We attach the journalist role to this account automatically after you submit it.
+              </p>
+              <Link
+                href={
+                  accountEmailHint
+                    ? `/journalists/register?emailHint=${encodeURIComponent(accountEmailHint)}`
+                    : '/journalists/register'
+                }
+                className="inline-block px-4 py-2 text-sm font-semibold rounded-sm text-white bg-gray-900 hover:bg-blue-900"
+              >
+                Add journalist role — open application
+              </Link>
+            </div>
+          )}
           {bootError && <p className="text-sm text-red-600 border border-red-200 bg-red-50 px-4 py-3 rounded-sm">{bootError}</p>}
 
           {publishOutcome.kind === 'rejected' && (
@@ -825,7 +829,7 @@ function JournalistSubmitInner() {
               <button
                 type="button"
                 onClick={() => saveDraft()}
-                disabled={loadingDraftSave}
+                disabled={loadingDraftSave || !canSubmitAsJournalist}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm border border-gray-400 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Save size={16} />
@@ -845,7 +849,7 @@ function JournalistSubmitInner() {
               <button
                 type="button"
                 onClick={() => runPublishReview()}
-                disabled={loadingPublish}
+                disabled={loadingPublish || !canSubmitAsJournalist}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm text-sm font-semibold text-white disabled:opacity-50"
                 style={{ backgroundColor: GOLD }}
               >
@@ -864,7 +868,7 @@ function JournalistSubmitInner() {
               <button
                 type="button"
                 onClick={() => runPublishReview()}
-                disabled={loadingPublish}
+                disabled={loadingPublish || !canSubmitAsJournalist}
                 className="px-4 py-2 rounded-sm text-sm font-semibold text-white disabled:opacity-50"
                 style={{ backgroundColor: GOLD }}
               >

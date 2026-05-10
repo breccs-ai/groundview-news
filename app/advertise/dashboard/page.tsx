@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
+import { hasAdvertiserRole } from '@/lib/profile-roles';
 import { Plus, MousePointerClick } from 'lucide-react';
 
 const NAVY = '#0f1f3d';
@@ -101,11 +102,10 @@ export default function AdvertiserDashboardPage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('role')
+        .select('roles, role')
         .eq('id', u.id)
         .maybeSingle();
-      const role = (prof as { role?: string } | null)?.role;
-      if (role !== 'advertiser') {
+      if (!hasAdvertiserRole(prof as { roles?: string[] | null; role?: string | null })) {
         setPortalBlocked(true);
         setUser({ email: u.email || '' });
         setLoading(false);
