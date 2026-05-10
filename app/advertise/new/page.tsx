@@ -116,13 +116,67 @@ export default function NewAdPage() {
     };
 
     if (adId) {
-      await supabase.from('advertisements').update(payload).eq('id', adId);
+      const { error } = await supabase.from('advertisements').update(payload).eq('id', adId);
+      if (error) {
+        console.error('[saveDraft] update', error);
+        return null;
+      }
       return adId;
-    } else {
-      const { data } = await supabase.from('advertisements').insert(payload).select('id').maybeSingle();
-      if (data?.id) { setAdId(data.id); return data.id; }
+    }
+    const { data, error } = await supabase
+      .from('advertisements')
+      .insert(payload)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.error('[saveDraft] insert', error);
       return null;
     }
+    if (data?.id) {
+      setAdId(data.id);
+      return data.id;
+    }
+    return null;
+  };
+
+  /** Persist ad with status `pending` before moderation + checkout (checkout accepts pending / pending_review). */
+  const saveAdPending = async (uid: string): Promise<string | null> => {
+    if (!selectedPkg) return null;
+    console.log('Saving ad...');
+    const payload = {
+      user_id: uid,
+      company_name: content.company_name,
+      title: content.title,
+      copy: content.copy,
+      destination_url: content.destination_url,
+      image_url: content.image_url,
+      video_url: content.video_url,
+      package_days: selectedPkg.days,
+      package_price_pence: selectedPkg.pence,
+      status: 'pending',
+      updated_at: new Date().toISOString(),
+    };
+
+    if (adId) {
+      const { error } = await supabase.from('advertisements').update(payload).eq('id', adId);
+      if (error) {
+        console.error('[saveAdPending] update', error);
+        return null;
+      }
+      return adId;
+    }
+    const { data, error } = await supabase
+      .from('advertisements')
+      .insert(payload)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.error('[saveAdPending] insert', error);
+      return null;
+    }
+    if (!data?.id) return null;
+    setAdId(data.id);
+    return data.id;
   };
 
   const proceedToStep2 = async () => {
@@ -130,7 +184,11 @@ export default function NewAdPage() {
       alert('Please fill in all required fields.');
       return;
     }
-    await saveDraft();
+    const id = await saveDraft();
+    if (!id) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return;
+    }
     setStep(2);
   };
 
@@ -139,28 +197,46 @@ export default function NewAdPage() {
       alert('Please select a package.');
       return;
     }
-    await saveDraft();
+    const id = await saveDraft();
+    if (!id) {
+      alert('Could not save your ad. Please try again.');
+      return;
+    }
     setStep(3);
   };
 
   const runModerationAndPay = async () => {
-    if (!adId || !selectedPkg) return;
-    setModerating(true);
     setModError('');
     setSubmitError('');
+
+    if (!selectedPkg) {
+      setSubmitError('Please select a package before paying.');
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user?.id ?? userId;
+    if (!uid) {
+      setSubmitError('You must be signed in to pay.');
+      return;
+    }
+
+    setModerating(true);
+
+    const effectiveAdId = await saveAdPending(uid);
+    if (!effectiveAdId) {
+      setSubmitError('Could not save your ad. Please try again.');
+      setModerating(false);
+      return;
+    }
+    console.log('Ad saved:', effectiveAdId);
 
     let uploadedImageUrl = content.image_url;
 
     if (content.image_file) {
-      const res = await fetch('/api/advertiser/upload-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adId }),
-      });
-
       const formData = new FormData();
       formData.append('file', content.image_file);
-      formData.append('adId', adId);
+      formData.append('adId', effectiveAdId);
 
       const uploadRes = await fetch('/api/advertiser/upload-image', {
         method: 'PUT',
@@ -175,14 +251,14 @@ export default function NewAdPage() {
 
       const { url } = await uploadRes.json();
       uploadedImageUrl = url;
-      await supabase.from('advertisements').update({ image_url: uploadedImageUrl }).eq('id', adId);
+      await supabase.from('advertisements').update({ image_url: uploadedImageUrl }).eq('id', effectiveAdId);
     }
 
     const modRes = await fetch('/api/advertiser/moderate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        adId,
+        adId: effectiveAdId,
         title: content.title,
         copy: content.copy,
         destination_url: content.destination_url,
@@ -199,22 +275,19 @@ export default function NewAdPage() {
     }
 
     setModerating(false);
-
-    if (!userId) {
-      setSubmitError('You must be signed in to pay.');
-      return;
-    }
-
     setSubmitting(true);
+
+    const packagePricePence = Math.round(selectedPkg.pence);
+    console.log('Creating checkout session...');
 
     const checkoutRes = await fetch('/api/advertiser/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        advertiser_id: userId,
-        ad_id: adId,
+        advertiser_id: uid,
+        ad_id: effectiveAdId,
         package_days: selectedPkg.days,
-        package_price: selectedPkg.pence,
+        package_price: packagePricePence,
         ad_title: content.title,
         company_name: content.company_name,
       }),
@@ -223,13 +296,21 @@ export default function NewAdPage() {
     const checkoutData = await checkoutRes.json();
 
     if (!checkoutRes.ok || !checkoutData.url) {
-      setSubmitError('Failed to start payment. Please try again or contact support@groundviewnews.com.');
+      const msg =
+        typeof checkoutData.error === 'string'
+          ? checkoutData.error
+          : 'Failed to start payment. Please try again or contact support@groundviewnews.com.';
+      setSubmitError(msg);
       setSubmitting(false);
       return;
     }
 
-    window.location.href = checkoutData.url as string;
+    const checkoutUrl = checkoutData.url as string;
+    console.log('Checkout URL:', checkoutUrl);
+    window.location.href = checkoutUrl;
   };
+
+  const isProcessing = moderating || submitting;
 
   return (
     <>
@@ -416,25 +497,28 @@ export default function NewAdPage() {
                 </div>
               )}
 
-              {submitError && (
-                <p className="text-sm text-red-600 mb-4">{submitError}</p>
-              )}
-
               <div className="flex gap-3">
-                <button onClick={() => setStep(2)}
-                  className="flex-1 py-3 border border-gray-300 font-semibold text-sm rounded-sm text-gray-700 hover:border-gray-500 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  disabled={isProcessing}
+                  className="flex-1 py-3 border border-gray-300 font-semibold text-sm rounded-sm text-gray-700 hover:border-gray-500 transition-colors disabled:opacity-50">
                   ← Back
                 </button>
-                <button onClick={runModerationAndPay} disabled={moderating || submitting}
+                <button
+                  type="button"
+                  onClick={() => runModerationAndPay()}
+                  disabled={isProcessing || !selectedPkg}
                   className="flex-1 py-3 font-semibold text-sm rounded-sm transition-colors text-white disabled:opacity-60"
                   style={{ backgroundColor: '#B8860B' }}>
-                  {moderating
-                    ? 'Checking content…'
-                    : submitting
-                      ? 'Creating checkout session…'
-                      : 'Pay Now →'}
+                  {isProcessing ? 'Processing...' : 'Pay Now →'}
                 </button>
               </div>
+              {submitError && (
+                <p className="text-sm text-red-600 mt-3" role="alert">
+                  {submitError}
+                </p>
+              )}
               <p className="text-xs text-gray-400 mt-3 text-center">
                 Your ad will be reviewed for content compliance before payment is processed.
               </p>
