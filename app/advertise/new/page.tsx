@@ -199,12 +199,25 @@ export default function NewAdPage() {
     }
 
     setModerating(false);
+
+    if (!userId) {
+      setSubmitError('You must be signed in to pay.');
+      return;
+    }
+
     setSubmitting(true);
 
     const checkoutRes = await fetch('/api/advertiser/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adId, packageDays: selectedPkg.days }),
+      body: JSON.stringify({
+        advertiser_id: userId,
+        ad_id: adId,
+        package_days: selectedPkg.days,
+        package_price: selectedPkg.pence,
+        ad_title: content.title,
+        company_name: content.company_name,
+      }),
     });
 
     const checkoutData = await checkoutRes.json();
@@ -215,7 +228,7 @@ export default function NewAdPage() {
       return;
     }
 
-    window.location.href = checkoutData.url;
+    window.location.href = checkoutData.url as string;
   };
 
   return (
@@ -415,7 +428,11 @@ export default function NewAdPage() {
                 <button onClick={runModerationAndPay} disabled={moderating || submitting}
                   className="flex-1 py-3 font-semibold text-sm rounded-sm transition-colors text-white disabled:opacity-60"
                   style={{ backgroundColor: '#B8860B' }}>
-                  {moderating ? 'Checking content…' : submitting ? 'Redirecting to payment…' : 'Pay Now →'}
+                  {moderating
+                    ? 'Checking content…'
+                    : submitting
+                      ? 'Creating checkout session…'
+                      : 'Pay Now →'}
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-3 text-center">
