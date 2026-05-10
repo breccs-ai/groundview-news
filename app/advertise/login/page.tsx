@@ -22,13 +22,35 @@ export default function AdvertiserLoginPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
     });
 
     if (error) {
       setErrorMsg('Incorrect email or password. Please try again.');
+      setStatus('error');
+      return;
+    }
+
+    const uid = authData.user?.id;
+    if (!uid) {
+      setErrorMsg('Could not verify your session. Please try again.');
+      setStatus('error');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', uid)
+      .maybeSingle();
+
+    if (profile?.role !== 'advertiser') {
+      await supabase.auth.signOut();
+      setErrorMsg(
+        'This email is registered as a journalist account. Please use your advertiser account or register a new advertiser account.'
+      );
       setStatus('error');
       return;
     }

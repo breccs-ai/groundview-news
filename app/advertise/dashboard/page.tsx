@@ -86,6 +86,7 @@ export default function AdvertiserDashboardPage() {
   const router = useRouter();
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
+  const [portalBlocked, setPortalBlocked] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
 
   useEffect(() => {
@@ -98,6 +99,20 @@ export default function AdvertiserDashboardPage() {
         return;
       }
 
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', u.id)
+        .maybeSingle();
+      const role = (prof as { role?: string } | null)?.role;
+      if (role !== 'advertiser') {
+        setPortalBlocked(true);
+        setUser({ email: u.email || '' });
+        setLoading(false);
+        return;
+      }
+
+      setPortalBlocked(false);
       setUser({ email: u.email || '' });
 
       const { data, error } = await supabase
@@ -120,6 +135,43 @@ export default function AdvertiserDashboardPage() {
     await supabase.auth.signOut();
     router.push('/advertise/login');
   };
+
+  if (portalBlocked) {
+    return (
+      <>
+        <Navbar />
+        <main className="bg-white min-h-screen">
+          <div style={{ backgroundColor: NAVY }} className="py-10">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
+              <p className="text-sm text-gray-300">
+                Wrong portal for this account.{' '}
+                <Link href="/advertise/login" className="text-amber-400 underline font-semibold">
+                  Sign in with an advertiser account
+                </Link>
+              </p>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-4">
+            <p className="text-gray-900 font-medium">
+              Please log in with your advertiser account at{' '}
+              <Link href="/advertise/login" className="text-amber-800 underline font-semibold">
+                /advertise/login
+              </Link>
+            </p>
+            {user && <p className="text-sm text-gray-600">Signed in as {user.email}</p>}
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>

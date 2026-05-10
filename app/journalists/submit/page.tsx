@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
@@ -63,6 +64,7 @@ function JournalistSubmitInner() {
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [bootError, setBootError] = useState('');
+  const [journalistPortalBlocked, setJournalistPortalBlocked] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -89,6 +91,11 @@ function JournalistSubmitInner() {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   });
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/journalists/login');
+  };
 
   const generateFeaturedImage = async () => {
     if (!accessToken) return;
@@ -187,11 +194,23 @@ function JournalistSubmitInner() {
         router.push('/journalists/login');
         return;
       }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('pen_name, role')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      const profileRow = profile as { pen_name?: string | null; role?: string | null } | null;
+      if ((profileRow?.role || '') !== 'journalist') {
+        setJournalistPortalBlocked(true);
+        setLoadingBoot(false);
+        return;
+      }
+
       setUserId(session.user.id);
       setAccessToken(session.access_token);
 
-      const { data: profile } = await supabase.from('profiles').select('pen_name').eq('id', session.user.id).maybeSingle();
-      const pn = profile?.pen_name?.trim();
+      const pn = profileRow?.pen_name?.trim();
 
       const loadDraft = async (draftId: string) => {
         const res = await fetch(`/api/articles?id=${encodeURIComponent(draftId)}`, {
@@ -475,33 +494,75 @@ function JournalistSubmitInner() {
     );
   }
 
+  if (journalistPortalBlocked) {
+    return (
+      <>
+        <Navbar />
+        <main className="bg-white min-h-screen">
+          <div style={{ backgroundColor: NAVY }} className="py-10">
+            <div className="max-w-3xl mx-auto px-6 md:px-0 flex flex-wrap items-start justify-between gap-4">
+              <p className="text-sm text-gray-300">
+                Wrong portal for this account.{' '}
+                <Link href="/journalists/login" className="underline font-semibold" style={{ color: GOLD }}>
+                  Sign in with a journalist account
+                </Link>
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSignOut()}
+                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div className="max-w-3xl mx-auto px-6 md:px-0 py-12 space-y-4">
+            <p className="text-gray-900 font-medium">
+              This email is registered as an advertiser account. Please use your journalist account.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
 
       <main className="bg-white min-h-screen">
         <div style={{ backgroundColor: NAVY }} className="py-10">
-          <div className="max-w-3xl mx-auto px-6 md:px-0">
-            <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: GOLD }}>
-              Journalist Portal
-            </p>
-            <h1
-              className="text-2xl md:text-3xl font-bold text-white"
-              style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-            >
-              {isEditing && form.title.trim()
-                ? `Editing: ${form.title}`
-                : isEditing
-                  ? 'Editing draft'
-                  : 'Submit an article'}
-            </h1>
-            {draftSavedAt && (
-              <p className="text-sm text-green-300 mt-2">
-                <span className="font-semibold">Draft saved</span>
-                <br />
-                <span className="text-green-200/90">{new Date(draftSavedAt).toLocaleString('en-GB')}</span>
+          <div className="max-w-3xl mx-auto px-6 md:px-0 flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: GOLD }}>
+                Journalist Portal
               </p>
-            )}
+              <h1
+                className="text-2xl md:text-3xl font-bold text-white"
+                style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+              >
+                {isEditing && form.title.trim()
+                  ? `Editing: ${form.title}`
+                  : isEditing
+                    ? 'Editing draft'
+                    : 'Submit an article'}
+              </h1>
+              {draftSavedAt && (
+                <p className="text-sm text-green-300 mt-2">
+                  <span className="font-semibold">Draft saved</span>
+                  <br />
+                  <span className="text-green-200/90">{new Date(draftSavedAt).toLocaleString('en-GB')}</span>
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSignOut()}
+              className="text-sm font-semibold px-4 py-2.5 border border-white/30 text-gray-300 hover:text-white rounded-sm transition-colors shrink-0 ml-auto sm:ml-0"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
 

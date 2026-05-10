@@ -18,10 +18,12 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServiceSupabase();
+    const fullNameTrimmed = typeof full_name === 'string' ? full_name.trim() : '';
+    /** Explicit advertiser role — required for advertiser-only portal access. */
     const { error } = await supabase.from('profiles').insert({
       id,
-      email,
-      full_name,
+      email: String(email).trim(),
+      full_name: fullNameTrimmed,
       role: 'advertiser',
     });
 

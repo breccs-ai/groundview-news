@@ -92,6 +92,7 @@ export default function JournalistDashboardPage() {
   const [articles, setArticles] = useState<ArticleRow[]>([]);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [portalBlocked, setPortalBlocked] = useState(false);
   const [monthArticlesPublished, setMonthArticlesPublished] = useState(0);
   const [monthViewsEstimate, setMonthViewsEstimate] = useState(0);
   const [monthEarningsEstimate, setMonthEarningsEstimate] = useState<number | null>(null);
@@ -118,9 +119,19 @@ export default function JournalistDashboardPage() {
 
     const { data: prof } = await supabase
       .from('profiles')
-      .select('full_name, pen_name, subscription_status, subscription_tier, created_at')
+      .select('full_name, pen_name, subscription_status, subscription_tier, created_at, role')
       .eq('id', user.id)
       .maybeSingle();
+
+    const role = (prof as { role?: string } | null)?.role;
+    if (role !== 'journalist') {
+      setPortalBlocked(true);
+      setProfile((prof as ProfileRow) || null);
+      setArticles([]);
+      setLoading(false);
+      return;
+    }
+    setPortalBlocked(false);
 
     setProfile((prof as ProfileRow) || null);
 
@@ -237,6 +248,39 @@ export default function JournalistDashboardPage() {
   };
 
   const isApproved = (profile?.subscription_status || '') === 'active';
+
+  if (portalBlocked) {
+    return (
+      <>
+        <Navbar />
+        <main className="bg-white min-h-screen">
+          <div style={{ backgroundColor: NAVY }} className="py-10">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
+              <p className="text-sm text-gray-300">
+                Wrong portal for this account.{' '}
+                <Link href="/journalists/login" className="text-amber-400 underline font-semibold">
+                  Sign in with a journalist account
+                </Link>
+              </p>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-4">
+            <p className="text-gray-900 font-medium">
+              This email is registered as an advertiser account. Please use your journalist account.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>

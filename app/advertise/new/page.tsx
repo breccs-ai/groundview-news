@@ -2,10 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronRight } from 'lucide-react';
+
+const NEED_ADVERTISER_MSG =
+  'Please log in with your advertiser account at /advertise/login';
 
 const PACKAGES = [
   { days: 7,  pence: 5900,  label: '7 days',  price: '£59',  description: 'Ideal for short campaigns and announcements.' },
@@ -42,6 +46,8 @@ export default function NewAdPage() {
   const [selectedPkg, setSelectedPkg] = useState<typeof PACKAGES[0] | null>(null);
   const [adId, setAdId] = useState<string | null>(draftId);
   const [userId, setUserId] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [portalBlocked, setPortalBlocked] = useState(false);
 
   const [moderating, setModerating] = useState(false);
   const [modError, setModError] = useState('');
@@ -51,11 +57,55 @@ export default function NewAdPage() {
   const [imagePreview, setImagePreview] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/advertise/login');
+  };
+
+  /** Current auth user must be role `advertiser` to save ads. Returns user id if ok. */
+  const getAdvertiserUserIdForSave = async (): Promise<string | null> => {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) return null;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.role !== 'advertiser') return null;
+
+    setUserId(user.id);
+    return user.id;
+  };
+
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/advertise/login'); return; }
-      setUserId(session.user.id);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/advertise/login');
+        setBooting(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.role !== 'advertiser') {
+        setPortalBlocked(true);
+        setBooting(false);
+        return;
+      }
+
+      setUserId(user.id);
 
       if (draftId) {
         const { data } = await supabase.from('advertisements').select('*').eq('id', draftId).maybeSingle();
@@ -74,8 +124,10 @@ export default function NewAdPage() {
           if (pkg) setSelectedPkg(pkg);
         }
       }
+      setBooting(false);
     })();
   }, [draftId, router]);
+
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -100,9 +152,14 @@ export default function NewAdPage() {
   };
 
   const saveDraft = async (): Promise<string | null> => {
-    if (!userId) return null;
+    const uid = await getAdvertiserUserIdForSave();
+    if (!uid) {
+      setSubmitError(NEED_ADVERTISER_MSG);
+      return null;
+    }
+
     const payload = {
-      user_id: userId,
+      user_id: uid,
       company_name: content.company_name,
       title: content.title,
       copy: content.copy,
@@ -141,6 +198,12 @@ export default function NewAdPage() {
 
   /** Persist ad with status `pending` before moderation + checkout (checkout accepts pending / pending_review). */
   const saveAdPending = async (uid: string): Promise<string | null> => {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
+    if (profile?.role !== 'advertiser') {
+      setSubmitError(NEED_ADVERTISER_MSG);
+      return null;
+    }
+
     if (!selectedPkg) return null;
     console.log('Saving ad...');
     const payload = {
@@ -214,10 +277,9 @@ export default function NewAdPage() {
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const uid = sessionData.session?.user?.id ?? userId;
+    const uid = await getAdvertiserUserIdForSave();
     if (!uid) {
-      setSubmitError('You must be signed in to pay.');
+      setSubmitError(NEED_ADVERTISER_MSG);
       return;
     }
 
@@ -312,17 +374,73 @@ export default function NewAdPage() {
 
   const isProcessing = moderating || submitting;
 
+  if (booting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (portalBlocked) {
+    return (
+      <>
+        <Navbar />
+        <main className="bg-white min-h-screen">
+          <div style={{ backgroundColor: '#0f1f3d' }} className="py-10">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
+              <p className="text-sm text-gray-300">
+                Wrong portal for this account.{' '}
+                <Link href="/advertise/login" className="text-amber-400 underline font-semibold">
+                  Sign in with an advertiser account
+                </Link>
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSignOut()}
+                className="text-sm font-semibold px-4 py-2 border border-white/30 text-gray-300 hover:text-white rounded-sm shrink-0"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-4">
+            <p className="text-gray-900 font-medium">{NEED_ADVERTISER_MSG}</p>
+            <p className="text-sm text-gray-600">
+              Journalist sessions cannot create ads. Visit{' '}
+              <Link href="/advertise/login" className="text-amber-800 underline font-semibold">
+                /advertise/login
+              </Link>{' '}
+              after signing out, or register a dedicated advertiser account.
+            </p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
       <main className="bg-white min-h-screen">
         <div style={{ backgroundColor: '#0f1f3d' }} className="py-10">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-2">Advertiser Portal</p>
             <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
               Create New Ad
             </h1>
-            <div className="flex items-center gap-2 mt-4">
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSignOut()}
+              className="text-sm font-semibold px-4 py-2.5 border border-white/30 text-gray-300 hover:text-white rounded-sm transition-colors shrink-0 ml-auto sm:ml-0"
+            >
+              Sign Out
+            </button>
+          </div>
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 flex items-center gap-2 mt-4">
               {([1, 2, 3] as Step[]).map((s) => (
                 <div key={s} className="flex items-center gap-2">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? 'bg-amber-500 text-white' : 'bg-white/20 text-gray-400'}`}>
@@ -336,9 +454,16 @@ export default function NewAdPage() {
               ))}
             </div>
           </div>
-        </div>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+          {submitError === NEED_ADVERTISER_MSG && (
+            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 mb-6" role="alert">
+              {NEED_ADVERTISER_MSG}{' '}
+              <Link href="/advertise/login" className="font-semibold underline">
+                Advertiser login
+              </Link>
+            </p>
+          )}
           {/* Step 1: Content */}
           {step === 1 && (
             <div className="space-y-6">

@@ -22,10 +22,35 @@ export default function JournalistLoginPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
 
     if (error) {
       setErrorMsg('Incorrect email or password. Please try again.');
+      setStatus('error');
+      return;
+    }
+
+    const uid = authData.user?.id;
+    if (!uid) {
+      setErrorMsg('Could not verify your session. Please try again.');
+      setStatus('error');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', uid)
+      .maybeSingle();
+
+    if (profile?.role !== 'journalist') {
+      await supabase.auth.signOut();
+      setErrorMsg(
+        'This email is registered as an advertiser account. Please use your journalist account.'
+      );
       setStatus('error');
       return;
     }
