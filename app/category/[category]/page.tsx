@@ -10,9 +10,6 @@ import CategoryFilter from '@/components/CategoryFilter';
 import NewsletterSignup from '@/components/NewsletterSignup';
 import { getPublishedArticles, getCategoryMeta, CATEGORIES } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { Eye, Share2 } from 'lucide-react';
-import { formatStatCount } from '@/lib/format-stats';
-import { parseArticleShares } from '@/lib/article-shares';
 
 type Props = {
   params: { category: string };
@@ -100,7 +97,7 @@ export default async function CategoryPage({ params }: Props) {
                   </p>
                 )}
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                <div className="mt-4 flex items-center gap-3 text-sm text-gray-500">
                   {featured.author_name && (
                     <>
                       <span className="font-medium text-gray-700">{featured.author_name}</span>
@@ -108,15 +105,6 @@ export default async function CategoryPage({ params }: Props) {
                     </>
                   )}
                   <span>{formatDate(featured.published_at)}</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                    <Eye size={14} aria-hidden />
-                    {formatStatCount(featured.views ?? 0)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                    <Share2 size={14} aria-hidden />
-                    {formatStatCount(parseArticleShares(featured.shares).total)}
-                  </span>
                 </div>
 
                 {featured.excerpt && (
@@ -127,7 +115,7 @@ export default async function CategoryPage({ params }: Props) {
 
                 <div className="mt-7">
                   <Link
-                    href={`/articles/${featured.slug}`}
+                    href={`/article/${featured.slug}`}
                     className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold rounded-sm transition-colors"
                     style={{ backgroundColor: '#B8860B', color: '#fff' }}
                   >
@@ -146,9 +134,9 @@ export default async function CategoryPage({ params }: Props) {
                         className="mt-2 text-xl sm:text-2xl font-bold text-gray-900 leading-snug hover:text-blue-900 transition-colors"
                         style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                       >
-                        <Link href={`/articles/${article.slug}`}>{article.title}</Link>
+                        <Link href={`/article/${article.slug}`}>{article.title}</Link>
                       </h3>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                      <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
                         {article.author_name && (
                           <>
                             <span className="font-medium text-gray-600">{article.author_name}</span>
@@ -156,15 +144,6 @@ export default async function CategoryPage({ params }: Props) {
                           </>
                         )}
                         <span>{formatDate(article.published_at)}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="inline-flex items-center gap-1 text-gray-400">
-                          <Eye size={12} aria-hidden />
-                          {formatStatCount(article.views ?? 0)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-gray-400">
-                          <Share2 size={12} aria-hidden />
-                          {formatStatCount(parseArticleShares(article.shares).total)}
-                        </span>
                       </div>
                       {article.excerpt && (
                         <p className="mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2">
@@ -172,7 +151,7 @@ export default async function CategoryPage({ params }: Props) {
                         </p>
                       )}
                       <Link
-                        href={`/articles/${article.slug}`}
+                        href={`/article/${article.slug}`}
                         className="mt-3 inline-flex items-center text-sm font-semibold transition-colors"
                         style={{ color: '#B8860B' }}
                       >

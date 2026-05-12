@@ -1,10 +1,7 @@
 import Link from 'next/link';
-import { Eye, Share2 } from 'lucide-react';
 import { Article } from '@/lib/supabase';
 import CategoryBadge from './CategoryBadge';
 import { formatDate } from '@/lib/utils';
-import { formatStatCount } from '@/lib/format-stats';
-import { parseArticleShares } from '@/lib/article-shares';
 
 type Props = {
   article: Article;
@@ -12,9 +9,7 @@ type Props = {
 };
 
 export default function ArticleCard({ article, variant = 'default' }: Props) {
-  const href = `/articles/${article.slug}`;
-  const viewCount = article.views ?? 0;
-  const shareTotal = parseArticleShares(article.shares).total;
+  const href = `/article/${article.slug}`;
 
   if (variant === 'compact') {
     return (
@@ -38,16 +33,6 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
             {article.title}
           </h3>
           <p className="mt-1 text-xs text-gray-400">{formatDate(article.published_at)}</p>
-          <p className="mt-1.5 flex items-center gap-3 text-[11px] text-gray-400">
-            <span className="inline-flex items-center gap-1">
-              <Eye size={12} strokeWidth={2} aria-hidden />
-              {formatStatCount(viewCount)}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Share2 size={12} strokeWidth={2} aria-hidden />
-              {formatStatCount(shareTotal)}
-            </span>
-          </p>
         </div>
       </div>
     );
@@ -78,19 +63,10 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
                   {article.subtitle}
                 </p>
               )}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-300 text-xs">
+              <div className="mt-3 flex items-center gap-3 text-gray-300 text-xs">
                 {article.author_name && <span>{article.author_name}</span>}
                 {article.author_name && <span>·</span>}
                 <span>{formatDate(article.published_at)}</span>
-                <span className="text-gray-400">·</span>
-                <span className="inline-flex items-center gap-1 text-gray-400">
-                  <Eye size={12} className="opacity-90" aria-hidden />
-                  {formatStatCount(viewCount)}
-                </span>
-                <span className="inline-flex items-center gap-1 text-gray-400">
-                  <Share2 size={12} className="opacity-90" aria-hidden />
-                  {formatStatCount(shareTotal)}
-                </span>
               </div>
             </div>
           </div>
@@ -106,19 +82,10 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
             {article.subtitle && (
               <p className="mt-2 text-gray-600 text-base leading-relaxed">{article.subtitle}</p>
             )}
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-400 text-xs">
+            <div className="mt-3 flex items-center gap-3 text-gray-400 text-xs">
               {article.author_name && <span>{article.author_name}</span>}
               {article.author_name && <span>·</span>}
               <span>{formatDate(article.published_at)}</span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1 text-gray-500">
-                <Eye size={12} aria-hidden />
-                {formatStatCount(viewCount)}
-              </span>
-              <span className="inline-flex items-center gap-1 text-gray-500">
-                <Share2 size={12} aria-hidden />
-                {formatStatCount(shareTotal)}
-              </span>
             </div>
           </div>
         )}
@@ -152,19 +119,10 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
             {article.subtitle}
           </p>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-400 text-xs font-sans">
+        <div className="mt-3 flex items-center gap-3 text-gray-400 text-xs font-sans">
           {article.author_name && <span className="font-medium text-gray-600">{article.author_name}</span>}
           {article.author_name && <span>·</span>}
           <span>{formatDate(article.published_at)}</span>
-          <span>·</span>
-          <span className="inline-flex items-center gap-1">
-            <Eye size={12} aria-hidden />
-            {formatStatCount(viewCount)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Share2 size={12} aria-hidden />
-            {formatStatCount(shareTotal)}
-          </span>
         </div>
       </div>
     </div>

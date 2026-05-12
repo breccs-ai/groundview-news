@@ -9,7 +9,6 @@ import {
   FilePlus,
   LogOut,
   Globe,
-  DollarSign,
   Menu,
   X,
 } from 'lucide-react';
@@ -17,7 +16,6 @@ import {
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/articles/new', label: 'New Article', icon: FilePlus },
-  { href: '/admin/revenue', label: 'Revenue', icon: DollarSign },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {

@@ -1,14 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-/**
- * Article stats columns — run in Supabase SQL Editor if not already applied:
- *
- * ```sql
- * ALTER TABLE articles ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
- * ALTER TABLE articles ADD COLUMN IF NOT EXISTS shares jsonb DEFAULT '{"twitter": 0, "facebook": 0, "linkedin": 0, "whatsapp": 0, "total": 0}'::jsonb;
- * ```
- */
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
@@ -21,36 +12,22 @@ export type Article = {
   slug: string;
   author_name: string;
   category: string;
-  /** Editorial submission type (review routing); DB default `general`. */
-  editorial_category?: string;
   label: string;
   body: ArticleBody;
   excerpt: string;
   featured_image_url: string;
-  /** Page-view counter; increment via RPC from client once per session. */
-  views?: number | null;
-  /** Per-platform share counts + total; see `parseArticleShares` in lib/article-shares.ts */
-  shares?: unknown;
   published_at: string;
   created_at: string;
 };
 
-/** Legacy block-based body (pre–full Markdown). Still supported for rendering migration. */
 export type ArticleBodyBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'heading'; level?: number; text: string }
-  | { type: 'image'; url: string; caption?: string }
-  | { type: string; text?: string; level?: number; items?: string[]; url?: string; caption?: string };
+  | { type: 'image'; url: string; caption?: string };
 
-/** jsonb body: standard storage is `{ markdown: string }`; legacy `{ content: [...] }` remains readable. */
-export type ArticleBody =
-  | string
-  | null
-  | {
-      markdown?: string;
-      content?: ArticleBodyBlock[];
-      [key: string]: unknown;
-    };
+export type ArticleBody = {
+  content?: ArticleBodyBlock[];
+} | string | null;
 
 export type Category = {
   slug: string;

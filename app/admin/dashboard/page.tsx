@@ -24,48 +24,17 @@ type Article = {
 
 type ToastMsg = { type: 'success' | 'error'; text: string };
 
-type ArticleQueueTab = 'all' | 'automated' | 'editorial';
-
-type PendingJournalist = {
-  id: string;
-  full_name: string;
-  pen_name: string | null;
-  email: string;
-  bio: string | null;
-  expertise: string[] | null;
-  created_at: string;
-};
-
 export default function AdminDashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingJournalists, setPendingJournalists] = useState<PendingJournalist[]>([]);
-  const [pendingLoading, setPendingLoading] = useState(true);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<DbStatus>(null);
-  const [rejecting, setRejecting] = useState<PendingJournalist | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [articleQueueTab, setArticleQueueTab] = useState<ArticleQueueTab>('all');
 
   const showToast = (type: ToastMsg['type'], text: string) => {
     setToast({ type, text });
     setTimeout(() => setToast(null), 4000);
   };
-
-  const fetchPendingJournalists = useCallback(async () => {
-    setPendingLoading(true);
-    const res = await fetch('/api/admin/journalists/pending', { method: 'GET' });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast('error', body.error || 'Failed to load journalist applications.');
-      setPendingJournalists([]);
-      setPendingLoading(false);
-      return;
-    }
-    setPendingJournalists((body.rows || []) as PendingJournalist[]);
-    setPendingLoading(false);
-  }, []);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -91,47 +60,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchArticles();
-    fetchPendingJournalists();
-  }, [fetchArticles, fetchPendingJournalists]);
-
-  const decideJournalist = async (journalist: PendingJournalist, action: 'approve' | 'reject', reason?: string) => {
-    const res = await fetch('/api/admin/journalists/decision', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        journalist_id: journalist.id,
-        action,
-        reason,
-      }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast('error', body.error || 'Action failed.');
-      return;
-    }
-    showToast('success', action === 'approve' ? 'Journalist approved.' : 'Journalist rejected.');
-    fetchPendingJournalists();
-  };
-
-  const handleRejectArticle = async (article: Article) => {
-    const { error } = await supabase.from('articles').update({ status: 'rejected' }).eq('id', article.id);
-
-    if (error) {
-      showToast('error', `Failed to reject: ${error.message}`);
-      return;
-    }
-
-    // TODO: trigger rejection email here — notify the journalist (e.g. reuse sendOutcomeEmail via a small API route).
-
-    await fetch('/api/revalidate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: article.slug }),
-    }).catch(() => {});
-
-    showToast('success', `"${article.title}" rejected.`);
-    fetchArticles();
-  };
+  }, [fetchArticles]);
 
   const handlePublish = async (article: Article) => {
     const now = new Date().toISOString();
@@ -210,34 +139,13 @@ export default function AdminDashboard() {
       published: 'bg-green-100 text-green-800',
       draft: 'bg-gray-100 text-gray-600',
       pending: 'bg-amber-100 text-amber-800',
-      pending_editorial: 'bg-amber-100 text-amber-900',
-      quarantined: 'bg-orange-100 text-orange-900',
-      rejected: 'bg-red-100 text-red-800',
     };
-    const labels: Record<string, string> = {
-      pending_editorial: 'Pending Editorial Review',
-      quarantined: 'Quarantined',
-    };
-    const text = labels[status] || status.replace(/_/g, ' ');
     return (
       <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-sm capitalize ${map[status] || 'bg-gray-100 text-gray-600'}`}>
-        {text}
+        {status}
       </span>
     );
   };
-
-  const filteredArticles = articles.filter((article) => {
-    if (articleQueueTab === 'all') return true;
-    if (articleQueueTab === 'automated') {
-      return article.status === 'pending' || article.status === 'quarantined';
-    }
-    return article.status === 'pending_editorial';
-  });
-
-  const automatedQueueCount = articles.filter(
-    (a) => a.status === 'pending' || a.status === 'quarantined',
-  ).length;
-  const editorialQueueCount = articles.filter((a) => a.status === 'pending_editorial').length;
 
   return (
     <AdminShell>
@@ -283,55 +191,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Reject journalist modal */}
-      {rejecting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-white rounded-sm shadow-xl p-6 max-w-md w-full">
-            <div className="flex items-start gap-3 mb-4">
-              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Reject journalist application</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {rejecting.full_name} ({rejecting.email})
-                </p>
-              </div>
-            </div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">Reason *</label>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={4}
-              className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors resize-none"
-              placeholder="Explain briefly why this application is not approved."
-            />
-            <div className="flex gap-3 justify-end mt-4">
-              <button
-                onClick={() => { setRejecting(null); setRejectReason(''); }}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-sm text-gray-700 hover:border-gray-500 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  const reason = rejectReason.trim();
-                  if (reason.length < 3) {
-                    showToast('error', 'Please provide a rejection reason.');
-                    return;
-                  }
-                  const journalist = rejecting;
-                  setRejecting(null);
-                  setRejectReason('');
-                  await decideJournalist(journalist, 'reject', reason);
-                }}
-                className="px-4 py-2 text-sm bg-amber-700 text-white rounded-sm hover:bg-amber-800 transition-colors font-semibold"
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* DB status banner */}
       {dbStatus && !dbStatus.ok && (
         <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-sm">
@@ -351,93 +210,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Pending journalist applications */}
-      <div className="mb-10">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
-              Pending Journalist Applications
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">{pendingJournalists.length} pending</p>
-          </div>
-          <button
-            onClick={fetchPendingJournalists}
-            className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-sm text-sm text-gray-700 hover:border-gray-400 transition-colors"
-          >
-            <RefreshCw size={14} className={pendingLoading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-sm overflow-hidden">
-          {pendingLoading ? (
-            <div className="py-10 text-center text-sm text-gray-400">Loading applications…</div>
-          ) : pendingJournalists.length === 0 ? (
-            <div className="py-10 text-center text-sm text-gray-500">No pending applications.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">Applicant</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden lg:table-cell">Bio</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden md:table-cell">Expertise</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">Applied</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {pendingJournalists.map((j) => (
-                    <tr key={j.id} className="hover:bg-gray-50 transition-colors align-top">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{j.full_name}</p>
-                        {j.pen_name && <p className="text-xs text-gray-500 mt-0.5">{j.pen_name}</p>}
-                        <p className="text-xs text-gray-400 mt-1">{j.email}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell max-w-md">
-                        <p className="line-clamp-3">{j.bio || '—'}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="flex flex-wrap gap-1.5 max-w-sm">
-                          {(j.expertise || []).length === 0 ? (
-                            <span className="text-xs text-gray-400">—</span>
-                          ) : (
-                            (j.expertise || []).map((x) => (
-                              <span key={x} className="inline-flex px-2 py-0.5 text-xs rounded-sm bg-amber-50 text-amber-800 border border-amber-100">
-                                {x}
-                              </span>
-                            ))
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                        {formatDate(j.created_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => decideJournalist(j, 'approve')}
-                            className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => { setRejecting(j); setRejectReason(''); }}
-                            className="px-2.5 py-1 text-xs font-semibold bg-amber-700 text-white rounded-sm hover:bg-amber-800 transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
@@ -448,41 +220,6 @@ export default function AdminDashboard() {
             Articles
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">{articles.length} total</p>
-          <div className="flex flex-wrap gap-2 mt-4">
-            <button
-              type="button"
-              onClick={() => setArticleQueueTab('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
-                articleQueueTab === 'all'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-              }`}
-            >
-              All articles
-            </button>
-            <button
-              type="button"
-              onClick={() => setArticleQueueTab('automated')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
-                articleQueueTab === 'automated'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-              }`}
-            >
-              Automated moderation ({automatedQueueCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setArticleQueueTab('editorial')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors ${
-                articleQueueTab === 'editorial'
-                  ? 'bg-amber-800 text-white border-amber-800'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-              }`}
-            >
-              Pending Editorial Review ({editorialQueueCount})
-            </button>
-          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -517,10 +254,6 @@ export default function AdminDashboard() {
               Write your first article
             </Link>
           </div>
-        ) : filteredArticles.length === 0 ? (
-          <div className="py-16 text-center text-sm text-gray-500">
-            No articles match this filter.
-          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -542,7 +275,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredArticles.map((article) => {
+                {articles.map((article) => {
                   const cat = getCategoryMeta(article.category);
                   return (
                     <tr key={article.id} className="hover:bg-gray-50 transition-colors">
@@ -568,79 +301,38 @@ export default function AdminDashboard() {
                           : <span className="text-gray-300">Not published</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end flex-wrap">
-                          {articleQueueTab === 'editorial' ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handlePublish(article)}
-                                title="Approve and publish"
-                                className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectArticle(article)}
-                                title="Reject article"
-                                className="px-2.5 py-1 text-xs font-semibold bg-red-700 text-white rounded-sm hover:bg-red-600 transition-colors"
-                              >
-                                Reject
-                              </button>
-                              <Link
-                                href={`/admin/articles/edit/${article.id}`}
-                                className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
-                                title="Edit"
-                              >
-                                <Pencil size={14} />
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => confirmDelete(article.id)}
-                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
+                        <div className="flex items-center gap-1 justify-end">
+                          {article.status === 'published' ? (
+                            <button
+                              onClick={() => handleUnpublish(article)}
+                              title="Unpublish (move to draft)"
+                              className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            >
+                              <Globe size={14} />
+                            </button>
                           ) : (
-                            <>
-                              {article.status === 'published' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUnpublish(article)}
-                                  title="Unpublish (move to draft)"
-                                  className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                >
-                                  <Globe size={14} />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePublish(article)}
-                                  title="Publish"
-                                  className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
-                                >
-                                  Publish
-                                </button>
-                              )}
-                              <Link
-                                href={`/admin/articles/edit/${article.id}`}
-                                className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
-                                title="Edit"
-                              >
-                                <Pencil size={14} />
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => confirmDelete(article.id)}
-                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handlePublish(article)}
+                              title="Publish"
+                              className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
+                            >
+                              Publish
+                            </button>
                           )}
+                          <Link
+                            href={`/admin/articles/edit/${article.id}`}
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </Link>
+                          <button
+                            onClick={() => confirmDelete(article.id)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
