@@ -35,6 +35,9 @@ export default function AdvertiserRegisterV2Page() {
 }
 
 function RegisterContent() {
+  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
+  }
   const searchParams = useSearchParams();
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
@@ -55,12 +58,6 @@ function RegisterContent() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStatus, setForgotStatus] = useState<'idle' | 'loading' | 'sent'>('idle');
-
-  useEffect(() => {
-    if (!stripeKey) {
-      console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
-    }
-  }, [stripeKey]);
 
   useEffect(() => {
     if (searchParams.get('step') === '2') setStep(2);
@@ -217,7 +214,7 @@ function RegisterContent() {
         setErrorMsg(typeof body.error === 'string' ? body.error : 'Could not start verification.');
         return;
       }
-      if (!stripeKey) {
+      if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
         setErrorMsg('Stripe publishable key is not configured.');
         return;
       }
