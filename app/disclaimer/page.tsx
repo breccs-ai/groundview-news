@@ -235,10 +235,10 @@ export default function DisclaimerPage() {
                   <p>
                     To report an error, email{' '}
                     <a
-                      href="mailto:editorial@groundviewnews.com"
+                      href="mailto:info@groundviewnews.com"
                       className="text-amber-700 hover:text-amber-900 underline font-medium"
                     >
-                      editorial@groundviewnews.com
+                      info@groundviewnews.com
                     </a>{' '}
                     with the article URL, the specific passage you believe is in error, and any
                     supporting evidence. We will acknowledge receipt and provide a response.

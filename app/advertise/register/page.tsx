@@ -11,8 +11,9 @@ import { CircleCheck as CheckCircle } from 'lucide-react';
 export default function AdvertiserRegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -34,13 +35,49 @@ export default function AdvertiserRegisterPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
+    const emailTrim = form.email.trim();
+    const password = form.password;
+
+    const signUp = await supabase.auth.signUp({
+      email: emailTrim,
+      password,
     });
 
-    if (error || !data.user) {
-      setErrorMsg(error?.message || 'Registration failed. Please try again.');
+    let uid: string | undefined;
+    let usedExistingLogin = false;
+
+    if (signUp.error) {
+      const em = signUp.error.message.toLowerCase();
+      const duplicate =
+        em.includes('registered') ||
+        em.includes('already') ||
+        em.includes('exists') ||
+        em.includes('user already');
+      if (duplicate) {
+        const signedIn = await supabase.auth.signInWithPassword({
+          email: emailTrim,
+          password,
+        });
+        if (signedIn.error || !signedIn.data.user) {
+          setErrorMsg(
+            'An account with this email already exists. Sign in below with your password, then try advertiser registration again from your account dashboard.',
+          );
+          setStatus('error');
+          return;
+        }
+        uid = signedIn.data.user.id;
+        usedExistingLogin = true;
+      } else {
+        setErrorMsg(signUp.error.message || 'Registration failed. Please try again.');
+        setStatus('error');
+        return;
+      }
+    } else {
+      uid = signUp.data.user?.id;
+    }
+
+    if (!uid) {
+      setErrorMsg('Registration failed. Please try again.');
       setStatus('error');
       return;
     }
@@ -49,8 +86,8 @@ export default function AdvertiserRegisterPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: data.user.id,
-        email: form.email,
+        id: uid,
+        email: emailTrim,
         full_name: form.full_name,
       }),
     });
@@ -58,18 +95,32 @@ export default function AdvertiserRegisterPage() {
     const profileBody = await profileRes.json().catch(() => ({}));
 
     if (!profileRes.ok) {
-      setErrorMsg(profileBody.error || 'Account created but profile setup failed. Please contact support@groundviewnews.com.');
+      setErrorMsg(
+        typeof profileBody.error === 'string'
+          ? profileBody.error
+          : 'Account exists but advertiser setup failed. Please contact support@groundviewnews.com.',
+      );
       setStatus('error');
       return;
     }
 
-    await fetch('/api/advertiser/welcome-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email, full_name: form.full_name }),
-    }).catch(() => {});
+    if (!profileBody.existing) {
+      await fetch('/api/advertiser/welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailTrim, full_name: form.full_name }),
+      }).catch(() => {});
+    }
 
-    router.push('/advertise/dashboard');
+    const baseMsg =
+      'Advertiser access added to your account. You can now log in with your existing credentials.';
+    setSuccessMsg(
+      profileBody.existing || usedExistingLogin
+        ? profileBody.message || baseMsg
+        : 'Your advertiser account is ready. Redirecting…',
+    );
+    setStatus('success');
+    window.setTimeout(() => router.replace('/dashboard'), 1600);
   };
 
   return (
@@ -87,6 +138,17 @@ export default function AdvertiserRegisterPage() {
         </div>
 
         <div className="max-w-md mx-auto px-4 sm:px-6 py-14">
+          {status === 'success' ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-sm p-6 text-center space-y-3">
+              <CheckCircle size={44} strokeWidth={1.5} className="mx-auto text-amber-700" aria-hidden />
+              <p className="text-sm font-semibold text-amber-950">{successMsg}</p>
+              <p className="text-xs text-amber-900/90">
+                <Link href="/dashboard" className="underline font-semibold">
+                  Open your dashboard
+                </Link>
+              </p>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">Full Name *</label>
@@ -120,6 +182,7 @@ export default function AdvertiserRegisterPage() {
               {status === 'loading' ? 'Creating account…' : 'Create Account'}
             </button>
           </form>
+          )}
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}

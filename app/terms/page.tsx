@@ -110,10 +110,10 @@ export default function TermsPage() {
               When factual errors are brought to our attention, we review them promptly and publish
               corrections with a correction notice. Errors may be reported to{' '}
               <a
-                href="mailto:editorial@groundviewnews.com"
+                href="mailto:info@groundviewnews.com"
                 className="text-amber-700 hover:text-amber-900 underline"
               >
-                editorial@groundviewnews.com
+                info@groundviewnews.com
               </a>
               .
             </p>
@@ -181,10 +181,10 @@ export default function TermsPage() {
             <p>
               To request syndication, republication, or licensing rights, please contact{' '}
               <a
-                href="mailto:editorial@groundviewnews.com"
+                href="mailto:info@groundviewnews.com"
                 className="text-amber-700 hover:text-amber-900 underline"
               >
-                editorial@groundviewnews.com
+                info@groundviewnews.com
               </a>
               .
             </p>

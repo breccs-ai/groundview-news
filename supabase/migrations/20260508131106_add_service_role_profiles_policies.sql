@@ -14,7 +14,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE tablename = 'profiles' AND policyname = 'Service role can insert profiles'
+    WHERE policyname = 'Service role can insert profiles' AND tablename = 'profiles'
   ) THEN
     CREATE POLICY "Service role can insert profiles"
       ON profiles FOR INSERT
@@ -27,7 +27,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE tablename = 'profiles' AND policyname = 'Service role can update profiles'
+    WHERE policyname = 'Service role can update profiles' AND tablename = 'profiles'
   ) THEN
     CREATE POLICY "Service role can update profiles"
       ON profiles FOR UPDATE

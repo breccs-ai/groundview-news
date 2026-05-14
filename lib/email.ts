@@ -1,4 +1,11 @@
-export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+const DEFAULT_FROM = 'Ground View News <noreply@groundviewnews.com>';
+
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  from: string = DEFAULT_FROM
+): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping email send');
@@ -12,7 +19,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Ground View News <noreply@groundviewnews.com>',
+      from,
       to,
       subject,
       html,

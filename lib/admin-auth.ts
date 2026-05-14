@@ -24,26 +24,6 @@ export function slugify(title: string): string {
     .slice(0, 80);
 }
 
-export function bodyTextToJson(text: string): { content: { type: string; text: string }[] } {
-  const paragraphs = text
-    .split(/\n\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => ({ type: 'paragraph', text: p }));
-  return { content: paragraphs };
-}
-
-export function bodyJsonToText(body: unknown): string {
-  if (!body) return '';
-  if (typeof body === 'string') return body;
-  const b = body as { content?: { type: string; text?: string }[] };
-  if (!b.content || !Array.isArray(b.content)) return JSON.stringify(body);
-  return b.content
-    .filter((block) => block.type === 'paragraph' && block.text)
-    .map((block) => block.text)
-    .join('\n\n');
-}
-
 export const CATEGORY_OPTIONS = [
   { value: 'africa-diaspora', label: 'Africa & Diaspora' },
   { value: 'world-politics', label: 'World Politics' },
@@ -52,12 +32,41 @@ export const CATEGORY_OPTIONS = [
   { value: 'commentary', label: 'Commentary' },
 ];
 
+/** Values must match DB `articles_label_check` / editorial dropdowns. */
 export const LABEL_OPTIONS = [
   'Commentary',
   'Opinion',
   'In Depth',
   'Analysis',
   'Editorial',
-];
+  'News',
+  'Interview',
+  'Feature',
+] as const;
 
-export const STATUS_OPTIONS = ['draft', 'pending', 'published'];
+export type ArticleLabel = (typeof LABEL_OPTIONS)[number];
+
+/** Allowed `articles.category` slug values. */
+export const ARTICLE_CATEGORY_SLUGS = [
+  'africa-diaspora',
+  'world-politics',
+  'human-rights',
+  'economy',
+  'commentary',
+] as const;
+
+export function normalizeArticleLabel(input: string | undefined | null): ArticleLabel {
+  const t = typeof input === 'string' ? input.trim() : '';
+  if (!t) return 'Commentary';
+  return (LABEL_OPTIONS as readonly string[]).includes(t)
+    ? (t as ArticleLabel)
+    : 'Commentary';
+}
+
+export function normalizeArticleCategory(input: string | undefined | null): string {
+  const t = typeof input === 'string' ? input.trim() : '';
+  if (!t) return 'commentary';
+  return (ARTICLE_CATEGORY_SLUGS as readonly string[]).includes(t) ? t : 'commentary';
+}
+
+export const STATUS_OPTIONS = ['draft', 'pending', 'pending_editorial', 'published'];

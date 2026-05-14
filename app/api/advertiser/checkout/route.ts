@@ -1,68 +1,181 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const PACKAGES: Record<number, { pence: number; label: string }> = {
-  7:  { pence: 5900,  label: '7-day Ad Package' },
-  14: { pence: 9900,  label: '14-day Ad Package' },
-  30: { pence: 17900, label: '30-day Ad Package' },
-  60: { pence: 29900, label: '60-day Ad Package' },
-  90: { pence: 39900, label: '90-day Ad Package' },
-};
+function getStripe(): Stripe | null {
+  const k = process.env.STRIPE_SECRET_KEY;
+  if (!k) return null;
+  return new Stripe(k);
+}
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+function hasAdvertiserRole(profile: { roles?: string[] | null; role?: string | null } | null): boolean {
+  return Boolean(
+    (profile?.roles && profile.roles.includes('advertiser')) || profile?.role === 'advertiser'
   );
 }
 
+/** After moderation, ads use `pending_review` (ready for checkout). Also accept `pending` if used. */
+function isAwaitingPayment(status: string) {
+  return status === 'pending_review' || status === 'pending';
+}
+
 export async function POST(req: NextRequest) {
-  const { adId, packageDays } = await req.json();
+  try {
+    const stripe = getStripe();
+    if (!stripe) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+    }
 
-  const pkg = PACKAGES[packageDays as number];
-  if (!adId || !pkg) {
-    return NextResponse.json({ error: 'Invalid adId or package' }, { status: 400 });
+    const supabase = getServiceSupabase();
+    if (!supabase) {
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    const advertiserId =
+      typeof body.advertiser_id === 'string' ? body.advertiser_id.trim() : '';
+    const adId = typeof body.ad_id === 'string' ? body.ad_id.trim() : '';
+    const packageDays = Number(body.package_days);
+    const packagePrice = Number(body.package_price);
+    const adTitle =
+      typeof body.ad_title === 'string' ? body.ad_title.trim() : 'Advertisement';
+    const companyName =
+      typeof body.company_name === 'string' ? body.company_name.trim() : '';
+
+    if (!advertiserId || !adId || !Number.isFinite(packageDays) || packageDays <= 0) {
+      return NextResponse.json({ error: 'Missing or invalid fields' }, { status: 400 });
+    }
+
+    if (!Number.isFinite(packagePrice) || packagePrice < 1) {
+      return NextResponse.json({ error: 'Invalid package_price' }, { status: 400 });
+    }
+
+    const { data: ad, error: adErr } = await supabase
+      .from('advertisements')
+      .select('id, user_id, status, company_name, title, package_days')
+      .eq('id', adId)
+      .maybeSingle();
+
+    if (adErr) {
+      return NextResponse.json({ error: adErr.message }, { status: 400 });
+    }
+
+    if (!ad) {
+      return NextResponse.json({ error: 'Ad not found' }, { status: 404 });
+    }
+
+    const row = ad as {
+      user_id: string;
+      status: string;
+    };
+
+    if (row.user_id !== advertiserId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (!isAwaitingPayment(row.status)) {
+      return NextResponse.json(
+        { error: 'Ad is not awaiting payment' },
+        { status: 400 }
+      );
+    }
+
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('email, roles, role')
+      .eq('id', advertiserId)
+      .maybeSingle();
+
+    if (profErr) {
+      return NextResponse.json({ error: profErr.message }, { status: 400 });
+    }
+
+    if (!hasAdvertiserRole(profile as { roles?: string[] | null; role?: string | null } | null)) {
+      return NextResponse.json(
+        { error: 'Advertiser access required for checkout' },
+        { status: 403 }
+      );
+    }
+
+    const customerEmail =
+      typeof (profile as { email?: string } | null)?.email === 'string'
+        ? String((profile as { email: string }).email).trim()
+        : undefined;
+
+    if (!customerEmail) {
+      return NextResponse.json(
+        { error: 'Advertiser email not found' },
+        { status: 400 }
+      );
+    }
+
+    const unitAmount = Math.round(packagePrice);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      currency: 'gbp',
+      line_items: [
+        {
+          price_data: {
+            currency: 'gbp',
+            product_data: {
+              name: adTitle || 'Advertisement',
+            },
+            unit_amount: unitAmount,
+          },
+          quantity: 1,
+        },
+      ],
+      success_url:
+        'https://groundviewnews.com/advertise/success?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://groundviewnews.com/advertise/new?cancelled=true',
+      metadata: {
+        ad_id: adId,
+        advertiser_id: advertiserId,
+        package_days: String(packageDays),
+      },
+      customer_email: customerEmail,
+    });
+
+    if (!session.url) {
+      return NextResponse.json(
+        { error: 'Checkout session missing URL' },
+        { status: 500 }
+      );
+    }
+
+    await supabase
+      .from('advertisements')
+      .update({
+        stripe_session_id: session.id,
+        package_days: packageDays,
+        package_price_pence: unitAmount,
+        company_name: companyName || (ad as { company_name?: string }).company_name,
+        title: adTitle || (ad as { title?: string }).title,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', adId);
+
+    return NextResponse.json({
+      sessionId: session.id,
+      url: session.url,
+    });
+  } catch (e) {
+    console.error('[advertiser/checkout]', e);
+    return NextResponse.json(
+      { error: 'Could not create checkout session' },
+      { status: 500 }
+    );
   }
-
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
-  }
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com';
-
-  const params = new URLSearchParams({
-    'payment_method_types[]': 'card',
-    'line_items[0][price_data][currency]': 'gbp',
-    'line_items[0][price_data][product_data][name]': pkg.label,
-    'line_items[0][price_data][unit_amount]': String(pkg.pence),
-    'line_items[0][quantity]': '1',
-    mode: 'payment',
-    success_url: `${baseUrl}/advertise/dashboard?payment=success`,
-    cancel_url: `${baseUrl}/advertise/new?draft=${adId}`,
-    'metadata[adId]': adId,
-    'metadata[packageDays]': String(packageDays),
-  });
-
-  const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${stripeSecretKey}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: params.toString(),
-  });
-
-  const session = await res.json();
-
-  if (!res.ok || !session.url) {
-    return NextResponse.json({ error: session.error?.message || 'Stripe error' }, { status: 500 });
-  }
-
-  const supabase = getSupabase();
-  await supabase.from('advertisements')
-    .update({ stripe_session_id: session.id, package_price_pence: pkg.pence, updated_at: new Date().toISOString() })
-    .eq('id', adId);
-
-  return NextResponse.json({ url: session.url });
 }

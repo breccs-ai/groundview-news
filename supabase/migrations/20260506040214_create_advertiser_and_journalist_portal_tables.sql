@@ -18,7 +18,7 @@
 
   ### advertisements
   - `id` (uuid, PK)
-  - `user_id` (uuid, references profiles)
+  - `advertiser_id` (uuid): initially references profiles(id) for bootstrap; migration 20260514140000 repoints ownership to advertiser_profiles(id). RLS for advertisements is defined there (EXISTS … ap.user_id = auth.uid()).
   - `company_name` (text)
   - `title` (text, max 60 chars enforced at app level)
   - `copy` (text, max 150 chars enforced at app level)
@@ -62,26 +62,28 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can read own profile"
-  ON profiles FOR SELECT
-  TO authenticated
-  USING (auth.uid() = id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can read own profile' AND tablename = 'profiles') THEN
+    CREATE POLICY "Users can read own profile" ON profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+  END IF;
+END $$;
 
-CREATE POLICY "Users can insert own profile"
-  ON profiles FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own profile' AND tablename = 'profiles') THEN
+    CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+  END IF;
+END $$;
 
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own profile' AND tablename = 'profiles') THEN
+    CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+  END IF;
+END $$;
 
 -- advertisements table
 CREATE TABLE IF NOT EXISTS advertisements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  advertiser_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   company_name text NOT NULL DEFAULT '',
   title text NOT NULL DEFAULT '',
   copy text NOT NULL DEFAULT '',
@@ -105,24 +107,12 @@ CREATE TABLE IF NOT EXISTS advertisements (
 
 ALTER TABLE advertisements ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can read own ads"
-  ON advertisements FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own ads"
-  ON advertisements FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own ads"
-  ON advertisements FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- Authenticated RLS policies for advertisements live in 20260514140000_advertiser_system_v2.sql
+-- (after advertiser_profiles exists). Using auth.uid() = advertiser_id here would be wrong once
+-- advertiser_id references advertiser_profiles(id) instead of profiles/auth uid.
 
 -- Index for cron queries
 CREATE INDEX IF NOT EXISTS idx_advertisements_status ON advertisements(status);
 CREATE INDEX IF NOT EXISTS idx_advertisements_updated_at ON advertisements(updated_at);
 CREATE INDEX IF NOT EXISTS idx_advertisements_ends_at ON advertisements(ends_at);
-CREATE INDEX IF NOT EXISTS idx_advertisements_user_id ON advertisements(user_id);
+CREATE INDEX IF NOT EXISTS idx_advertisements_advertiser_id ON advertisements(advertiser_id);

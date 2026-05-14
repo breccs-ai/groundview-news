@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
 
   if (slug) {
     revalidatePath(`/article/${slug}`);
+    revalidatePath(`/articles/${slug}`);
   }
 
   return NextResponse.json({ revalidated: true });

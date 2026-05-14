@@ -75,21 +75,21 @@ export default function ContactPage() {
                     <Mail size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-gray-700">Editorial queries</p>
-                      <p className="text-sm text-gray-500">editorial@groundviewnews.com</p>
+                      <p className="text-sm text-gray-500">info@groundviewnews.com</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Mail size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-gray-700">Tips &amp; stories</p>
-                      <p className="text-sm text-gray-500">tips@groundviewnews.com</p>
+                      <p className="text-sm text-gray-500">info@groundviewnews.com</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Mail size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-gray-700">Corrections</p>
-                      <p className="text-sm text-gray-500">corrections@groundviewnews.com</p>
+                      <p className="text-sm text-gray-500">info@groundviewnews.com</p>
                     </div>
                   </div>
                 </div>

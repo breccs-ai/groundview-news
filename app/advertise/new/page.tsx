@@ -2,10 +2,21 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronRight } from 'lucide-react';
+
+function hasAdvertiserRole(profile: { roles?: string[] | null; role?: string | null } | null | undefined): boolean {
+  return Boolean(
+    (profile?.roles && profile.roles.includes('advertiser')) || profile?.role === 'advertiser'
+  );
+}
+
+const ADD_ADVERTISER_ROLE_MSG =
+  'Add advertiser role to your account to create and manage ads.';
+const NEED_LOGIN_ADVERTISER_MSG = 'Please log in with your advertiser account at /advertise/login.';
 
 const PACKAGES = [
   { days: 7,  pence: 5900,  label: '7 days',  price: '£59',  description: 'Ideal for short campaigns and announcements.' },
@@ -42,6 +53,10 @@ export default function NewAdPage() {
   const [selectedPkg, setSelectedPkg] = useState<typeof PACKAGES[0] | null>(null);
   const [adId, setAdId] = useState<string | null>(draftId);
   const [userId, setUserId] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [canAdvertiserSave, setCanAdvertiserSave] = useState(true);
+  const [addRoleBusy, setAddRoleBusy] = useState(false);
+  const [addRoleError, setAddRoleError] = useState('');
 
   const [moderating, setModerating] = useState(false);
   const [modError, setModError] = useState('');
@@ -51,11 +66,115 @@ export default function NewAdPage() {
   const [imagePreview, setImagePreview] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/advertise/login');
+  };
+
+  /** Validates session + advertiser role (roles array or legacy column). Alerts on failure. */
+  const getAdvertiserUserIdForSave = async (): Promise<string | null> => {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return null;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('roles, role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!hasAdvertiserRole(profile)) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return null;
+    }
+
+    setUserId(user.id);
+    return user.id;
+  };
+
+  /** Persists ads via service-role API (bypasses RLS). */
+  const persistAdViaApi = async (args: {
+    ad_id: string | null;
+    company_name: string;
+    title: string;
+    copy: string;
+    destination_url: string;
+    image_url: string;
+    video_url: string;
+    package_days: number;
+    package_price_pence: number;
+    status: string;
+  }): Promise<string | null> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return null;
+    }
+
+    const res = await fetch('/api/advertiser/save-ad', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        ...(args.ad_id ? { ad_id: args.ad_id } : {}),
+        company_name: args.company_name,
+        title: args.title,
+        copy: args.copy,
+        destination_url: args.destination_url,
+        image_url: args.image_url,
+        video_url: args.video_url,
+        package_days: args.package_days,
+        package_price_pence: args.package_price_pence,
+        status: args.status,
+      }),
+    });
+
+    const json = (await res.json().catch(() => ({}))) as { error?: string; ad_id?: string };
+
+    if (!res.ok || !json.ad_id) {
+      console.error('[persistAdViaApi]', res.status, json);
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return null;
+    }
+
+    return json.ad_id;
+  };
+
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/advertise/login'); return; }
-      setUserId(session.user.id);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/advertise/login');
+        setBooting(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('roles, role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!hasAdvertiserRole(profile)) {
+        setCanAdvertiserSave(false);
+        setBooting(false);
+        return;
+      }
+
+      setCanAdvertiserSave(true);
+
+      setUserId(user.id);
 
       if (draftId) {
         const { data } = await supabase.from('advertisements').select('*').eq('id', draftId).maybeSingle();
@@ -74,8 +193,10 @@ export default function NewAdPage() {
           if (pkg) setSelectedPkg(pkg);
         }
       }
+      setBooting(false);
     })();
   }, [draftId, router]);
+
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -100,9 +221,14 @@ export default function NewAdPage() {
   };
 
   const saveDraft = async (): Promise<string | null> => {
-    if (!userId) return null;
-    const payload = {
-      user_id: userId,
+    const uid = await getAdvertiserUserIdForSave();
+    if (!uid) {
+      setSubmitError(canAdvertiserSave ? NEED_LOGIN_ADVERTISER_MSG : ADD_ADVERTISER_ROLE_MSG);
+      return null;
+    }
+
+    const savedId = await persistAdViaApi({
+      ad_id: adId,
       company_name: content.company_name,
       title: content.title,
       copy: content.copy,
@@ -112,17 +238,45 @@ export default function NewAdPage() {
       package_days: selectedPkg?.days || 30,
       package_price_pence: selectedPkg?.pence || 0,
       status: 'draft',
-      updated_at: new Date().toISOString(),
-    };
+    });
 
-    if (adId) {
-      await supabase.from('advertisements').update(payload).eq('id', adId);
-      return adId;
-    } else {
-      const { data } = await supabase.from('advertisements').insert(payload).select('id').maybeSingle();
-      if (data?.id) { setAdId(data.id); return data.id; }
+    if (savedId) setAdId(savedId);
+    return savedId;
+  };
+
+  /** Persist ad with status `pending` before moderation + checkout (checkout accepts pending / pending_review). */
+  const saveAdPending = async (uid: string): Promise<string | null> => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('roles, role')
+      .eq('id', uid)
+      .maybeSingle();
+
+    const hasRole =
+      (profile?.roles && profile.roles.includes('advertiser')) || profile?.role === 'advertiser';
+    if (!hasRole) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      setSubmitError(ADD_ADVERTISER_ROLE_MSG);
       return null;
     }
+
+    if (!selectedPkg) return null;
+
+    const savedId = await persistAdViaApi({
+      ad_id: adId,
+      company_name: content.company_name,
+      title: content.title,
+      copy: content.copy,
+      destination_url: content.destination_url,
+      image_url: content.image_url,
+      video_url: content.video_url,
+      package_days: selectedPkg.days,
+      package_price_pence: selectedPkg.pence,
+      status: 'pending',
+    });
+
+    if (savedId) setAdId(savedId);
+    return savedId;
   };
 
   const proceedToStep2 = async () => {
@@ -130,7 +284,11 @@ export default function NewAdPage() {
       alert('Please fill in all required fields.');
       return;
     }
-    await saveDraft();
+    const id = await saveDraft();
+    if (!id) {
+      alert('Could not save your ad. Check you are signed in and try again.');
+      return;
+    }
     setStep(2);
   };
 
@@ -139,28 +297,45 @@ export default function NewAdPage() {
       alert('Please select a package.');
       return;
     }
-    await saveDraft();
+    const id = await saveDraft();
+    if (!id) {
+      alert('Could not save your ad. Please try again.');
+      return;
+    }
     setStep(3);
   };
 
   const runModerationAndPay = async () => {
-    if (!adId || !selectedPkg) return;
-    setModerating(true);
     setModError('');
     setSubmitError('');
+
+    if (!selectedPkg) {
+      setSubmitError('Please select a package before paying.');
+      return;
+    }
+
+    const uid = await getAdvertiserUserIdForSave();
+    if (!uid) {
+      setSubmitError(canAdvertiserSave ? NEED_LOGIN_ADVERTISER_MSG : ADD_ADVERTISER_ROLE_MSG);
+      return;
+    }
+
+    setModerating(true);
+
+    const effectiveAdId = await saveAdPending(uid);
+    if (!effectiveAdId) {
+      setSubmitError('Could not save your ad. Please try again.');
+      setModerating(false);
+      return;
+    }
+    console.log('Ad saved:', effectiveAdId);
 
     let uploadedImageUrl = content.image_url;
 
     if (content.image_file) {
-      const res = await fetch('/api/advertiser/upload-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adId }),
-      });
-
       const formData = new FormData();
       formData.append('file', content.image_file);
-      formData.append('adId', adId);
+      formData.append('adId', effectiveAdId);
 
       const uploadRes = await fetch('/api/advertiser/upload-image', {
         method: 'PUT',
@@ -175,14 +350,35 @@ export default function NewAdPage() {
 
       const { url } = await uploadRes.json();
       uploadedImageUrl = url;
-      await supabase.from('advertisements').update({ image_url: uploadedImageUrl }).eq('id', adId);
+      if (!selectedPkg) {
+        setModError('Package missing.');
+        setModerating(false);
+        return;
+      }
+      const imgSave = await persistAdViaApi({
+        ad_id: effectiveAdId,
+        company_name: content.company_name,
+        title: content.title,
+        copy: content.copy,
+        destination_url: content.destination_url,
+        image_url: uploadedImageUrl,
+        video_url: content.video_url,
+        package_days: selectedPkg.days,
+        package_price_pence: selectedPkg.pence,
+        status: 'pending',
+      });
+      if (!imgSave) {
+        setModError('Could not update ad image.');
+        setModerating(false);
+        return;
+      }
     }
 
     const modRes = await fetch('/api/advertiser/moderate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        adId,
+        adId: effectiveAdId,
         title: content.title,
         copy: content.copy,
         destination_url: content.destination_url,
@@ -201,34 +397,108 @@ export default function NewAdPage() {
     setModerating(false);
     setSubmitting(true);
 
+    const packagePricePence = Math.round(selectedPkg.pence);
+    console.log('Creating checkout session...');
+
     const checkoutRes = await fetch('/api/advertiser/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adId, packageDays: selectedPkg.days }),
+      body: JSON.stringify({
+        advertiser_id: uid,
+        ad_id: effectiveAdId,
+        package_days: selectedPkg.days,
+        package_price: packagePricePence,
+        ad_title: content.title,
+        company_name: content.company_name,
+      }),
     });
 
     const checkoutData = await checkoutRes.json();
 
     if (!checkoutRes.ok || !checkoutData.url) {
-      setSubmitError('Failed to start payment. Please try again or contact support@groundviewnews.com.');
+      const msg =
+        typeof checkoutData.error === 'string'
+          ? checkoutData.error
+          : 'Failed to start payment. Please try again or contact support@groundviewnews.com.';
+      setSubmitError(msg);
       setSubmitting(false);
       return;
     }
 
-    window.location.href = checkoutData.url;
+    const checkoutUrl = checkoutData.url as string;
+    console.log('Checkout URL:', checkoutUrl);
+    window.location.href = checkoutUrl;
   };
+
+  const isProcessing = moderating || submitting;
+
+  const handleAddAdvertiserRole = async () => {
+    setAddRoleError('');
+    setAddRoleBusy(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.id || !user.email) {
+        setAddRoleError('You need to be signed in to add advertiser access.');
+        return;
+      }
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const res = await fetch('/api/advertiser/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          email: user.email,
+          full_name: (prof as { full_name?: string } | null)?.full_name || '',
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddRoleError(typeof body.error === 'string' ? body.error : 'Could not add advertiser access.');
+        return;
+      }
+      setCanAdvertiserSave(true);
+      setSubmitError('');
+    } finally {
+      setAddRoleBusy(false);
+    }
+  };
+
+  if (booting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
       <Navbar />
       <main className="bg-white min-h-screen">
         <div style={{ backgroundColor: '#0f1f3d' }} className="py-10">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-2">Advertiser Portal</p>
             <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
               Create New Ad
             </h1>
-            <div className="flex items-center gap-2 mt-4">
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSignOut()}
+              className="text-sm font-semibold px-4 py-2.5 border border-white/30 text-gray-300 hover:text-white rounded-sm transition-colors shrink-0 ml-auto sm:ml-0"
+            >
+              Sign Out
+            </button>
+          </div>
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 flex items-center gap-2 mt-4">
               {([1, 2, 3] as Step[]).map((s) => (
                 <div key={s} className="flex items-center gap-2">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? 'bg-amber-500 text-white' : 'bg-white/20 text-gray-400'}`}>
@@ -242,9 +512,56 @@ export default function NewAdPage() {
               ))}
             </div>
           </div>
-        </div>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+          {!canAdvertiserSave && (
+            <div className="text-sm text-amber-950 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 mb-6 space-y-3" role="region">
+              <p className="font-medium">{ADD_ADVERTISER_ROLE_MSG}</p>
+              <p className="text-xs text-amber-900/90">
+                You can apply access on this account without signing out, or{' '}
+                <Link href="/advertise/register" className="font-semibold underline">
+                  open the advertiser signup flow
+                </Link>
+                .
+              </p>
+              {addRoleError && (
+                <p className="text-xs text-red-700" role="alert">
+                  {addRoleError}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={addRoleBusy}
+                onClick={() => handleAddAdvertiserRole()}
+                className="px-4 py-2 text-sm font-semibold rounded-sm text-white bg-gray-900 hover:bg-blue-900 disabled:opacity-60"
+              >
+                {addRoleBusy ? 'Adding…' : 'Add advertiser role to this account'}
+              </button>
+            </div>
+          )}
+          {(submitError === ADD_ADVERTISER_ROLE_MSG || submitError === NEED_LOGIN_ADVERTISER_MSG) && (
+            <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-sm px-4 py-3 mb-6" role="alert">
+              {submitError === NEED_LOGIN_ADVERTISER_MSG ? (
+                <>
+                  {NEED_LOGIN_ADVERTISER_MSG}{' '}
+                  <Link href="/advertise/login" className="font-semibold underline">
+                    Advertiser login
+                  </Link>
+                </>
+              ) : (
+                <>
+                  {ADD_ADVERTISER_ROLE_MSG}{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleAddAdvertiserRole()}
+                    className="font-semibold underline text-left"
+                  >
+                    Add advertiser role now
+                  </button>
+                </>
+              )}
+            </p>
+          )}
           {/* Step 1: Content */}
           {step === 1 && (
             <div className="space-y-6">
@@ -403,21 +720,28 @@ export default function NewAdPage() {
                 </div>
               )}
 
-              {submitError && (
-                <p className="text-sm text-red-600 mb-4">{submitError}</p>
-              )}
-
               <div className="flex gap-3">
-                <button onClick={() => setStep(2)}
-                  className="flex-1 py-3 border border-gray-300 font-semibold text-sm rounded-sm text-gray-700 hover:border-gray-500 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  disabled={isProcessing}
+                  className="flex-1 py-3 border border-gray-300 font-semibold text-sm rounded-sm text-gray-700 hover:border-gray-500 transition-colors disabled:opacity-50">
                   ← Back
                 </button>
-                <button onClick={runModerationAndPay} disabled={moderating || submitting}
+                <button
+                  type="button"
+                  onClick={() => runModerationAndPay()}
+                  disabled={isProcessing || !selectedPkg}
                   className="flex-1 py-3 font-semibold text-sm rounded-sm transition-colors text-white disabled:opacity-60"
                   style={{ backgroundColor: '#B8860B' }}>
-                  {moderating ? 'Checking content…' : submitting ? 'Redirecting to payment…' : 'Pay Now →'}
+                  {isProcessing ? 'Processing...' : 'Pay Now →'}
                 </button>
               </div>
+              {submitError && (
+                <p className="text-sm text-red-600 mt-3" role="alert">
+                  {submitError}
+                </p>
+              )}
               <p className="text-xs text-gray-400 mt-3 text-center">
                 Your ad will be reviewed for content compliance before payment is processed.
               </p>

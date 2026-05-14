@@ -24,13 +24,24 @@ export async function POST(req: NextRequest) {
   }
 
   await sendEmail(
-    'editorial@groundviewnews.com',
+    'info@groundviewnews.com',
     `New Contact Message: ${subject}`,
     `<p><strong>Name:</strong> ${name}</p>
 <p><strong>Email:</strong> ${email}</p>
 <p><strong>Subject:</strong> ${subject}</p>
 <p><strong>Message:</strong></p>
 <p>${message.replace(/\n/g, '<br />')}</p>`
+  );
+
+  const confirmationHtml = `<p>Thank you for reaching out to Ground View News. We have received your message and will be in touch as soon as possible.</p>
+<p>This is an automated confirmation. Please do not reply to this email.</p>
+<p>Ground View News<br />groundviewnews.com</p>`;
+
+  await sendEmail(
+    email,
+    'We have received your message — Ground View News',
+    confirmationHtml,
+    'Ground View News <info@groundviewnews.com>'
   );
 
   return NextResponse.json({ ok: true });

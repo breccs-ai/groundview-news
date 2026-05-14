@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/email';
+import { ad_expired } from '@/lib/emails/advertiser-emails';
 
 function getSupabase() {
   return createClient(
@@ -16,34 +16,44 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabase();
-  const now = new Date().toISOString();
+  const now = new Date();
 
-  const { data: expiredAds } = await supabase
+  const { data: activeAds } = await supabase
     .from('advertisements')
-    .select('id, title, company_name, user_id, profiles(email, full_name)')
-    .eq('status', 'active')
-    .lt('ends_at', now);
+    .select('id, title, advertiser_id, expires_at, ends_at')
+    .eq('status', 'active');
+
+  const expiredRows = (activeAds || []).filter((r: Record<string, unknown>) => {
+    const ex = r.expires_at ? new Date(String(r.expires_at)) : null;
+    const en = r.ends_at ? new Date(String(r.ends_at)) : null;
+    const eff = ex && !Number.isNaN(ex.getTime()) ? ex : en;
+    return eff && !Number.isNaN(eff.getTime()) && eff < now;
+  });
 
   let count = 0;
 
-  for (const ad of expiredAds || []) {
-    const adRecord = ad as Record<string, unknown>;
-    const profile = adRecord.profiles as { email: string; full_name: string } | null;
+  for (const adRecord of expiredRows) {
+    const id = String(adRecord.id);
+    const title = String(adRecord.title || 'Your ad');
+    const advertiserId = String(adRecord.advertiser_id);
 
-    await supabase.from('advertisements')
+    const { data: prof } = await supabase
+      .from('advertiser_profiles')
+      .select('email, contact_name, company_name')
+      .eq('id', advertiserId)
+      .maybeSingle();
+
+    await supabase
+      .from('advertisements')
       .update({ status: 'expired', updated_at: new Date().toISOString() })
-      .eq('id', adRecord.id);
+      .eq('id', id);
 
-    if (profile?.email) {
-      await sendEmail(
-        profile.email,
-        'Your Ground View News ad has expired',
-        `<p>Hi ${profile.full_name || 'there'},</p>
-<p>Your ad <strong>${adRecord.title || adRecord.company_name}</strong> has expired.</p>
-<p>Renew your ad or create a new one at any time: <a href="https://groundviewnews.com/advertise/dashboard">Advertiser Dashboard</a></p>`
-      );
+    const p = prof as { email?: string; contact_name?: string; company_name?: string } | null;
+    const email = String(p?.email || '');
+    const name = String(p?.contact_name || p?.company_name || 'Advertiser');
+    if (email) {
+      await ad_expired(name, email, title);
     }
-
     count++;
   }
 

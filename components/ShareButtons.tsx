@@ -8,14 +8,28 @@ type Props = {
   url: string;
 };
 
+function stripUrlToCanonical(url: string): string {
+  try {
+    // Ensures we never include query params or fragments.
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const u = new URL(url);
+      return `${u.origin}${u.pathname}`;
+    }
+  } catch {
+    // fall through
+  }
+  return url.split('?')[0].split('#')[0];
+}
+
 export default function ShareButtons({ title, url }: Props) {
   const [copied, setCopied] = useState(false);
 
-  const encodedUrl = encodeURIComponent(url);
+  const cleanUrl = stripUrlToCanonical(url);
+  const encodedUrl = encodeURIComponent(cleanUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const copyLink = () => {
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(cleanUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -58,7 +72,14 @@ export default function ShareButtons({ title, url }: Props) {
         aria-label="Copy link"
         className="p-2 rounded-sm border border-gray-200 text-gray-500 hover:border-gray-900 hover:text-gray-900 transition-colors"
       >
-        {copied ? <Check size={15} className="text-green-600" /> : <Link2 size={15} />}
+        {copied ? (
+          <span className="inline-flex items-center gap-2">
+            <Check size={15} className="text-green-600" />
+            <span className="text-xs font-semibold text-green-700">Copied!</span>
+          </span>
+        ) : (
+          <Link2 size={15} />
+        )}
       </button>
     </div>
   );

@@ -1,0 +1,5 @@
+-- Advertisement INSERT/UPDATE from the Next.js app for signed-in advertisers is handled by
+-- `POST /api/advertiser/save-ad` using the Supabase **service_role** client, which **bypasses RLS**.
+--
+-- Existing policies ("Users can read/insert/update own ads") remain for direct browser Supabase usage.
+-- No additional permissive RLS rule is required for service_role on standard Supabase.

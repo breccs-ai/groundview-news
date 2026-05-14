@@ -15,18 +15,14 @@
   server-side API routes using the anon key can perform admin operations.
 */
 
-CREATE POLICY "Admin can insert articles"
-  ON articles FOR INSERT
-  TO anon
-  WITH CHECK (true);
-
-CREATE POLICY "Admin can update articles"
-  ON articles FOR UPDATE
-  TO anon
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "Admin can delete articles"
-  ON articles FOR DELETE
-  TO anon
-  USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admin can insert articles' AND tablename = 'articles') THEN
+    CREATE POLICY "Admin can insert articles" ON articles FOR INSERT TO anon WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admin can update articles' AND tablename = 'articles') THEN
+    CREATE POLICY "Admin can update articles" ON articles FOR UPDATE TO anon USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admin can delete articles' AND tablename = 'articles') THEN
+    CREATE POLICY "Admin can delete articles" ON articles FOR DELETE TO anon USING (true);
+  END IF;
+END $$;

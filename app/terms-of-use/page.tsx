@@ -97,10 +97,10 @@ export default function TermsOfUsePage() {
               <p>
                 To request syndication or republication rights, contact us at{' '}
                 <a
-                  href="mailto:editorial@groundviewnews.com"
+                  href="mailto:info@groundviewnews.com"
                   className="text-amber-700 hover:text-amber-900 underline"
                 >
-                  editorial@groundviewnews.com
+                  info@groundviewnews.com
                 </a>
                 .
               </p>

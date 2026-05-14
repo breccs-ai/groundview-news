@@ -140,11 +140,40 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="mailto:editorial@groundviewnews.com"
+                  href="mailto:info@groundviewnews.com"
                   className="text-sm text-gray-400 hover:text-white transition-colors"
                 >
-                  editorial@groundviewnews.com
+                  info@groundviewnews.com
                 </a>
+              </li>
+            </ul>
+            <h4 className="text-white text-xs font-semibold uppercase tracking-widest mb-4 mt-8">
+              Advertising
+            </h4>
+            <ul className="space-y-2.5">
+              <li>
+                <Link
+                  href="/advertiser/register"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Advertise With Us
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/advertiser/dashboard"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Advertiser Login
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/legal/advertiser-terms"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Advertiser Terms
+                </Link>
               </li>
             </ul>
           </div>

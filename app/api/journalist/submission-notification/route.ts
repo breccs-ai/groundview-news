@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
 
   await Promise.all([
     sendEmail(
-      'editorial@groundviewnews.com',
+      'info@groundviewnews.com',
       `New article submitted for review: ${title}`,
       `<p>A new article has been submitted for editorial review.</p>
 <p><strong>Title:</strong> ${title}</p>
