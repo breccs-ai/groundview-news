@@ -6,7 +6,7 @@ import AdminShell from '@/components/AdminShell';
 import { supabase } from '@/lib/supabase';
 import { getCategoryMeta } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw, CircleCheck as CheckCircle2, Circle as XCircle, Megaphone, ExternalLink } from 'lucide-react';
+import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw, CircleCheck as CheckCircle2, Circle as XCircle, Megaphone, ExternalLink, ShieldCheck } from 'lucide-react';
 
 type DbStatus = { ok: boolean; publishedCount: number; draftCount: number; error?: string } | null;
 
@@ -61,6 +61,15 @@ type AdStats = {
   expiring_7d: number;
 };
 
+type PendingKyc = {
+  id: string;
+  company_name: string;
+  email: string;
+  kyc_submitted_at: string | null;
+  kyc_document_url: string | null;
+  kyc_document_name: string | null;
+};
+
 export default function AdminDashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +90,10 @@ export default function AdminDashboard() {
   const [adDetail, setAdDetail] = useState<AdminAdRow | null>(null);
   const [overrideAd, setOverrideAd] = useState<AdminAdRow | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
+  const [kycRows, setKycRows] = useState<PendingKyc[]>([]);
+  const [kycLoading, setKycLoading] = useState(true);
+  const [rejectingKyc, setRejectingKyc] = useState<PendingKyc | null>(null);
+  const [kycRejectReason, setKycRejectReason] = useState('');
 
   const showToast = (type: ToastMsg['type'], text: string) => {
     setToast({ type, text });
@@ -123,6 +136,49 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
+  const fetchPendingKyc = useCallback(async () => {
+    setKycLoading(true);
+    const res = await fetch('/api/admin/kyc', { method: 'GET', credentials: 'include' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast('error', body.error || 'Failed to load KYC submissions.');
+      setKycRows([]);
+      setKycLoading(false);
+      return;
+    }
+    setKycRows((body.rows || []) as PendingKyc[]);
+    setKycLoading(false);
+  }, []);
+
+  const viewKycDocument = async (profileId: string) => {
+    const res = await fetch(`/api/admin/kyc?profile_id=${encodeURIComponent(profileId)}&signed_url=1`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.url) {
+      showToast('error', body.error || 'Could not open document.');
+      return;
+    }
+    window.open(body.url as string, '_blank', 'noopener,noreferrer');
+  };
+
+  const decideKyc = async (profileId: string, action: 'approve' | 'reject', reason?: string) => {
+    const res = await fetch('/api/admin/kyc', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: profileId, action, reason }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast('error', body.error || 'KYC action failed.');
+      return;
+    }
+    showToast('success', action === 'approve' ? 'Advertiser verified.' : 'Verification rejected.');
+    fetchPendingKyc();
+  };
+
   const fetchAdvertisements = useCallback(async () => {
     setAdLoading(true);
     const params = new URLSearchParams();
@@ -150,7 +206,8 @@ export default function AdminDashboard() {
     fetchArticles();
     fetchPendingJournalists();
     fetchAdvertisements();
-  }, [fetchArticles, fetchPendingJournalists, fetchAdvertisements]);
+    fetchPendingKyc();
+  }, [fetchArticles, fetchPendingJournalists, fetchAdvertisements, fetchPendingKyc]);
 
   const decideJournalist = async (journalist: PendingJournalist, action: 'approve' | 'reject', reason?: string) => {
     const res = await fetch('/api/admin/journalists/decision', {
@@ -351,6 +408,55 @@ export default function AdminDashboard() {
                 className="px-4 py-2 text-sm bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors font-semibold"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject KYC modal */}
+      {rejectingKyc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-sm shadow-xl p-6 max-w-md w-full">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Reject identity verification</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {rejectingKyc.company_name} ({rejectingKyc.email})
+                </p>
+              </div>
+            </div>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">Reason *</label>
+            <textarea
+              value={kycRejectReason}
+              onChange={(e) => setKycRejectReason(e.target.value)}
+              rows={4}
+              className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors resize-none"
+              placeholder="Explain why this document cannot be accepted."
+            />
+            <div className="flex gap-3 justify-end mt-4">
+              <button
+                onClick={() => { setRejectingKyc(null); setKycRejectReason(''); }}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-sm text-gray-700 hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const reason = kycRejectReason.trim();
+                  if (reason.length < 3) {
+                    showToast('error', 'Please provide a rejection reason.');
+                    return;
+                  }
+                  const row = rejectingKyc;
+                  setRejectingKyc(null);
+                  setKycRejectReason('');
+                  await decideKyc(row.id, 'reject', reason);
+                }}
+                className="px-4 py-2 text-sm bg-amber-700 text-white rounded-sm hover:bg-amber-800 transition-colors font-semibold"
+              >
+                Reject
               </button>
             </div>
           </div>
@@ -592,6 +698,84 @@ export default function AdminDashboard() {
                           )}
                           <button type="button" className="text-xs text-gray-600 underline" onClick={() => void postAdAction('expire', ad.id)}>Expire</button>
                           <button type="button" className="text-xs text-red-700 underline" onClick={() => void postAdAction('cancel', ad.id)}>Cancel</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* KYC document review */}
+      <div className="mb-10">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
+              <ShieldCheck size={22} className="text-amber-700" />
+              KYC Document Review
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">{kycRows.length} pending</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void fetchPendingKyc()}
+            className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-sm text-sm text-gray-700 hover:border-gray-400 transition-colors"
+          >
+            <RefreshCw size={14} className={kycLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-sm overflow-hidden">
+          {kycLoading ? (
+            <div className="py-10 text-center text-sm text-gray-400">Loading KYC submissions…</div>
+          ) : kycRows.length === 0 ? (
+            <div className="py-10 text-center text-sm text-gray-500">No documents awaiting review.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase text-gray-500">Company</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase text-gray-500">Email</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase text-gray-500">Submitted</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {kycRows.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50 align-top">
+                      <td className="px-4 py-3 font-medium text-gray-900">{row.company_name}</td>
+                      <td className="px-4 py-3 text-gray-600">{row.email}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {row.kyc_submitted_at ? formatDate(row.kyc_submitted_at) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            className="text-xs text-blue-800 underline"
+                            onClick={() => void viewKycDocument(row.id)}
+                          >
+                            View document
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
+                            onClick={() => void decideKyc(row.id, 'approve')}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 text-xs font-semibold bg-amber-700 text-white rounded-sm hover:bg-amber-800 transition-colors"
+                            onClick={() => { setRejectingKyc(row); setKycRejectReason(''); }}
+                          >
+                            Reject
+                          </button>
                         </div>
                       </td>
                     </tr>

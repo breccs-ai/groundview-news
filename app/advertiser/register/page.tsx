@@ -6,12 +6,10 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
-import { loadStripe } from '@stripe/stripe-js';
-
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 const RESET_REDIRECT = 'https://groundviewnews.com/advertiser/reset-password';
+const KYC_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+const KYC_MAX_BYTES = 10 * 1024 * 1024;
 
 const COUNTRIES = [
   { v: 'United Kingdom', l: 'United Kingdom' },
@@ -35,9 +33,6 @@ export default function AdvertiserRegisterV2Page() {
 }
 
 function RegisterContent() {
-  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-    console.error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
-  }
   const searchParams = useSearchParams();
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
@@ -55,6 +50,9 @@ function RegisterContent() {
   const [errorMsg, setErrorMsg] = useState('');
   const [kycLoading, setKycLoading] = useState(false);
   const [kycStep2Gate, setKycStep2Gate] = useState<'loading' | 'show'>('loading');
+  const [kycFile, setKycFile] = useState<File | null>(null);
+  const [kycPreviewUrl, setKycPreviewUrl] = useState<string | null>(null);
+  const [kycUploadSuccess, setKycUploadSuccess] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStatus, setForgotStatus] = useState<'idle' | 'loading' | 'sent'>('idle');
@@ -80,7 +78,7 @@ function RegisterContent() {
       }
       const { data: row, error } = await supabase
         .from('advertiser_profiles')
-        .select('kyc_status, stripe_identity_verified')
+        .select('kyc_status')
         .eq('user_id', user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -88,10 +86,13 @@ function RegisterContent() {
         setKycStep2Gate('show');
         return;
       }
-      const r = row as { kyc_status: string; stripe_identity_verified: boolean };
-      if (r.kyc_status === 'verified' && r.stripe_identity_verified === true) {
+      const r = row as { kyc_status: string };
+      if (r.kyc_status === 'verified') {
         router.replace('/advertiser/dashboard');
         return;
+      }
+      if (r.kyc_status === 'pending_review') {
+        setKycUploadSuccess(true);
       }
       setKycStep2Gate('show');
     })();
@@ -195,7 +196,43 @@ function RegisterContent() {
     setStep(2);
   };
 
-  const startKyc = async () => {
+  useEffect(() => {
+    if (!kycFile || !kycFile.type.startsWith('image/')) {
+      setKycPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(kycFile);
+    setKycPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [kycFile]);
+
+  const onKycFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMsg('');
+    const file = e.target.files?.[0];
+    if (!file) {
+      setKycFile(null);
+      return;
+    }
+    if (!KYC_ACCEPT.split(',').includes(file.type)) {
+      setErrorMsg('Please upload a JPEG, PNG, WebP, or PDF file.');
+      setKycFile(null);
+      e.target.value = '';
+      return;
+    }
+    if (file.size > KYC_MAX_BYTES) {
+      setErrorMsg('File exceeds 10MB limit.');
+      setKycFile(null);
+      e.target.value = '';
+      return;
+    }
+    setKycFile(file);
+  };
+
+  const submitKycDocument = async () => {
+    if (!kycFile) {
+      setErrorMsg('Please select a document to upload.');
+      return;
+    }
     setKycLoading(true);
     setErrorMsg('');
     try {
@@ -205,37 +242,20 @@ function RegisterContent() {
         setErrorMsg('Not signed in.');
         return;
       }
-      const res = await fetch('/api/advertiser/kyc', {
+      const formData = new FormData();
+      formData.append('file', kycFile);
+      const res = await fetch('/api/advertiser/kyc-upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg(typeof body.error === 'string' ? body.error : 'Could not start verification.');
+        setErrorMsg(typeof body.error === 'string' ? body.error : 'Upload failed. Please try again.');
         return;
       }
-      if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-        setErrorMsg('Stripe publishable key is not configured.');
-        return;
-      }
-      const stripe = await stripePromise;
-      if (!stripe) {
-        setErrorMsg('Could not load Stripe.');
-        return;
-      }
-      const clientSecret = body.client_secret as string;
-      const verify = (stripe as unknown as { verifyIdentity: (cs: string) => Promise<{ error?: { message?: string } }> })
-        .verifyIdentity;
-      if (typeof verify !== 'function') {
-        setErrorMsg('Stripe Identity is not available in this browser build. Update @stripe/stripe-js.');
-        return;
-      }
-      const { error } = await verify.call(stripe, clientSecret);
-      if (error?.message) {
-        setErrorMsg(error.message);
-        return;
-      }
-      window.location.href = '/advertiser/dashboard';
+      setKycUploadSuccess(true);
+      setKycFile(null);
     } finally {
       setKycLoading(false);
     }
@@ -380,26 +400,45 @@ function RegisterContent() {
             <div className="bg-white border border-stone-200 rounded-lg p-8 shadow-sm text-center text-sm text-gray-600">
               Checking your verification status…
             </div>
-          ) : (
+          ) : kycUploadSuccess ? (
             <div className="bg-white border border-stone-200 rounded-lg p-6 space-y-4 shadow-sm">
               <p className="text-sm text-gray-800 leading-relaxed">
-                We are required by UK and EU law to verify your identity before you can place advertisements on Ground
-                View News. Identity verification is conducted by Stripe Identity. You will be asked to provide a
-                government-issued photo ID such as a passport, driving licence, or national ID card. Your documents are
-                processed securely by Stripe and are not stored by Ground View News. By proceeding, you consent to Stripe
-                collecting and processing your identity documents in accordance with{' '}
-                <a
-                  href="https://stripe.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-900 underline"
-                >
-                  Stripe&rsquo;s Privacy Policy
-                </a>
-                . A one-time verification fee applies.
+                Your document has been submitted successfully. We will review it within 1-2 business days and notify you
+                by email. You can access your dashboard while you wait.
               </p>
+              <Link
+                href="/advertiser/dashboard"
+                className="block w-full py-3 rounded-md bg-[#0f1f3d] text-white font-semibold text-sm text-center"
+              >
+                Go to dashboard
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-white border border-stone-200 rounded-lg p-6 space-y-5 shadow-sm">
+              <div>
+                <h2
+                  className="text-xl font-bold text-gray-900 mb-1"
+                  style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                >
+                  Verify your identity
+                </h2>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  To comply with UK and EU regulations, we need to verify your identity before you can place
+                  advertisements. Please upload a clear photo or scan of one of the following:
+                </p>
+              </div>
+
+              <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
+                <li>Passport (any country)</li>
+                <li>Driving licence (any country)</li>
+                <li>National ID card (any country)</li>
+              </ul>
+
               <p className="text-xs text-gray-600 leading-relaxed">
-                By clicking Start identity verification you confirm you have read and agree to our{' '}
+                We are required by UK and EU law to verify your identity before you can place advertisements on Ground
+                View News. Please upload a government-issued photo ID. Your document is stored securely and reviewed only
+                by Ground View News staff for the purpose of identity verification. It is never shared with third parties.
+                By submitting your document you confirm you have read and agree to our{' '}
                 <Link href="/legal/advertiser-terms" className="text-amber-900 underline">
                   Advertiser Terms
                 </Link>{' '}
@@ -409,17 +448,51 @@ function RegisterContent() {
                 </Link>
                 .
               </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Identity document *</label>
+                <input
+                  type="file"
+                  accept={KYC_ACCEPT}
+                  onChange={onKycFileChange}
+                  className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-900"
+                />
+                {kycFile && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Selected: <span className="font-medium text-gray-900">{kycFile.name}</span>
+                  </p>
+                )}
+                {kycPreviewUrl && (
+                  <img
+                    src={kycPreviewUrl}
+                    alt="Document preview"
+                    className="mt-3 max-h-48 rounded-md border border-stone-200 object-contain"
+                  />
+                )}
+              </div>
+
+              <div className="rounded-md border border-amber-100 bg-amber-50/60 px-3 py-3 text-xs text-gray-700 leading-relaxed">
+                <p className="font-semibold text-gray-900 mb-1">Please ensure your document is:</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Clear and fully visible with no cut-off edges</li>
+                  <li>Not expired</li>
+                  <li>Showing your full name and date of birth</li>
+                </ul>
+              </div>
+
               {errorMsg && <p className="text-sm text-red-700">{errorMsg}</p>}
+
               <button
                 type="button"
-                onClick={() => void startKyc()}
-                disabled={kycLoading}
+                onClick={() => void submitKycDocument()}
+                disabled={kycLoading || !kycFile}
                 className="w-full py-3 rounded-md bg-amber-700 text-white font-semibold text-sm disabled:opacity-60"
               >
-                {kycLoading ? 'Opening Stripe…' : 'Start identity verification'}
+                {kycLoading ? 'Uploading your document…' : 'Submit document for review'}
               </button>
+
               <Link href="/advertiser/dashboard" className="block text-center text-sm text-amber-900 underline">
-                Skip to dashboard (if already verified)
+                Go to dashboard
               </Link>
             </div>
           )}
