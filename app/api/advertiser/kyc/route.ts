@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       advertiser_profile_id: row.id,
     } as Record<string, string>,
-    flow: 'vf_1TXM7GCAw3fTEUks3wAZcI3b',
     return_url: `${baseUrl.replace(/\/$/, '')}/advertiser/dashboard?kyc=return`,
   });
 
