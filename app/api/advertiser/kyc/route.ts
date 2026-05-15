@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     options: {
       document: {
         allowed_types: ['driving_license', 'passport', 'id_card'],
-        require_id_number: true,
+        require_id_number: false,
         require_live_capture: true,
       },
     },
