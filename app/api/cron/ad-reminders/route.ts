@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         'Your Ground View News ad draft has been discarded',
         `<p>Hi ${profile.full_name || 'there'},</p>
 <p>Your saved ad draft has been discarded after 7 days of inactivity. You can create a new ad at any time.</p>
-<p><a href="https://groundviewnews.com/advertise/new">Create a new ad</a></p>`
+<p><a href="https://groundviewnews.com/advertiser/create-ad">Create a new ad</a></p>`
       );
       discarded++;
     } else if (needsFirstReminder) {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         'You have an unfinished ad on Ground View News',
         `<p>Hi ${profile.full_name || 'there'},</p>
 <p>You started creating an ad on Ground View News but haven't completed it yet.</p>
-<p><a href="https://groundviewnews.com/advertise/new?draft=${adRecord.id}">Complete your ad here</a></p>
+<p><a href="https://groundviewnews.com/advertiser/create-ad?draft=${adRecord.id}">Complete your ad here</a></p>
 <p>If you no longer wish to continue, you can ignore this email.</p>`
       );
       reminded++;

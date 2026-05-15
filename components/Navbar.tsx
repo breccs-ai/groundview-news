@@ -195,7 +195,7 @@ export default function Navbar() {
                         ) : null}
                         {acct.hasAdvertiser ? (
                           <Link
-                            href="/advertise/dashboard"
+                            href="/advertiser/dashboard"
                             className="block px-3 py-2 text-sm text-gray-200 hover:bg-white/10"
                             onClick={() => setAccountDropdownOpen(false)}
                           >
@@ -305,7 +305,7 @@ export default function Navbar() {
                   </Link>
                 ) : null}
                 {acct.hasAdvertiser ? (
-                  <Link href="/advertise/dashboard" className="block px-3 py-2 text-sm text-gray-300 hover:text-white">
+                  <Link href="/advertiser/dashboard" className="block px-3 py-2 text-sm text-gray-300 hover:text-white">
                     My Advertiser Portal
                   </Link>
                 ) : null}

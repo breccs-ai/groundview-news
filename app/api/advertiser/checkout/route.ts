@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       ],
       success_url:
         'https://groundviewnews.com/advertise/success?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://groundviewnews.com/advertise/new?cancelled=true',
+      cancel_url: 'https://groundviewnews.com/advertiser/create-ad?cancelled=true',
       metadata: {
         ad_id: adId,
         advertiser_id: advertiserId,

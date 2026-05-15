@@ -76,7 +76,7 @@ export default function UnifiedDashboardPage() {
       return;
     }
     if (hasA && !hasJ) {
-      router.replace('/advertise/dashboard');
+      router.replace('/advertiser/dashboard');
       return;
     }
 
@@ -259,7 +259,7 @@ export default function UnifiedDashboardPage() {
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <Link
-                    href="/advertise/dashboard"
+                    href="/advertiser/dashboard"
                     className="inline-flex items-center justify-center gap-2 flex-1 py-3 px-4 text-sm font-semibold rounded-sm text-[#1a1a1a] hover:opacity-95 transition-opacity"
                     style={{ backgroundColor: GOLD }}
                   >
@@ -267,7 +267,7 @@ export default function UnifiedDashboardPage() {
                     <ChevronRight size={16} aria-hidden />
                   </Link>
                   <Link
-                    href="/advertise/new"
+                    href="/advertiser/create-ad"
                     className="inline-flex items-center justify-center flex-1 py-3 px-4 text-sm font-semibold rounded-sm border border-gray-400 text-gray-800 hover:bg-gray-50 transition-colors"
                   >
                     Create new ad
@@ -292,7 +292,7 @@ export default function UnifiedDashboardPage() {
               )}
               {!hasA && (
                 <Link
-                  href="/advertise/register"
+                  href="/advertiser/register"
                   className="inline-flex items-center px-4 py-2.5 text-sm font-semibold rounded-sm text-[#1a1a1a] hover:opacity-95"
                   style={{ backgroundColor: GOLD }}
                 >
