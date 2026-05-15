@@ -3,7 +3,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
+  images: {
+    unoptimized: true,
+  },
   /**
    * NEXT_PUBLIC_* is exposed to the browser. Server-only secrets (STRIPE_SECRET_KEY,
    * STRIPE_WEBHOOK_SECRET) must stay in environment / deployment config only — do not

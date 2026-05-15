@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
+import { CircleCheck } from 'lucide-react';
 
 const RESET_REDIRECT = 'https://groundviewnews.com/advertiser/reset-password';
 const KYC_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
@@ -68,18 +69,17 @@ function RegisterContent() {
     }
     let cancelled = false;
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: sess } = await supabase.auth.getSession();
       if (cancelled) return;
-      if (!user?.id) {
+      const userId = sess.session?.user?.id;
+      if (!userId) {
         setKycStep2Gate('show');
         return;
       }
       const { data: row, error } = await supabase
         .from('advertiser_profiles')
         .select('kyc_status')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
       if (cancelled) return;
       if (error || !row) {
@@ -261,6 +261,13 @@ function RegisterContent() {
     }
   };
 
+  const passwordTooShort = form.password.length > 0 && form.password.length < 8;
+  const confirmTooShort = form.confirm.length > 0 && form.confirm.length < 8;
+  const passwordsMismatch = form.confirm.length > 0 && form.password !== form.confirm;
+  const passwordsMatch =
+    form.password.length >= 8 && form.confirm.length >= 8 && form.password === form.confirm;
+  const step1PasswordValid = passwordsMatch;
+
   const sendForgotReset = async () => {
     if (!forgotEmail.trim()) return;
     setForgotStatus('loading');
@@ -277,14 +284,34 @@ function RegisterContent() {
     <>
       <Navbar />
       <main className="min-h-screen bg-stone-50">
-        <div className="max-w-lg mx-auto px-4 py-14">
-          <h1
-            className="text-3xl font-bold text-gray-900 mb-2"
-            style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-          >
-            Advertiser registration
-          </h1>
-          <p className="text-sm text-gray-600 mb-8">
+        <div style={{ backgroundColor: '#0f1f3d' }} className="w-full px-4 py-12 sm:py-14">
+          <div className="max-w-lg mx-auto">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#d4a017] mb-2">Advertiser Portal</p>
+            {step === 1 ? (
+              <>
+                <h1
+                  className="text-3xl sm:text-4xl font-bold text-white mb-2"
+                  style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                >
+                  Create an account
+                </h1>
+                <p className="text-sm text-white/90 leading-relaxed">
+                  Register to create and manage your ads on Ground View News.
+                </p>
+              </>
+            ) : (
+              <h1
+                className="text-3xl sm:text-4xl font-bold text-white"
+                style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+              >
+                Verify your identity
+              </h1>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-lg mx-auto px-4 py-8 sm:py-10">
+          <p className="text-sm text-gray-600 mb-6">
             Step {step} of 2 ·{' '}
             <Link href="/legal/advertiser-terms" className="text-amber-800 underline">
               Advertiser terms
@@ -321,7 +348,18 @@ function RegisterContent() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Password *</label>
-                <input name="password" type="password" required className="w-full border rounded-md px-3 py-2 text-sm" value={form.password} onChange={handleChange} />
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.password}
+                  onChange={handleChange}
+                />
+                {passwordTooShort && (
+                  <p className="mt-1.5 text-xs text-red-700">Password must be at least 8 characters</p>
+                )}
                 {!showForgotPassword ? (
                   <button type="button" className="text-xs text-amber-900 underline mt-1.5" onClick={() => setShowForgotPassword(true)}>
                     Forgot password?
@@ -330,7 +368,27 @@ function RegisterContent() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Confirm password *</label>
-                <input name="confirm" type="password" required className="w-full border rounded-md px-3 py-2 text-sm" value={form.confirm} onChange={handleChange} />
+                <input
+                  name="confirm"
+                  type="password"
+                  required
+                  minLength={8}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.confirm}
+                  onChange={handleChange}
+                />
+                {passwordsMismatch && (
+                  <p className="mt-1.5 text-xs text-red-700">Passwords do not match</p>
+                )}
+                {confirmTooShort && !passwordsMismatch && (
+                  <p className="mt-1.5 text-xs text-red-700">Password must be at least 8 characters</p>
+                )}
+                {passwordsMatch && (
+                  <p className="mt-1.5 text-xs text-green-700 flex items-center gap-1">
+                    <CircleCheck size={14} aria-hidden />
+                    Passwords match
+                  </p>
+                )}
               </div>
               {showForgotPassword && (
                 <div className="rounded-md border border-amber-200 bg-amber-50/60 p-4 space-y-3">
@@ -390,10 +448,10 @@ function RegisterContent() {
               {errorMsg && <p className="text-sm text-red-700">{errorMsg}</p>}
               <button
                 type="submit"
-                disabled={status === 'loading'}
+                disabled={status === 'loading' || !step1PasswordValid}
                 className="w-full py-3 rounded-md bg-[#0f1f3d] text-white font-semibold text-sm disabled:opacity-60"
               >
-                {status === 'loading' ? 'Creating account…' : 'Continue to identity verification'}
+                {status === 'loading' ? 'Creating account…' : 'Continue'}
               </button>
             </form>
           ) : kycStep2Gate === 'loading' ? (
@@ -415,18 +473,10 @@ function RegisterContent() {
             </div>
           ) : (
             <div className="bg-white border border-stone-200 rounded-lg p-6 space-y-5 shadow-sm">
-              <div>
-                <h2
-                  className="text-xl font-bold text-gray-900 mb-1"
-                  style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-                >
-                  Verify your identity
-                </h2>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  To comply with UK and EU regulations, we need to verify your identity before you can place
-                  advertisements. Please upload a clear photo or scan of one of the following:
-                </p>
-              </div>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                To comply with UK and EU regulations, we need to verify your identity before you can place
+                advertisements. Please upload a clear photo or scan of one of the following:
+              </p>
 
               <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1">
                 <li>Passport (any country)</li>
