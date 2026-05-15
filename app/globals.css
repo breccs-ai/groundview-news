@@ -112,4 +112,21 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  .featured-hero-progress-bar {
+    transform-origin: left;
+    transform: scaleX(0);
+    animation-name: featured-hero-progress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes featured-hero-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
 }
