@@ -383,8 +383,31 @@ function RegisterContent() {
           ) : (
             <div className="bg-white border border-stone-200 rounded-lg p-6 space-y-4 shadow-sm">
               <p className="text-sm text-gray-800 leading-relaxed">
-                We are required by UK and EU law to verify your identity before you can place advertisements. A one-time
-                verification fee applies. This keeps Ground View News and its advertisers legally protected.
+                We are required by UK and EU law to verify your identity before you can place advertisements on Ground
+                View News. Identity verification is conducted by Stripe Identity. You will be asked to provide a
+                government-issued photo ID such as a passport, driving licence, or national ID card. Your documents are
+                processed securely by Stripe and are not stored by Ground View News. By proceeding, you consent to Stripe
+                collecting and processing your identity documents in accordance with{' '}
+                <a
+                  href="https://stripe.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-900 underline"
+                >
+                  Stripe&rsquo;s Privacy Policy
+                </a>
+                . A one-time verification fee applies.
+              </p>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                By clicking Start identity verification you confirm you have read and agree to our{' '}
+                <Link href="/legal/advertiser-terms" className="text-amber-900 underline">
+                  Advertiser Terms
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy-policy" className="text-amber-900 underline">
+                  Privacy Policy
+                </Link>
+                .
               </p>
               {errorMsg && <p className="text-sm text-red-700">{errorMsg}</p>}
               <button

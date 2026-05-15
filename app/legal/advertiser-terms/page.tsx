@@ -69,6 +69,11 @@ export default function AdvertiserTermsPage() {
               complete identity verification before placing advertisements. Verification is processed by Stripe Identity. A
               one-time verification fee is charged to the advertiser. Breccs Private Limited does not store identity
               documents directly. Verified identity data is held by Stripe in accordance with their privacy policy.
+              Stripe Identity collects and processes identity documents including government-issued photo ID such as
+              passports and driving licences. A selfie check is not required. Accepted documents include passports,
+              driving licences, and national ID cards from all countries. Stripe holds identity data in accordance
+              with its privacy policy. Ground View News retains only the verification status — verified or not
+              verified — and the date of verification.
             </p>
           </Section>
 

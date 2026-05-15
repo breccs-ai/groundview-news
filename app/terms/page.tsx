@@ -270,6 +270,20 @@ export default function TermsPage() {
             </p>
           </Section>
 
+          <Section title="Identity Verification">
+            <p>
+              Advertisers on Ground View News are required to complete identity verification before
+              placing advertisements. Verification is conducted by Stripe Identity, a third-party
+              service operated by Stripe, Inc. By completing identity verification, you consent to
+              Stripe collecting and processing your identity documents in accordance with
+              Stripe&rsquo;s terms of service and privacy policy. Ground View News receives only the
+              verification result and does not have access to your raw identity documents. You must
+              provide accurate and genuine identity documents. Providing false or fraudulent documents
+              is a breach of these terms and may result in immediate account termination and reporting
+              to relevant authorities.
+            </p>
+          </Section>
+
           <Section title="9. Acceptable Use">
             <p>You agree not to use the Site to:</p>
             <ul className="list-disc pl-5 space-y-1">

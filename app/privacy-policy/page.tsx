@@ -138,6 +138,29 @@ export default function PrivacyPolicyPage() {
             </p>
           </Section>
 
+          <Section title="Identity Verification and KYC">
+            <p>
+              Ground View News uses Stripe Identity to verify the identity of advertisers on our
+              platform. This is required for legal compliance and fraud prevention purposes. When you
+              complete identity verification, your identity documents and biometric data are collected
+              and processed by Stripe, Inc. in accordance with Stripe&rsquo;s Privacy Policy (
+              <a
+                href="https://stripe.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-700 hover:text-amber-900 underline"
+              >
+                stripe.com/privacy
+              </a>
+              ). Ground View News does not store your identity documents directly. We only receive
+              confirmation of whether your identity has been successfully verified. Verification data
+              is used solely to determine eligibility to place advertisements on our platform and is
+              never shared with third parties or used for any other purpose. Identity verification is
+              processed under our lawful basis of legal obligation and legitimate interests under UK
+              GDPR and EU GDPR.
+            </p>
+          </Section>
+
           <Section title="3. Why We Collect Your Data and Our Legal Basis">
             <p>
               We only process your personal data where we have a lawful basis to do so under EU GDPR

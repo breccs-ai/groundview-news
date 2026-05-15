@@ -45,7 +45,9 @@ export default function CookieConsent() {
               </div>
               <p className="text-sm text-gray-300 leading-relaxed">
                 We use essential cookies to make this site work. We&rsquo;d also like to use
-                analytics cookies to understand how you use the site. See our{' '}
+                analytics cookies to understand how you use the site. Advertisers completing identity
+                verification may interact with Stripe Identity, a third-party service that processes
+                identity documents under Stripe&rsquo;s privacy policy. See our{' '}
                 <Link
                   href="/privacy-policy#cookies"
                   className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
