@@ -4,10 +4,23 @@ import { isAdminServerSession } from '@/lib/admin-server';
 
 export const runtime = 'nodejs';
 
-function monthRangeUTC(date = new Date()) {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0));
-  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1, 0, 0, 0));
+type PeriodRange = { startISO: string; endISO: string };
+
+function monthRangeUTC(year: number, monthIndex: number): PeriodRange {
+  const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
   return { startISO: start.toISOString(), endISO: end.toISOString() };
+}
+
+function currentMonthRangeUTC(date = new Date()): PeriodRange {
+  return monthRangeUTC(date.getUTCFullYear(), date.getUTCMonth());
+}
+
+function previousMonthRangeUTC(date = new Date()): PeriodRange {
+  const y = date.getUTCFullYear();
+  const m = date.getUTCMonth();
+  if (m === 0) return monthRangeUTC(y - 1, 11);
+  return monthRangeUTC(y, m - 1);
 }
 
 async function getSettingNumber(
@@ -21,6 +34,70 @@ async function getSettingNumber(
   return Number.isFinite(n) ? n : fallback;
 }
 
+type ViewRow = { journalist_id?: string; engagement_score?: number };
+
+function buildWeightedMap(views: ViewRow[]): Map<string, number> {
+  const weightedByJournalist = new Map<string, number>();
+  for (const v of views) {
+    const jid = String(v.journalist_id || '');
+    if (!jid) continue;
+    const e = Number(v.engagement_score);
+    const norm = Number.isFinite(e) ? e : 1;
+    const w = norm < 0.5 ? 0.2 : norm;
+    weightedByJournalist.set(jid, (weightedByJournalist.get(jid) || 0) + w);
+  }
+  return weightedByJournalist;
+}
+
+async function computePeriodShare(
+  supabase: NonNullable<ReturnType<typeof getServiceSupabase>>,
+  range: PeriodRange,
+  sharePercent: number,
+  platformCosts: number
+) {
+  const { data: monthViews } = await supabase
+    .from('article_views')
+    .select('journalist_id, engagement_score')
+    .gte('created_at', range.startISO)
+    .lt('created_at', range.endISO);
+
+  const weightedByJournalist = buildWeightedMap((monthViews || []) as ViewRow[]);
+  const totalWeighted = Array.from(weightedByJournalist.values()).reduce((a, b) => a + b, 0);
+
+  const { data: monthAds } = await supabase
+    .from('advertisements')
+    .select('price_gbp, price_paid, paid_at')
+    .in('status', ['active', 'expired'])
+    .gte('paid_at', range.startISO)
+    .lt('paid_at', range.endISO);
+
+  const totalAdRevenue = (monthAds || []).reduce((s, a) => {
+    const row = a as { price_gbp?: number; price_paid?: number };
+    const v = Number(row.price_paid ?? row.price_gbp);
+    return s + (Number.isFinite(v) ? v : 0);
+  }, 0);
+
+  const netRevenue = Math.max(0, totalAdRevenue - platformCosts);
+  const journalistPool = netRevenue * (sharePercent / 100);
+
+  const owedByJournalist = new Map<string, number>();
+  for (const [jid, wv] of Array.from(weightedByJournalist.entries())) {
+    const viewShare = totalWeighted > 0 ? wv / totalWeighted : 0;
+    owedByJournalist.set(jid, journalistPool * viewShare);
+  }
+
+  const totalOwed = Array.from(owedByJournalist.values()).reduce((a, b) => a + b, 0);
+
+  return {
+    range,
+    total_ad_revenue_gbp: totalAdRevenue,
+    net_revenue_gbp: netRevenue,
+    journalist_pool_gbp: journalistPool,
+    total_owed_gbp: totalOwed,
+    owedByJournalist,
+  };
+}
+
 export async function GET() {
   if (!isAdminServerSession()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,7 +108,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  const { startISO, endISO } = monthRangeUTC();
+  const platformCosts = await getSettingNumber(supabase, 'platform_cost_monthly', 0);
+  const sharePercent = await getSettingNumber(supabase, 'journalist_revenue_share_percent', 30);
+
+  const thisMonthRange = currentMonthRangeUTC();
+  const lastMonthRange = previousMonthRangeUTC();
+
+  const [thisMonth, lastMonth] = await Promise.all([
+    computePeriodShare(supabase, thisMonthRange, sharePercent, platformCosts),
+    computePeriodShare(supabase, lastMonthRange, sharePercent, platformCosts),
+  ]);
 
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
@@ -50,7 +136,7 @@ export async function GET() {
 
   const { data: articles } = await supabase
     .from('articles')
-    .select('id, author_id, views, status')
+    .select('id, author_id, views')
     .not('author_id', 'is', null);
 
   const articleCount = new Map<string, number>();
@@ -62,42 +148,6 @@ export async function GET() {
     viewsFromArticles.set(jid, (viewsFromArticles.get(jid) || 0) + (Number(row.views) || 0));
   }
 
-  const { data: monthViews } = await supabase
-    .from('article_views')
-    .select('journalist_id, engagement_score')
-    .gte('created_at', startISO)
-    .lt('created_at', endISO);
-
-  const weightedByJournalist = new Map<string, number>();
-  for (const v of monthViews || []) {
-    const jid = String((v as { journalist_id?: string }).journalist_id || '');
-    if (!jid) continue;
-    const e = Number((v as { engagement_score?: number }).engagement_score);
-    const norm = Number.isFinite(e) ? e : 1;
-    const w = norm < 0.5 ? 0.2 : norm;
-    weightedByJournalist.set(jid, (weightedByJournalist.get(jid) || 0) + w);
-  }
-
-  const totalWeighted = Array.from(weightedByJournalist.values()).reduce((a, b) => a + b, 0);
-
-  const { data: monthAds } = await supabase
-    .from('advertisements')
-    .select('price_gbp, price_paid, paid_at')
-    .in('status', ['active', 'expired'])
-    .gte('paid_at', startISO)
-    .lt('paid_at', endISO);
-
-  const totalAdRevenue = (monthAds || []).reduce((s, a) => {
-    const row = a as { price_gbp?: number; price_paid?: number };
-    const v = Number(row.price_paid ?? row.price_gbp);
-    return s + (Number.isFinite(v) ? v : 0);
-  }, 0);
-
-  const platformCosts = await getSettingNumber(supabase, 'platform_cost_monthly', 0);
-  const sharePercent = await getSettingNumber(supabase, 'journalist_revenue_share_percent', 30);
-  const netRevenue = Math.max(0, totalAdRevenue - platformCosts);
-  const journalistPool = netRevenue * (sharePercent / 100);
-
   const list = journalists.map((p) => {
     const row = p as {
       id: string;
@@ -108,9 +158,6 @@ export async function GET() {
       subscription_status: string;
       created_at: string;
     };
-    const wv = weightedByJournalist.get(row.id) || 0;
-    const viewShare = totalWeighted > 0 ? wv / totalWeighted : 0;
-    const owed = journalistPool * viewShare;
 
     return {
       id: row.id,
@@ -121,25 +168,30 @@ export async function GET() {
       status: row.subscription_status || 'pending_approval',
       article_count: articleCount.get(row.id) || 0,
       total_views: viewsFromArticles.get(row.id) || 0,
-      month_weighted_views: wv,
-      month_view_share: viewShare,
-      revenue_share_owed_gbp: owed,
+      this_month_accruing_gbp: thisMonth.owedByJournalist.get(row.id) || 0,
+      last_month_settled_gbp: lastMonth.owedByJournalist.get(row.id) || 0,
     };
   });
 
-  const totalOwed = list.reduce((s, j) => s + j.revenue_share_owed_gbp, 0);
-
   return NextResponse.json({
-    month: {
-      start: startISO,
-      end: endISO,
-      total_ad_revenue_gbp: totalAdRevenue,
-      platform_costs_gbp: platformCosts,
-      net_revenue_gbp: netRevenue,
-      journalist_pool_gbp: journalistPool,
-      share_percent: sharePercent,
-      total_owed_gbp: totalOwed,
+    share_percent: sharePercent,
+    platform_costs_gbp: platformCosts,
+    this_month: {
+      start: thisMonthRange.startISO,
+      end: thisMonthRange.endISO,
+      total_ad_revenue_gbp: thisMonth.total_ad_revenue_gbp,
+      net_revenue_gbp: thisMonth.net_revenue_gbp,
+      journalist_pool_gbp: thisMonth.journalist_pool_gbp,
+      total_owed_gbp: thisMonth.total_owed_gbp,
     },
-    journalists: list.sort((a, b) => b.revenue_share_owed_gbp - a.revenue_share_owed_gbp),
+    last_month: {
+      start: lastMonthRange.startISO,
+      end: lastMonthRange.endISO,
+      total_ad_revenue_gbp: lastMonth.total_ad_revenue_gbp,
+      net_revenue_gbp: lastMonth.net_revenue_gbp,
+      journalist_pool_gbp: lastMonth.journalist_pool_gbp,
+      total_owed_gbp: lastMonth.total_owed_gbp,
+    },
+    journalists: list.sort((a, b) => b.this_month_accruing_gbp - a.this_month_accruing_gbp),
   });
 }

@@ -14,7 +14,7 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     if (isAdminAuthenticated()) {
-      router.replace('/admin/dashboard');
+      router.replace('/admin/overview');
     }
   }, [router]);
 
@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
     const body = await res.json().catch(() => ({}));
 
     if (res.ok && body.success) {
-      router.push('/admin/dashboard');
+      router.push('/admin/overview');
     } else if (res.status === 500) {
       setStatus('misconfigured');
       setErrorDetail(body.error || 'Server error. Check Vercel environment variables.');

@@ -12,6 +12,15 @@ export type AdTier = LegacyBillingTier;
 /** Annual discount: ~17.5% off effective monthly rate (within 15–20% target). */
 export const ANNUAL_DISCOUNT_RATE = 0.175;
 
+/**
+ * Launch pricing (intentional as of go-live):
+ * - Basic: £89/month
+ * - Standard: £149/month
+ * - Premium: £249/month
+ * - Annual billing: ~17.5% discount vs 12× monthly (see ANNUAL_DISCOUNT_RATE)
+ *
+ * TODO: Review Premium at £299/month once monthly traffic exceeds 10,000 unique readers.
+ */
 export const TIER_PRICING: Record<
   PlacementTier,
   { monthlyGbp: number; label: string; shortLabel: string }

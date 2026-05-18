@@ -14,19 +14,16 @@ type Journalist = {
   status: string;
   article_count: number;
   total_views: number;
-  month_weighted_views: number;
-  month_view_share: number;
-  revenue_share_owed_gbp: number;
+  this_month_accruing_gbp: number;
+  last_month_settled_gbp: number;
 };
 
 type MonthSummary = {
   start: string;
   end: string;
   total_ad_revenue_gbp: number;
-  platform_costs_gbp: number;
   net_revenue_gbp: number;
   journalist_pool_gbp: number;
-  share_percent: number;
   total_owed_gbp: number;
 };
 
@@ -34,9 +31,36 @@ function gbp(n: number) {
   return `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function MonthSummaryBlock({
+  title,
+  month,
+  sharePercent,
+}: {
+  title: string;
+  month: MonthSummary;
+  sharePercent: number;
+}) {
+  return (
+    <div className="p-5 bg-white border border-gray-200 rounded-sm">
+      <h2 className="text-sm font-semibold text-gray-900 mb-1">{title}</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        {formatDate(month.start)} — {formatDate(month.end)} · {sharePercent}% of net ad revenue to journalists
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Ad revenue" value={gbp(month.total_ad_revenue_gbp)} />
+        <StatCard label="Net revenue" value={gbp(month.net_revenue_gbp)} />
+        <StatCard label="Journalist pool" value={gbp(month.journalist_pool_gbp)} />
+        <StatCard label="Total owed" value={gbp(month.total_owed_gbp)} />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminJournalistsPage() {
   const [journalists, setJournalists] = useState<Journalist[]>([]);
-  const [month, setMonth] = useState<MonthSummary | null>(null);
+  const [thisMonth, setThisMonth] = useState<MonthSummary | null>(null);
+  const [lastMonth, setLastMonth] = useState<MonthSummary | null>(null);
+  const [sharePercent, setSharePercent] = useState(30);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +70,9 @@ export default function AdminJournalistsPage() {
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setJournalists((body.journalists || []) as Journalist[]);
-        setMonth((body.month || null) as MonthSummary | null);
+        setThisMonth((body.this_month || null) as MonthSummary | null);
+        setLastMonth((body.last_month || null) as MonthSummary | null);
+        setSharePercent(Number(body.share_percent) || 30);
       }
       setLoading(false);
     })();
@@ -61,20 +87,10 @@ export default function AdminJournalistsPage() {
         <p className="text-sm text-gray-500 mt-0.5">Contributors, readership, and monthly revenue share</p>
       </div>
 
-      {month && (
-        <div className="mb-8 p-5 bg-white border border-gray-200 rounded-sm">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Monthly revenue share summary (current month)</h2>
-          <p className="text-xs text-gray-500 mb-4">
-            {formatDate(month.start)} — {formatDate(month.end)} · {month.share_percent}% of net ad revenue to journalists
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard label="Ad revenue" value={gbp(month.total_ad_revenue_gbp)} />
-            <StatCard label="Platform costs" value={gbp(month.platform_costs_gbp)} />
-            <StatCard label="Net revenue" value={gbp(month.net_revenue_gbp)} />
-            <StatCard label="Journalist pool" value={gbp(month.journalist_pool_gbp)} />
-            <StatCard label="Total owed" value={gbp(month.total_owed_gbp)} />
-            <StatCard label="Journalists" value={journalists.length} />
-          </div>
+      {thisMonth && lastMonth && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <MonthSummaryBlock title="This month (accruing)" month={thisMonth} sharePercent={sharePercent} />
+          <MonthSummaryBlock title="Last month (settled)" month={lastMonth} sharePercent={sharePercent} />
         </div>
       )}
 
@@ -94,7 +110,12 @@ export default function AdminJournalistsPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase text-gray-500">Status</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold uppercase text-gray-500">Articles</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold uppercase text-gray-500">Total views</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase text-gray-500">Share owed</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase text-gray-500 whitespace-nowrap">
+                    This month (accruing)
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase text-gray-500 whitespace-nowrap">
+                    Last month (settled)
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase text-gray-500">Joined</th>
                 </tr>
               </thead>
@@ -108,7 +129,10 @@ export default function AdminJournalistsPage() {
                     <td className="px-4 py-3 text-right tabular-nums">{j.article_count}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{j.total_views.toLocaleString('en-GB')}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium text-amber-900">
-                      {gbp(j.revenue_share_owed_gbp)}
+                      {gbp(j.this_month_accruing_gbp)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium text-gray-800">
+                      {gbp(j.last_month_settled_gbp)}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(j.join_date)}</td>
                   </tr>
