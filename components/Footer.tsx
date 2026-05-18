@@ -210,6 +210,14 @@ export default function Footer() {
           </div>
         </div>
       </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-4 text-center">
+        <Link
+          href="/admin"
+          className="text-[10px] text-gray-600 hover:text-gray-500 transition-colors"
+        >
+          Staff login
+        </Link>
+      </div>
     </footer>
   );
 }
