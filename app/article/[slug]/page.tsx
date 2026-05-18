@@ -9,6 +9,7 @@ import AdminArticleEditFab from '@/components/AdminArticleEditFab';
 import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
+import AdSlot from '@/components/ads/AdSlot';
 import ArticleCard from '@/components/ArticleCard';
 import NewsletterSignup from '@/components/NewsletterSignup';
 import ArticleReadersLine from '@/components/ArticleReadersLine';
@@ -96,7 +97,11 @@ export default async function ArticlePage({ params }: Props) {
                   <p className="text-xs text-gray-400">{formatDate(article.published_at)}</p>
                 </div>
               </div>
-              <ArticleReadersLine slug={article.slug} initialViews={article.views ?? 0} />
+              <ArticleReadersLine
+                slug={article.slug}
+                articleId={article.id}
+                initialViews={article.views ?? 0}
+              />
             </div>
           </div>
         </div>
@@ -114,9 +119,10 @@ export default async function ArticlePage({ params }: Props) {
           </div>
         )}
 
-        {/* Article body */}
-        <div className="max-w-[720px] mx-auto px-6 md:px-0 pb-12">
-          <ArticleBodyRenderer body={article.body} />
+        {/* Article body + sidebar ads */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
+          <div className="max-w-[720px] lg:max-w-none mx-auto lg:mx-0 px-2 md:px-0">
+          <ArticleBodyRenderer body={article.body} injectMidAd />
 
           <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
             <div>
@@ -131,6 +137,10 @@ export default async function ArticlePage({ params }: Props) {
               initialShares={sharesParsed}
             />
           </div>
+          </div>
+          <aside className="hidden lg:block">
+            <AdSlot zone="article_sidebar" variant="sidebar" className="sticky top-24" />
+          </aside>
         </div>
 
         {/* Article disclaimer */}

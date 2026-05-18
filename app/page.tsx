@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import CategoryFilter from '@/components/CategoryFilter';
 import FeaturedArticleHero from '@/components/FeaturedArticleHero';
+import AdSlot from '@/components/ads/AdSlot';
 import NewsletterSignup from '@/components/NewsletterSignup';
 import { getPublishedArticles } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
@@ -32,64 +33,71 @@ export default async function HomePage() {
       <Navbar />
 
       <main>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <AdSlot zone="homepage_featured" variant="featured" className="mb-6" />
+        </div>
+
         {featuredArticles.length > 0 && <FeaturedArticleHero articles={featuredArticles} />}
 
-        {/* Secondary articles list */}
         {secondary.length > 0 && (
           <section className="bg-white">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-              <div className="mb-8">
-                <CategoryFilter />
-              </div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
+              <div>
+                <div className="mb-8">
+                  <CategoryFilter />
+                </div>
 
-              <div className="divide-y divide-gray-100">
-                {secondary.map((article) => (
-                  <article key={article.id} className="py-6">
-                    <CategoryBadge category={article.category} label={article.label} />
-                    <h2
-                      className="mt-2 text-xl sm:text-2xl font-bold text-gray-900 leading-snug hover:text-blue-900 transition-colors"
-                      style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-                    >
-                      <Link href={`/articles/${article.slug}`}>{article.title}</Link>
-                    </h2>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                      {article.author_name && (
-                        <>
-                          <span className="font-medium text-gray-600">{article.author_name}</span>
-                          <span className="text-gray-300">·</span>
-                        </>
+                <div className="divide-y divide-gray-100">
+                  {secondary.map((article) => (
+                    <article key={article.id} className="py-6">
+                      <CategoryBadge category={article.category} label={article.label} />
+                      <h2
+                        className="mt-2 text-xl sm:text-2xl font-bold text-gray-900 leading-snug hover:text-blue-900 transition-colors"
+                        style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                      >
+                        <Link href={`/articles/${article.slug}`}>{article.title}</Link>
+                      </h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                        {article.author_name && (
+                          <>
+                            <span className="font-medium text-gray-600">{article.author_name}</span>
+                            <span className="text-gray-300">·</span>
+                          </>
+                        )}
+                        <span>{formatDate(article.published_at)}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className="inline-flex items-center gap-1 text-gray-400">
+                          <Eye size={12} aria-hidden />
+                          {formatStatCount(article.views ?? 0)}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-gray-400">
+                          <Share2 size={12} aria-hidden />
+                          {formatStatCount(parseArticleShares(article.shares).total)}
+                        </span>
+                      </div>
+                      {article.excerpt && (
+                        <p className="mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2">
+                          {article.excerpt}
+                        </p>
                       )}
-                      <span>{formatDate(article.published_at)}</span>
-                      <span className="text-gray-300">·</span>
-                      <span className="inline-flex items-center gap-1 text-gray-400">
-                        <Eye size={12} aria-hidden />
-                        {formatStatCount(article.views ?? 0)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-gray-400">
-                        <Share2 size={12} aria-hidden />
-                        {formatStatCount(parseArticleShares(article.shares).total)}
-                      </span>
-                    </div>
-                    {article.excerpt && (
-                      <p className="mt-2 text-sm text-gray-600 leading-relaxed line-clamp-2">
-                        {article.excerpt}
-                      </p>
-                    )}
-                    <Link
-                      href={`/articles/${article.slug}`}
-                      className="mt-3 inline-flex items-center text-sm font-semibold transition-colors"
-                      style={{ color: '#B8860B' }}
-                    >
-                      Read More →
-                    </Link>
-                  </article>
-                ))}
+                      <Link
+                        href={`/articles/${article.slug}`}
+                        className="mt-3 inline-flex items-center text-sm font-semibold transition-colors"
+                        style={{ color: '#B8860B' }}
+                      >
+                        Read More →
+                      </Link>
+                    </article>
+                  ))}
+                </div>
               </div>
+              <aside className="hidden lg:block">
+                <AdSlot zone="homepage_sidebar" variant="sidebar" className="sticky top-24" />
+              </aside>
             </div>
           </section>
         )}
 
-        {/* Divider banner */}
         <div style={{ backgroundColor: '#0f1f3d' }} className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <p

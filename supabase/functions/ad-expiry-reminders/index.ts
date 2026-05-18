@@ -1,12 +1,8 @@
 /**
  * Supabase Edge Function: ad-expiry-reminders
  *
- * Schedule daily via Supabase Dashboard → Edge Functions → Cron, or pg_cron calling
- * `POST https://<project>.supabase.co/functions/v1/ad-expiry-reminders` with
- * `Authorization: Bearer <service_role_or_function_secret>`.
- *
- * Env (set in Supabase function secrets): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
- * RESEND_API_KEY, STRIPE_SECRET_KEY (optional, for subscription renewal reminders).
+ * Schedule daily via Supabase Dashboard → Edge Functions → Cron, or Vercel cron
+ * calling `/api/cron/expire-ads` which delegates here.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -15,6 +11,18 @@ const SITE = 'https://groundviewnews.com';
 
 function daysBetween(a: Date, b: Date): number {
   return Math.ceil((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function effectiveExpiry(row: { expires_at?: string | null; expiry_date?: string | null }): Date | null {
+  if (row.expiry_date) {
+    const d = new Date(`${row.expiry_date}T23:59:59.999Z`);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (row.expires_at) {
+    const d = new Date(row.expires_at);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
 }
 
 async function sendResend(to: string, subject: string, html: string): Promise<void> {
@@ -59,19 +67,32 @@ Deno.serve(async (req) => {
   const supabase = createClient(url, key);
   const now = new Date();
 
-  const { data: oneOffAds } = await supabase
+  const { data: activeAds } = await supabase
     .from('advertisements')
-    .select('id, title, expires_at, advertiser_id')
-    .eq('status', 'active')
-    .eq('tier', 'one_off');
+    .select('id, title, expires_at, expiry_date, advertiser_id, billing_cycle, stripe_subscription_id')
+    .eq('status', 'active');
 
   let reminders = 0;
   let expired = 0;
 
-  for (const ad of oneOffAds || []) {
-    const row = ad as { id: string; title: string; expires_at: string | null; advertiser_id: string };
-    if (!row.expires_at) continue;
-    const exp = new Date(row.expires_at);
+  for (const ad of activeAds || []) {
+    const row = ad as {
+      id: string;
+      title: string;
+      expires_at: string | null;
+      expiry_date: string | null;
+      advertiser_id: string;
+      billing_cycle: string | null;
+      stripe_subscription_id: string | null;
+    };
+
+    if (row.stripe_subscription_id && row.billing_cycle === 'monthly') {
+      continue;
+    }
+
+    const exp = effectiveExpiry(row);
+    if (!exp) continue;
+
     const d = daysBetween(now, exp);
     if (d < 0) {
       const { data: expiredLog } = await supabase
@@ -81,7 +102,10 @@ Deno.serve(async (req) => {
         .eq('reminder_type', 'expired')
         .maybeSingle();
       if (!expiredLog) {
-        await supabase.from('advertisements').update({ status: 'expired', updated_at: now.toISOString() }).eq('id', row.id);
+        await supabase
+          .from('advertisements')
+          .update({ status: 'expired', updated_at: now.toISOString() })
+          .eq('id', row.id);
         const { data: prof } = await supabase
           .from('advertiser_profiles')
           .select('email, contact_name, company_name')
@@ -141,9 +165,9 @@ Deno.serve(async (req) => {
 
   const { data: subAds } = await supabase
     .from('advertisements')
-    .select('id, title, tier, price_gbp, stripe_subscription_id, advertiser_id')
+    .select('id, title, billing_cycle, price_gbp, stripe_subscription_id, advertiser_id')
     .eq('status', 'active')
-    .in('tier', ['monthly', 'annual'])
+    .eq('billing_cycle', 'monthly')
     .not('stripe_subscription_id', 'is', null);
 
   let subReminders = 0;
@@ -151,7 +175,6 @@ Deno.serve(async (req) => {
     const row = ad as {
       id: string;
       title: string;
-      tier: string;
       price_gbp: number | null;
       stripe_subscription_id: string;
       advertiser_id: string;
@@ -204,7 +227,13 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ ok: true, date: now.toISOString(), one_off_reminders: reminders, one_off_expired: expired, subscription_reminders: subReminders }),
+    JSON.stringify({
+      ok: true,
+      date: now.toISOString(),
+      expiry_reminders: reminders,
+      expired,
+      subscription_reminders: subReminders,
+    }),
     { headers: { 'Content-Type': 'application/json' } },
   );
 });

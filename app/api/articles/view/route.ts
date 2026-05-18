@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { classifyReferrer } from '@/lib/referrer-source';
 
 function getServiceSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+}
+
+function siteHost(): string {
+  try {
+    const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com';
+    return new URL(base).hostname;
+  } catch {
+    return 'groundviewnews.com';
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -26,13 +36,27 @@ export async function POST(req: NextRequest) {
   const engagementRaw = (time / 60) * (scroll / 100);
   const engagementScore = clampNum(engagementRaw, 0, 10);
 
+  const referrer = typeof body.referrer === 'string' ? body.referrer : '';
+  const referrer_source = classifyReferrer(referrer, siteHost());
+
   const supabase = getServiceSupabase();
+
+  const { data: article } = await supabase
+    .from('articles')
+    .select('author_id')
+    .eq('id', body.article_id)
+    .maybeSingle();
+
+  const journalistId = (article as { author_id?: string } | null)?.author_id ?? null;
+
   const { error } = await supabase.from('article_views').insert({
     article_id: body.article_id,
+    journalist_id: journalistId,
     session_id: body.session_id || null,
     time_on_page_seconds: time,
     scroll_depth_percent: scroll,
-    referrer: body.referrer || null,
+    referrer: referrer || null,
+    referrer_source,
     engagement_score: engagementScore,
   });
 
@@ -48,4 +72,3 @@ function clampNum(value: unknown, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, n));
 }
-

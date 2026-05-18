@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { classifyReferrer } from '@/lib/referrer-source';
 
-/**
- * Run in Supabase SQL Editor (adds `views` + RPC for atomic increments):
- *
- * ```sql
- * ALTER TABLE articles ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
- * ```
- *
- * ```sql
- * CREATE OR REPLACE FUNCTION increment_article_views(article_slug text)
- * RETURNS void AS $$
- * BEGIN
- *   UPDATE articles SET views = COALESCE(views, 0) + 1 WHERE slug = article_slug;
- * END;
- * $$ LANGUAGE plpgsql;
- * ```
- */
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -24,8 +9,17 @@ function getServiceSupabase() {
   return createClient(url, key);
 }
 
+function siteHost(): string {
+  try {
+    const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com';
+    return new URL(base).hostname;
+  } catch {
+    return 'groundviewnews.com';
+  }
+}
+
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: { slug: string } },
 ) {
   const slug = decodeURIComponent(context.params.slug || '').trim();
@@ -38,13 +32,49 @@ export async function POST(
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  const { error } = await supabase.rpc('increment_article_views', {
+  const body = (await req.json().catch(() => ({}))) as {
+    session_id?: string;
+    referrer?: string;
+  };
+
+  const { data: article, error: artErr } = await supabase
+    .from('articles')
+    .select('id, author_id')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (artErr || !article) {
+    return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+  }
+
+  const art = article as { id: string; author_id: string | null };
+  const referrer = typeof body.referrer === 'string' ? body.referrer : '';
+  const referrer_source = classifyReferrer(referrer, siteHost());
+  const sessionId =
+    typeof body.session_id === 'string' && body.session_id.trim()
+      ? body.session_id.trim().slice(0, 128)
+      : `anon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const { error: rpcErr } = await supabase.rpc('increment_article_views', {
     article_slug: slug,
   });
 
-  if (error) {
-    console.error('[articles/view]', error.message);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (rpcErr) {
+    console.error('[articles/view]', rpcErr.message);
+    return NextResponse.json({ error: rpcErr.message }, { status: 400 });
+  }
+
+  const { error: insErr } = await supabase.from('article_views').insert({
+    article_id: art.id,
+    journalist_id: art.author_id,
+    session_id: sessionId,
+    referrer: referrer || null,
+    referrer_source,
+    engagement_score: 1,
+  });
+
+  if (insErr) {
+    console.error('[articles/view] article_views insert', insErr.message);
   }
 
   return NextResponse.json({ ok: true });

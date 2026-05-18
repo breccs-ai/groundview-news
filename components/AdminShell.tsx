@@ -12,10 +12,18 @@ import {
   DollarSign,
   Menu,
   X,
+  BarChart3,
+  Users,
+  Megaphone,
+  PenLine,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/overview', label: 'Overview', icon: BarChart3 },
+  { href: '/admin/dashboard', label: 'Articles', icon: LayoutDashboard },
+  { href: '/admin/subscribers', label: 'Subscribers', icon: Users },
+  { href: '/admin/advertisers', label: 'Advertisers', icon: Megaphone },
+  { href: '/admin/journalists', label: 'Journalists', icon: PenLine },
   { href: '/admin/articles/new', label: 'New Article', icon: FilePlus },
   { href: '/admin/revenue', label: 'Revenue', icon: DollarSign },
 ];
@@ -92,7 +100,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href));
+            const active =
+              pathname === item.href ||
+              (item.href !== '/admin/dashboard' &&
+                item.href !== '/admin/overview' &&
+                pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}

@@ -7,15 +7,16 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 import {
-  AD_PRICING,
-  FORMAT_DISPLAY_LABELS,
-  getAdPriceGbp,
-  getBillingPlanFormalName,
+  getCheckoutPriceGbp,
+  getMonthlyPriceGbp,
+  getAnnualPriceLines,
   getBillingPlanRadioCaption,
   getSelectionSummarySentence,
-  type AdFormat,
-  type AdTier,
+  TIER_PRICING,
+  type PlacementTier,
+  type BillingCycle,
 } from '@/lib/advertiser/pricing';
+import { PLACEMENT_TIER_DESCRIPTIONS, PLACEMENT_TIER_NAMES } from '@/lib/advertiser/placements';
 
 const PENDING_AD_DRAFT_KEY = 'pending_ad_draft';
 const DRAFT_VERSION = 1;
@@ -26,142 +27,27 @@ type PendingAdDraft = {
   bodyText: string;
   destinationUrl: string;
   imageUrl: string;
-  format: AdFormat;
-  tier: AdTier;
+  tier: PlacementTier;
+  billing_cycle: BillingCycle;
   step: 1 | 2;
 };
 
-const FORMATS: AdFormat[] = ['leaderboard_banner', 'sidebar_banner', 'sponsored_article'];
+const PLACEMENT_TIERS: PlacementTier[] = ['basic', 'standard', 'premium'];
 
 const gbpN = (n: number) => `£${n.toLocaleString('en-GB')}`;
-const px = (f: AdFormat, t: AdTier) => gbpN(getAdPriceGbp(f, t));
 
-/** Card row: starting price = one-off price for that format. */
-const AD_TYPE_CARD: Record<AdFormat, { fromPrice: number; line: string }> = {
-  leaderboard_banner: {
-    fromPrice: getAdPriceGbp('leaderboard_banner', 'one_off'),
-    line: 'Full-width banner at the top of every page — maximum visibility',
-  },
-  sidebar_banner: {
-    fromPrice: getAdPriceGbp('sidebar_banner', 'one_off'),
-    line: 'Sidebar placement on all article pages — consistent exposure',
-  },
-  sponsored_article: {
-    fromPrice: getAdPriceGbp('sponsored_article', 'one_off'),
-    line: 'Your content published as a clearly labelled sponsored article',
-  },
-};
-
-type PlanRow = {
-  tier: AdTier;
-  name: string;
-  priceLead: string;
-  body: string;
-  inclusionOneLine: string;
-};
-
-const EXPANDED_PLANS: Record<AdFormat, { intro: string; plans: PlanRow[] }> = {
-  leaderboard_banner: {
-    intro:
-      'Your creative runs as a full-width banner at the top of every page on Ground View News — the highest-attention placement we offer.',
-    plans: [
-      {
-        tier: 'one_off',
-        name: 'One-off',
-        priceLead: px('leaderboard_banner', 'one_off'),
-        body: 'Runs for 7 days from approval. Single payment, no renewal.',
-        inclusionOneLine: 'Runs for 7 days from approval. Single payment, no renewal.',
-      },
-      {
-        tier: 'monthly',
-        name: 'Monthly',
-        priceLead: `${px('leaderboard_banner', 'monthly')}/month`,
-        body: 'Runs continuously. Billed monthly. Cancel anytime.',
-        inclusionOneLine: 'Runs continuously, billed monthly, cancel anytime.',
-      },
-      {
-        tier: 'annual',
-        name: 'Annual',
-        priceLead: `${px('leaderboard_banner', 'annual')}/year`,
-        body: 'Best value. Runs all year. Includes priority placement, monthly reports, and first right of renewal. Saves 33% vs monthly.',
-        inclusionOneLine:
-          'Year-round placement with priority treatment, monthly reports, first right of renewal, and 33% savings vs paying monthly.',
-      },
-    ],
-  },
-  sidebar_banner: {
-    intro: 'Your ad appears in the article sidebar on every story — steady visibility next to our independent reporting.',
-    plans: [
-      {
-        tier: 'one_off',
-        name: 'One-off',
-        priceLead: px('sidebar_banner', 'one_off'),
-        body: 'Runs for 7 days from approval. Single payment, no renewal.',
-        inclusionOneLine: 'Runs for 7 days from approval. Single payment, no renewal.',
-      },
-      {
-        tier: 'monthly',
-        name: 'Monthly',
-        priceLead: `${px('sidebar_banner', 'monthly')}/month`,
-        body: 'Runs continuously. Billed monthly. Cancel anytime.',
-        inclusionOneLine: 'Runs continuously, billed monthly, cancel anytime.',
-      },
-      {
-        tier: 'annual',
-        name: 'Annual',
-        priceLead: `${px('sidebar_banner', 'annual')}/year`,
-        body: 'Best value. Runs all year. Includes priority placement, monthly reports, and first right of renewal. Saves 33% vs monthly.',
-        inclusionOneLine:
-          'Year-round placement with priority treatment, monthly reports, first right of renewal, and 33% savings vs paying monthly.',
-      },
-    ],
-  },
-  sponsored_article: {
-    intro: 'Sponsored articles are published like regular stories but always clearly labelled as sponsored content.',
-    plans: [
-      {
-        tier: 'one_off',
-        name: 'One-off',
-        priceLead: px('sponsored_article', 'one_off'),
-        body: 'Single article published and live for 30 days.',
-        inclusionOneLine: 'Single sponsored article, live for 30 days.',
-      },
-      {
-        tier: 'monthly',
-        name: 'Monthly',
-        priceLead: `${px('sponsored_article', 'monthly')}/month`,
-        body: 'Two sponsored articles per month. Billed monthly. Cancel anytime.',
-        inclusionOneLine: 'Two sponsored articles per month, billed monthly — cancel anytime.',
-      },
-      {
-        tier: 'annual',
-        name: 'Annual',
-        priceLead: `${px('sponsored_article', 'annual')}/year`,
-        body: 'Up to three articles per month. Best value. Includes priority placement and monthly performance reports. Saves 33% vs monthly.',
-        inclusionOneLine:
-          'Up to three sponsored articles per month with priority placement, monthly performance reports, and 33% savings vs monthly.',
-      },
-    ],
-  },
-};
-
-function totalPriceLabel(format: AdFormat, tier: AdTier): string {
-  const p = getAdPriceGbp(format, tier);
-  if (tier === 'one_off') return `Total: ${gbpN(p)} GBP`;
-  if (tier === 'monthly') return `Total: ${gbpN(p)}/month GBP`;
-  return `Total: ${gbpN(p)}/year GBP`;
+function totalPriceLabel(tier: PlacementTier, billing: BillingCycle): string {
+  const p = getCheckoutPriceGbp(tier, billing);
+  if (billing === 'monthly') return `Total: ${gbpN(p)}/month GBP`;
+  return `Total: ${gbpN(p)} billed annually GBP`;
 }
 
-function planRowFor(format: AdFormat, tier: AdTier): PlanRow | undefined {
-  return EXPANDED_PLANS[format].plans.find((p) => p.tier === tier);
+function isPlacementTier(x: unknown): x is PlacementTier {
+  return x === 'basic' || x === 'standard' || x === 'premium';
 }
 
-function isAdFormat(x: unknown): x is AdFormat {
-  return x === 'leaderboard_banner' || x === 'sidebar_banner' || x === 'sponsored_article';
-}
-
-function isAdTier(x: unknown): x is AdTier {
-  return x === 'one_off' || x === 'monthly' || x === 'annual';
+function isBillingCycle(x: unknown): x is BillingCycle {
+  return x === 'monthly' || x === 'annual';
 }
 
 export default function CreateAdPage() {
@@ -183,8 +69,8 @@ function CreateAdInner() {
   const [destinationUrl, setDestinationUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState('');
-  const [format, setFormat] = useState<AdFormat | null>(null);
-  const [tier, setTier] = useState<AdTier | null>(null);
+  const [placementTier, setPlacementTier] = useState<PlacementTier | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [step2AuthChecked, setStep2AuthChecked] = useState(false);
@@ -205,7 +91,7 @@ function CreateAdInner() {
     if (!initialDraftRaw) return;
     try {
       const d = JSON.parse(initialDraftRaw) as Partial<PendingAdDraft>;
-      if (d.v !== DRAFT_VERSION || !isAdFormat(d.format) || !isAdTier(d.tier)) {
+      if (d.v !== DRAFT_VERSION || !isPlacementTier(d.tier) || !isBillingCycle(d.billing_cycle)) {
         localStorage.removeItem(PENDING_AD_DRAFT_KEY);
         return;
       }
@@ -214,8 +100,8 @@ function CreateAdInner() {
       setBodyText(typeof d.bodyText === 'string' ? d.bodyText : '');
       setDestinationUrl(typeof d.destinationUrl === 'string' ? d.destinationUrl : '');
       setImageUrl(typeof d.imageUrl === 'string' ? d.imageUrl : '');
-      setFormat(d.format);
-      setTier(d.tier);
+      setPlacementTier(d.tier);
+      setBillingCycle(d.billing_cycle);
       setStep(d.step === 2 ? 2 : 1);
       setPendingServerAd(d.step === 2);
     } catch {
@@ -240,7 +126,7 @@ function CreateAdInner() {
   }, [step]);
 
   useEffect(() => {
-    if (step !== 2 || adId || !format || !tier || !pendingServerAd) return;
+    if (step !== 2 || adId || !placementTier || !billingCycle || !pendingServerAd) return;
     if (!title.trim() || !destinationUrl.trim()) return;
 
     let cancelled = false;
@@ -265,8 +151,8 @@ function CreateAdInner() {
             body_text: bodyText.trim(),
             destination_url: destinationUrl.trim(),
             image_url: imageUrl,
-            format,
-            tier,
+            tier: placementTier,
+            billing_cycle: billingCycle,
           }),
         });
         const body = await res.json().catch(() => ({}));
@@ -307,21 +193,20 @@ function CreateAdInner() {
     return () => {
       cancelled = true;
     };
-  }, [step, adId, format, tier, title, bodyText, destinationUrl, imageUrl, pendingServerAd]);
+  }, [step, adId, placementTier, billingCycle, title, bodyText, destinationUrl, imageUrl, pendingServerAd]);
 
-  const price = format && tier ? getAdPriceGbp(format, tier) : null;
-  const label = format && tier ? AD_PRICING[format][tier].label : null;
+  const price = placementTier && billingCycle ? getCheckoutPriceGbp(placementTier, billingCycle) : null;
 
   const persistDraftForStep2 = () => {
-    if (!format || !tier) return;
+    if (!placementTier || !billingCycle) return;
     const draft: PendingAdDraft = {
       v: DRAFT_VERSION,
       title: title.trim(),
       bodyText: bodyText.trim(),
       destinationUrl: destinationUrl.trim(),
       imageUrl,
-      format,
-      tier,
+      tier: placementTier,
+      billing_cycle: billingCycle,
       step: 2,
     };
     localStorage.setItem(PENDING_AD_DRAFT_KEY, JSON.stringify(draft));
@@ -331,8 +216,8 @@ function CreateAdInner() {
   const submitStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    if (!format || !tier) {
-      setErrorMsg('Please select an ad type and a billing plan.');
+    if (!placementTier || !billingCycle) {
+      setErrorMsg('Please select a placement tier and billing cycle.');
       return;
     }
     if (!title.trim() || title.length > 80) {
@@ -375,8 +260,8 @@ function CreateAdInner() {
         body_text: bodyText.trim(),
         destination_url: destinationUrl.trim(),
         image_url: imageUrl,
-        format,
-        tier,
+        tier: placementTier,
+        billing_cycle: billingCycle,
       }),
     });
     const body = await res.json().catch(() => ({}));
@@ -414,7 +299,7 @@ function CreateAdInner() {
   };
 
   const pay = async () => {
-    if (!adId || !format || !tier) return;
+    if (!adId || !placementTier || !billingCycle) return;
     setBusy(true);
     setErrorMsg('');
     const {
@@ -429,7 +314,7 @@ function CreateAdInner() {
     const res = await fetch('/api/advertiser/create-ad-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ad_id: adId, format, tier }),
+      body: JSON.stringify({ ad_id: adId, tier: placementTier, billing_cycle: billingCycle }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.url) {
@@ -483,15 +368,16 @@ function CreateAdInner() {
                 </p>
               </div>
 
-              <p className="text-sm text-gray-800 font-medium pt-1">Select your ad type and billing plan below.</p>
+              <p className="text-sm text-gray-800 font-medium pt-1">Choose your placement tier and billing cycle.</p>
 
               <div className="space-y-3 pt-1">
-                {FORMATS.map((f) => {
-                  const meta = AD_TYPE_CARD[f];
-                  const expanded = format === f;
+                {PLACEMENT_TIERS.map((t) => {
+                  const expanded = placementTier === t;
+                  const monthly = getMonthlyPriceGbp(t);
+                  const annualLines = getAnnualPriceLines(t);
                   return (
                     <div
-                      key={f}
+                      key={t}
                       className={`rounded-xl border-2 overflow-hidden transition-shadow ${
                         expanded ? 'border-amber-600 shadow-md' : 'border-stone-200 hover:border-stone-300'
                       }`}
@@ -499,54 +385,51 @@ function CreateAdInner() {
                       <button
                         type="button"
                         onClick={() => {
-                          setFormat(f);
-                          setTier(null);
+                          setPlacementTier(t);
+                          setBillingCycle(null);
                         }}
                         className="w-full text-left p-4 bg-white"
                       >
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-serif text-base font-bold text-gray-900">{FORMAT_DISPLAY_LABELS[f]}</span>
-                          <span className="text-sm font-bold text-amber-800">From {gbpN(meta.fromPrice)}</span>
+                          <span className="font-serif text-base font-bold text-gray-900">{PLACEMENT_TIER_NAMES[t]}</span>
+                          <span className="text-sm font-bold text-amber-800">From {gbpN(monthly)}/month</span>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">{meta.line}</p>
+                        <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">{PLACEMENT_TIER_DESCRIPTIONS[t]}</p>
                       </button>
                       {expanded && (
-                        <div className="border-t border-amber-100 bg-stone-50/90 px-4 py-4 space-y-4">
-                          <p className="text-xs text-gray-700 leading-relaxed">{EXPANDED_PLANS[f].intro}</p>
-                          <div className="space-y-2">
-                            {EXPANDED_PLANS[f].plans.map((row) => {
-                              const chosen = tier === row.tier;
-                              return (
-                                <button
-                                  key={row.tier}
-                                  type="button"
-                                  onClick={() => setTier(row.tier)}
-                                  className={`w-full text-left rounded-lg border px-3 py-3 text-sm transition-colors ${
-                                    chosen
-                                      ? 'border-amber-600 bg-amber-50/90 ring-1 ring-amber-200'
-                                      : 'border-stone-200 bg-white hover:border-stone-300'
-                                  }`}
-                                >
-                                  <div className="font-semibold text-gray-900">
-                                    {row.name} — <span className="text-amber-900">{row.priceLead}</span>
-                                  </div>
-                                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">{row.body}</p>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {tier && planRowFor(f, tier) && (
-                            <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm space-y-2">
-                              <p className="font-semibold text-gray-900">
-                                {FORMAT_DISPLAY_LABELS[f]} — {getBillingPlanFormalName(tier)}
-                              </p>
-                              <p className="text-sm text-gray-800">
-                                <span className="font-semibold">{getBillingPlanFormalName(tier)}</span> —{' '}
-                                {planRowFor(f, tier)!.priceLead}
-                              </p>
-                              <p className="text-gray-700 text-sm leading-relaxed">{planRowFor(f, tier)!.inclusionOneLine}</p>
-                              <p className="text-base font-bold text-amber-900 pt-1">{totalPriceLabel(f, tier)}</p>
+                        <div className="border-t border-amber-100 bg-stone-50/90 px-4 py-4 space-y-3">
+                          <button
+                            type="button"
+                            onClick={() => setBillingCycle('monthly')}
+                            className={`w-full text-left rounded-lg border px-3 py-3 text-sm ${
+                              billingCycle === 'monthly'
+                                ? 'border-amber-600 bg-amber-50/90 ring-1 ring-amber-200'
+                                : 'border-stone-200 bg-white'
+                            }`}
+                          >
+                            <div className="font-semibold text-gray-900">
+                              Monthly — <span className="text-amber-900">{gbpN(monthly)}/month</span>
                             </div>
+                            <p className="text-xs text-gray-600 mt-1">Auto-renews monthly. Cancel anytime from your dashboard.</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBillingCycle('annual')}
+                            className={`w-full text-left rounded-lg border px-3 py-3 text-sm ${
+                              billingCycle === 'annual'
+                                ? 'border-amber-600 bg-amber-50/90 ring-1 ring-amber-200'
+                                : 'border-stone-200 bg-white'
+                            }`}
+                          >
+                            <div className="font-semibold text-gray-900">
+                              Annual — <span className="text-amber-900">{annualLines.annualTotal}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {annualLines.effectiveMonthly} (~{annualLines.savingsPercent}% vs monthly). Billed annually upfront.
+                            </p>
+                          </button>
+                          {billingCycle && (
+                            <p className="text-base font-bold text-amber-900">{totalPriceLabel(t, billingCycle)}</p>
                           )}
                         </div>
                       )}
@@ -556,7 +439,7 @@ function CreateAdInner() {
               </div>
 
               {errorMsg && <p className="text-sm text-red-700">{errorMsg}</p>}
-              {format && tier && (
+              {placementTier && billingCycle && (
                 <button type="submit" disabled={busy} className="w-full py-3 rounded-md bg-[#0f1f3d] text-white font-semibold text-sm disabled:opacity-60">
                   {busy ? 'Saving…' : 'Review and pay'}
                 </button>
@@ -598,17 +481,16 @@ function CreateAdInner() {
           {step === 2 && step2AuthChecked && step2SignedIn && (
             <div className="bg-white border rounded-lg p-6 space-y-4 shadow-sm">
               <h2 className="font-bold text-gray-900">Review and pay</h2>
-              {format && tier && price !== null ? (
+              {placementTier && billingCycle && price !== null ? (
                 <>
                   <div className="rounded-lg border-2 border-amber-200 bg-amber-50 px-4 py-5 text-center">
                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">Total due (GBP)</p>
                     <p className="text-3xl font-bold text-amber-950 mt-1">£{price.toFixed(2)}</p>
-                    <p className="text-sm text-gray-800 mt-3 leading-relaxed">{getSelectionSummarySentence(format, tier)}</p>
+                    <p className="text-sm text-gray-800 mt-3 leading-relaxed">{getSelectionSummarySentence(placementTier, billingCycle)}</p>
                   </div>
-                  {label && <p className="text-xs text-gray-500 text-center">{label}</p>}
                 </>
               ) : (
-                <p className="text-sm text-amber-900">Your saved draft is missing ad type or billing plan. Go back and select both.</p>
+                <p className="text-sm text-amber-900">Your saved draft is missing tier or billing cycle. Go back and select both.</p>
               )}
               <ul className="text-sm text-gray-700 space-y-1">
                 <li>
@@ -617,10 +499,10 @@ function CreateAdInner() {
                 <li>
                   <strong>Destination:</strong> {destinationUrl}
                 </li>
-                {format && tier && (
+                {placementTier && billingCycle && (
                   <li>
-                    <strong>Ad type / billing:</strong> {FORMAT_DISPLAY_LABELS[format]} / {getBillingPlanFormalName(tier)} (
-                    {getBillingPlanRadioCaption(format, tier)})
+                    <strong>Tier / billing:</strong> {PLACEMENT_TIER_NAMES[placementTier]} / {billingCycle === 'monthly' ? 'Monthly' : 'Annual'} (
+                    {getBillingPlanRadioCaption(placementTier, billingCycle)})
                   </li>
                 )}
                 {price !== null && (
@@ -636,7 +518,7 @@ function CreateAdInner() {
               )}
               <button
                 type="button"
-                disabled={busy || !adId || !format || !tier}
+                disabled={busy || !adId || !placementTier || !billingCycle}
                 onClick={() => void pay()}
                 className="w-full py-3 rounded-md bg-amber-700 text-white font-semibold text-sm disabled:opacity-60"
               >

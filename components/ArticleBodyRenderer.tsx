@@ -8,15 +8,21 @@ import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
 import type { ArticleBody } from '@/lib/supabase';
 import { storedBodyToEditorMarkdown } from '@/lib/article-markdown';
+import AdSlot from '@/components/ads/AdSlot';
 
 type Props = {
   body: ArticleBody;
+  /** Insert in-article ad slot after the third paragraph when true. */
+  injectMidAd?: boolean;
 };
 
 const GEORGIA = { fontFamily: "Georgia, 'Times New Roman', serif" };
 const PLAYFAIR = { fontFamily: "'Playfair Display', Georgia, serif" };
 
-function buildMarkdownComponents(getParagraphIndex: () => number): Components {
+function buildMarkdownComponents(
+  getParagraphIndex: () => number,
+  injectMidAd?: boolean
+): Components {
   return {
     h1: ({ children, ...props }) => (
       <h1
@@ -83,7 +89,7 @@ function buildMarkdownComponents(getParagraphIndex: () => number): Components {
     p: ({ children, ...props }) => {
       const idx = getParagraphIndex();
       const isFirst = idx === 0;
-      return (
+      const paragraph = (
         <p
           {...props}
           className={isFirst ? 'markdown-first-p' : undefined}
@@ -98,6 +104,17 @@ function buildMarkdownComponents(getParagraphIndex: () => number): Components {
           {children}
         </p>
       );
+      if (injectMidAd && idx === 2) {
+        return (
+          <>
+            {paragraph}
+            <div className="my-10">
+              <AdSlot zone="article_in_content" variant="inline" />
+            </div>
+          </>
+        );
+      }
+      return paragraph;
     },
     blockquote: ({ children, ...props }) => (
       <blockquote
@@ -272,9 +289,10 @@ function buildMarkdownComponents(getParagraphIndex: () => number): Components {
 type MarkdownInnerProps = {
   markdown: string;
   wrapperClassName?: string;
+  injectMidAd?: boolean;
 };
 
-export function MarkdownBodyContent({ markdown, wrapperClassName }: MarkdownInnerProps) {
+export function MarkdownBodyContent({ markdown, wrapperClassName, injectMidAd }: MarkdownInnerProps) {
   const paragraphIndexRef = useRef(0);
   paragraphIndexRef.current = 0;
 
@@ -284,8 +302,8 @@ export function MarkdownBodyContent({ markdown, wrapperClassName }: MarkdownInne
         const idx = paragraphIndexRef.current;
         paragraphIndexRef.current += 1;
         return idx;
-      }),
-    [markdown],
+      }, injectMidAd),
+    [markdown, injectMidAd],
   );
 
   return (
@@ -297,12 +315,12 @@ export function MarkdownBodyContent({ markdown, wrapperClassName }: MarkdownInne
   );
 }
 
-export default function ArticleBodyRenderer({ body }: Props) {
+export default function ArticleBodyRenderer({ body, injectMidAd }: Props) {
   const markdown = storedBodyToEditorMarkdown(body as unknown).trim();
 
   if (!markdown) {
     return <p className="text-gray-400 italic mx-auto max-w-[720px]">No content available.</p>;
   }
 
-  return <MarkdownBodyContent markdown={markdown} />;
+  return <MarkdownBodyContent markdown={markdown} injectMidAd={injectMidAd} />;
 }

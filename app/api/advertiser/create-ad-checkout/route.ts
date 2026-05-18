@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getServiceSupabase } from '@/lib/supabase-service';
-import { AD_PRICING, type AdFormat, type AdTier, getAdPriceGbp } from '@/lib/advertiser/pricing';
+import {
+  AD_PRICING,
+  getCheckoutPriceGbp,
+  isBillingCycle,
+  isPlacementTier,
+  type AdFormat,
+  type BillingCycle,
+  type LegacyBillingTier,
+  type PlacementTier,
+  getAdPriceGbp,
+  TIER_PRICING,
+} from '@/lib/advertiser/pricing';
+import { formatForPlacementTier } from '@/lib/advertiser/placements';
 import { isProhibitedDestinationUrl } from '@/lib/advertiser/url-blocklist';
 
 export const runtime = 'nodejs';
@@ -20,6 +32,13 @@ function bearer(req: NextRequest): string | null {
 
 function siteBase(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com').replace(/\/$/, '');
+}
+
+function checkoutLabel(placementTier: PlacementTier, billingCycle: BillingCycle): string {
+  const name = TIER_PRICING[placementTier].shortLabel;
+  return billingCycle === 'monthly'
+    ? `${name} — Monthly`
+    : `${name} — Annual (upfront)`;
 }
 
 export async function POST(req: NextRequest) {
@@ -46,11 +65,21 @@ export async function POST(req: NextRequest) {
   }
 
   const adId = typeof body.ad_id === 'string' ? body.ad_id.trim() : '';
-  const format = body.format as AdFormat;
-  const tier = body.tier as AdTier;
+  const placementTier = body.tier as PlacementTier;
+  const billingCycle = body.billing_cycle as BillingCycle;
+  const legacyFormat = body.format as AdFormat | undefined;
+  const legacyTier = body.tier as LegacyBillingTier | undefined;
 
-  if (!adId || !AD_PRICING[format] || !AD_PRICING[format][tier]) {
-    return NextResponse.json({ error: 'Invalid ad, format, or tier' }, { status: 400 });
+  const useNewModel = isPlacementTier(placementTier) && isBillingCycle(billingCycle);
+  const useLegacy =
+    !useNewModel &&
+    legacyFormat &&
+    legacyTier &&
+    AD_PRICING[legacyFormat] &&
+    AD_PRICING[legacyFormat][legacyTier as LegacyBillingTier];
+
+  if (!adId || (!useNewModel && !useLegacy)) {
+    return NextResponse.json({ error: 'Invalid ad, tier, or billing cycle' }, { status: 400 });
   }
 
   const { data: ad, error: adErr } = await service
@@ -70,7 +99,13 @@ export async function POST(req: NextRequest) {
     .eq('id', row.advertiser_id)
     .maybeSingle();
 
-  const prof = ap as { id: string; user_id: string; kyc_status: string; stripe_customer_id: string | null; email: string } | null;
+  const prof = ap as {
+    id: string;
+    user_id: string;
+    kyc_status: string;
+    stripe_customer_id: string | null;
+    email: string;
+  } | null;
   if (!prof || prof.user_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -84,23 +119,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Destination URL is not allowed' }, { status: 400 });
   }
 
-  const priceGbp = getAdPriceGbp(format, tier);
-  const unitAmount = Math.round(priceGbp * 100);
-  const base = siteBase();
-
   const customerId = prof.stripe_customer_id || undefined;
   if (!customerId) {
     return NextResponse.json({ error: 'Missing Stripe customer' }, { status: 400 });
   }
 
+  const base = siteBase();
+  let priceGbp: number;
+  let productName: string;
+  let format: string;
+  let tierStored: string;
+  let billing_cycle: string;
+  let annual_discount_applied = false;
+
+  if (useNewModel) {
+    priceGbp = getCheckoutPriceGbp(placementTier, billingCycle);
+    productName = checkoutLabel(placementTier, billingCycle);
+    format = formatForPlacementTier(placementTier);
+    tierStored = placementTier;
+    billing_cycle = billingCycle;
+    annual_discount_applied = billingCycle === 'annual';
+  } else {
+    const lf = legacyFormat as AdFormat;
+    format = lf;
+    const lt = legacyTier as LegacyBillingTier;
+    priceGbp = getAdPriceGbp(lf, lt);
+    productName = AD_PRICING[lf][lt].label;
+    tierStored = lt;
+    billing_cycle = lt;
+  }
+
+  const unitAmount = Math.round(priceGbp * 100);
   const meta = {
     ad_id: adId,
     advertiser_profile_id: prof.id,
     format,
-    tier,
+    tier: tierStored,
+    billing_cycle,
   } as Record<string, string>;
 
-  if (tier === 'one_off') {
+  const updatePayload = {
+    format,
+    tier: tierStored,
+    billing_cycle,
+    annual_discount_applied,
+    price_gbp: priceGbp,
+    stripe_session_id: '' as string,
+    status: 'pending_review',
+    updated_at: new Date().toISOString(),
+  };
+
+  if (useLegacy && legacyTier === 'one_off') {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer: customerId,
@@ -110,7 +179,7 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: 'gbp',
             unit_amount: unitAmount,
-            product_data: { name: AD_PRICING[format][tier].label },
+            product_data: { name: productName },
           },
           quantity: 1,
         },
@@ -124,22 +193,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No checkout URL' }, { status: 500 });
     }
 
-    await service
-      .from('advertisements')
-      .update({
-        format,
-        tier,
-        price_gbp: priceGbp,
-        stripe_session_id: session.id,
-        status: 'pending_review',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', adId);
-
+    updatePayload.stripe_session_id = session.id;
+    await service.from('advertisements').update(updatePayload).eq('id', adId);
     return NextResponse.json({ url: session.url, session_id: session.id });
   }
 
-  const interval: Stripe.Price.Recurring.Interval = tier === 'monthly' ? 'month' : 'year';
+  if (useNewModel && billingCycle === 'annual') {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: customerId,
+      currency: 'gbp',
+      line_items: [
+        {
+          price_data: {
+            currency: 'gbp',
+            unit_amount: unitAmount,
+            product_data: { name: productName },
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${base}/advertiser/create-ad?step=3&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${base}/advertiser/create-ad?cancelled=1`,
+      metadata: meta,
+    });
+
+    if (!session.url) {
+      return NextResponse.json({ error: 'No checkout URL' }, { status: 500 });
+    }
+
+    updatePayload.stripe_session_id = session.id;
+    await service.from('advertisements').update(updatePayload).eq('id', adId);
+    return NextResponse.json({ url: session.url, session_id: session.id });
+  }
+
+  const interval: Stripe.Price.Recurring.Interval =
+    useLegacy && legacyTier === 'annual' ? 'year' : 'month';
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
@@ -150,7 +239,7 @@ export async function POST(req: NextRequest) {
           currency: 'gbp',
           unit_amount: unitAmount,
           recurring: { interval },
-          product_data: { name: AD_PRICING[format][tier].label },
+          product_data: { name: productName },
         },
         quantity: 1,
       },
@@ -167,17 +256,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No checkout URL' }, { status: 500 });
   }
 
-  await service
-    .from('advertisements')
-    .update({
-      format,
-      tier,
-      price_gbp: priceGbp,
-      stripe_session_id: session.id,
-      status: 'pending_review',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', adId);
+  updatePayload.stripe_session_id = session.id;
+  await service.from('advertisements').update(updatePayload).eq('id', adId);
 
   return NextResponse.json({ url: session.url, session_id: session.id });
 }

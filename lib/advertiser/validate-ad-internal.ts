@@ -3,7 +3,14 @@ import OpenAI from 'openai';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { isProhibitedDestinationUrl } from '@/lib/advertiser/url-blocklist';
 import { ad_live, ad_rejected } from '@/lib/emails/advertiser-emails';
-import { getOneOffDurationDays, type AdFormat, type AdTier } from '@/lib/advertiser/pricing';
+import {
+  getOneOffDurationDays,
+  resolveBillingCycle,
+  type AdFormat,
+  type LegacyBillingTier,
+} from '@/lib/advertiser/pricing';
+import { formatForPlacementTier } from '@/lib/advertiser/placements';
+import { isPlacementTier, type PlacementTier } from '@/lib/advertiser/pricing';
 
 function getStripe(): Stripe | null {
   const k = process.env.STRIPE_SECRET_KEY;
@@ -33,7 +40,7 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
   const { data: ad, error } = await supabase
     .from('advertisements')
     .select(
-      'id, title, body_text, destination_url, format, tier, status, ai_review_status, stripe_payment_intent_id, stripe_subscription_id, price_gbp, advertiser_id'
+      'id, title, body_text, destination_url, format, tier, billing_cycle, status, ai_review_status, stripe_payment_intent_id, stripe_subscription_id, price_gbp, annual_discount_applied, advertiser_id'
     )
     .eq('id', advertisementId)
     .maybeSingle();
@@ -51,7 +58,11 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
   const bodyText = String(row.body_text || '');
   const destinationUrl = String(row.destination_url || '');
   const format = String(row.format || 'leaderboard_banner') as AdFormat;
-  const tier = String(row.tier || 'one_off') as AdTier;
+  const placementTier = isPlacementTier(row.tier) ? (row.tier as PlacementTier) : null;
+  const billingCycle = resolveBillingCycle({
+    billing_cycle: row.billing_cycle as string,
+    tier: row.tier as string,
+  });
   const piId = typeof row.stripe_payment_intent_id === 'string' ? row.stripe_payment_intent_id : '';
   const subId = typeof row.stripe_subscription_id === 'string' ? row.stripe_subscription_id : '';
   const advertiserId = String(row.advertiser_id || '');
@@ -135,14 +146,15 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
 
   const now = new Date();
   let expires: Date;
-  if (tier === 'one_off') {
+  if (billingCycle === 'one_off') {
     const days = getOneOffDurationDays(format);
     expires = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-  } else if (tier === 'monthly') {
+  } else if (billingCycle === 'monthly') {
     expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   } else {
     expires = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
   }
+  const expiryDate = expires.toISOString().slice(0, 10);
 
   const pricePaid = row.price_gbp != null ? Number(row.price_gbp) : null;
 
@@ -155,6 +167,8 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
       starts_at: now.toISOString(),
       expires_at: expires.toISOString(),
       ends_at: expires.toISOString(),
+      expiry_date: expiryDate,
+      format: placementTier ? formatForPlacementTier(placementTier) : format,
       paid_at: now.toISOString(),
       price_paid: pricePaid,
       updated_at: now.toISOString(),
@@ -184,7 +198,7 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
       advertiserEmail,
       title,
       format,
-      tier,
+      placementTier || billingCycle,
       now.toISOString(),
       expires.toISOString(),
       destinationUrl

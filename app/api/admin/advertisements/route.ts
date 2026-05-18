@@ -25,15 +25,22 @@ export async function GET(req: NextRequest) {
   const statusFilter = searchParams.get('status');
   const formatFilter = searchParams.get('format');
   const tierFilter = searchParams.get('tier');
+  const view = searchParams.get('view');
 
   let q = supabase
     .from('advertisements')
     .select(
-      'id, title, format, tier, status, ai_review_status, ai_review_reason, created_at, expires_at, stripe_payment_intent_id, destination_url, body_text, image_url, advertiser_id, advertiser_profiles(company_name, contact_name, email)'
+      'id, title, format, tier, billing_cycle, annual_discount_applied, status, ai_review_status, ai_review_reason, created_at, expires_at, expiry_date, stripe_payment_intent_id, destination_url, body_text, image_url, advertiser_id, advertiser_profiles(company_name, contact_name, email)'
     )
     .order('created_at', { ascending: false });
 
-  if (statusFilter) q = q.eq('status', statusFilter);
+  if (view === 'expired') {
+    q = q.eq('status', 'expired');
+  } else if (view === 'active') {
+    q = q.eq('status', 'active');
+  } else if (statusFilter) {
+    q = q.eq('status', statusFilter);
+  }
   if (formatFilter) q = q.eq('format', formatFilter);
   if (tierFilter) q = q.eq('tier', tierFilter);
 
@@ -49,6 +56,11 @@ export async function GET(req: NextRequest) {
     .from('advertisements')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'active');
+
+  const { count: expiredCount } = await supabase
+    .from('advertisements')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'expired');
 
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const { data: monthAds } = await supabase
@@ -84,6 +96,7 @@ export async function GET(req: NextRequest) {
     rows: list,
     stats: {
       active_ads: activeCount || 0,
+      expired_ads: expiredCount || 0,
       revenue_month_gbp: revenueMonth,
       pending_review: pendingReview || 0,
       expiring_7d: expiring?.length || 0,

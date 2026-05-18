@@ -56,6 +56,7 @@ type AdminAdRow = {
 
 type AdStats = {
   active_ads: number;
+  expired_ads: number;
   revenue_month_gbp: number;
   pending_review: number;
   expiring_7d: number;
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
   const [adRows, setAdRows] = useState<AdminAdRow[]>([]);
   const [adLoading, setAdLoading] = useState(true);
   const [adStats, setAdStats] = useState<AdStats | null>(null);
+  const [adViewTab, setAdViewTab] = useState<'active' | 'expired'>('active');
   const [adFilterStatus, setAdFilterStatus] = useState('');
   const [adFilterFormat, setAdFilterFormat] = useState('');
   const [adFilterTier, setAdFilterTier] = useState('');
@@ -182,7 +184,8 @@ export default function AdminDashboard() {
   const fetchAdvertisements = useCallback(async () => {
     setAdLoading(true);
     const params = new URLSearchParams();
-    if (adFilterStatus) params.set('status', adFilterStatus);
+    params.set('view', adViewTab);
+    if (adFilterStatus && adViewTab === 'active') params.set('status', adFilterStatus);
     if (adFilterFormat) params.set('format', adFilterFormat);
     if (adFilterTier) params.set('tier', adFilterTier);
     const res = await fetch(`/api/admin/advertisements?${params.toString()}`, {
@@ -200,7 +203,7 @@ export default function AdminDashboard() {
     setAdRows((body.rows || []) as AdminAdRow[]);
     setAdStats((body.stats || null) as AdStats | null);
     setAdLoading(false);
-  }, [adFilterStatus, adFilterFormat, adFilterTier]);
+  }, [adViewTab, adFilterStatus, adFilterFormat, adFilterTier]);
 
   useEffect(() => {
     fetchArticles();
@@ -542,6 +545,7 @@ export default function AdminDashboard() {
             {adStats && (
               <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-600">
                 <span><strong className="text-gray-900">{adStats.active_ads}</strong> active</span>
+                <span><strong className="text-gray-900">{adStats.expired_ads ?? 0}</strong> expired</span>
                 <span><strong className="text-gray-900">£{adStats.revenue_month_gbp.toFixed(2)}</strong> revenue this month</span>
                 <span><strong className="text-gray-900">{adStats.pending_review}</strong> pending review</span>
                 <span><strong className="text-gray-900">{adStats.expiring_7d}</strong> expiring in 7 days</span>
@@ -558,7 +562,24 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <div className="inline-flex rounded-sm border border-gray-200 overflow-hidden text-sm">
+            <button
+              type="button"
+              onClick={() => { setAdViewTab('active'); setAdFilterStatus(''); }}
+              className={`px-3 py-1.5 ${adViewTab === 'active' ? 'bg-[#0f1f3d] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Active ads
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAdViewTab('expired'); setAdFilterStatus(''); }}
+              className={`px-3 py-1.5 border-l border-gray-200 ${adViewTab === 'expired' ? 'bg-amber-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Expired ads
+            </button>
+          </div>
+          {adViewTab === 'active' && (
           <select
             value={adFilterStatus}
             onChange={(e) => setAdFilterStatus(e.target.value)}
@@ -568,10 +589,10 @@ export default function AdminDashboard() {
             <option value="pending_payment">pending_payment</option>
             <option value="pending_review">pending_review</option>
             <option value="active">active</option>
-            <option value="expired">expired</option>
             <option value="rejected">rejected</option>
             <option value="cancelled">cancelled</option>
           </select>
+          )}
           <select
             value={adFilterFormat}
             onChange={(e) => setAdFilterFormat(e.target.value)}
@@ -588,9 +609,9 @@ export default function AdminDashboard() {
             className="border border-gray-200 rounded-sm px-2 py-1.5 text-sm"
           >
             <option value="">All tiers</option>
-            <option value="one_off">one_off</option>
-            <option value="monthly">monthly</option>
-            <option value="annual">annual</option>
+            <option value="basic">basic</option>
+            <option value="standard">standard</option>
+            <option value="premium">premium</option>
           </select>
         </div>
 

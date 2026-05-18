@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
-import { getAdPriceGbp, type AdFormat, type AdTier, getOneOffDurationDays, AD_PRICING } from '@/lib/advertiser/pricing';
+import {
+  getCheckoutPriceGbp,
+  isBillingCycle,
+  isPlacementTier,
+  type BillingCycle,
+  type PlacementTier,
+} from '@/lib/advertiser/pricing';
+import { formatForPlacementTier } from '@/lib/advertiser/placements';
 import { isProhibitedDestinationUrl } from '@/lib/advertiser/url-blocklist';
 
 export const runtime = 'nodejs';
@@ -35,8 +42,8 @@ export async function POST(req: NextRequest) {
   const body_text = typeof body.body_text === 'string' ? body.body_text.trim() : '';
   const destination_url = typeof body.destination_url === 'string' ? body.destination_url.trim() : '';
   const image_url = typeof body.image_url === 'string' ? body.image_url.trim() : '';
-  const format = body.format as AdFormat;
-  const tier = body.tier as AdTier;
+  const tier = body.tier as PlacementTier;
+  const billing_cycle = body.billing_cycle as BillingCycle;
 
   if (!title || title.length > 80) {
     return NextResponse.json({ error: 'Title required, max 80 characters' }, { status: 400 });
@@ -56,8 +63,8 @@ export async function POST(req: NextRequest) {
   if (isProhibitedDestinationUrl(destination_url)) {
     return NextResponse.json({ error: 'Destination URL is not allowed' }, { status: 400 });
   }
-  if (!AD_PRICING[format] || !AD_PRICING[format][tier]) {
-    return NextResponse.json({ error: 'Invalid format or tier' }, { status: 400 });
+  if (!isPlacementTier(tier) || !isBillingCycle(billing_cycle)) {
+    return NextResponse.json({ error: 'Invalid placement tier or billing cycle' }, { status: 400 });
   }
 
   const { data: prof, error: pErr } = await service
@@ -75,14 +82,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Complete identity verification before creating ads' }, { status: 403 });
   }
 
-  const priceGbp = getAdPriceGbp(format, tier);
-  const oneOffDays = tier === 'one_off' ? getOneOffDurationDays(format) : 30;
+  const priceGbp = getCheckoutPriceGbp(tier, billing_cycle);
+  const format = formatForPlacementTier(tier);
   const package_price_pence = Math.round(priceGbp * 100);
+  const package_days = billing_cycle === 'annual' ? 365 : 30;
 
   const { data: inserted, error: insErr } = await service
     .from('advertisements')
     .insert({
-      user_id: user.id,
       advertiser_id: pr.id,
       company_name: pr.company_name,
       title,
@@ -92,8 +99,10 @@ export async function POST(req: NextRequest) {
       image_url: image_url || null,
       format,
       tier,
+      billing_cycle,
+      annual_discount_applied: billing_cycle === 'annual',
       price_gbp: priceGbp,
-      package_days: oneOffDays,
+      package_days,
       package_price_pence,
       status: 'pending_payment',
       ai_review_status: 'pending',
@@ -132,9 +141,13 @@ export async function PATCH(req: NextRequest) {
   const ad_id = typeof body.ad_id === 'string' ? body.ad_id.trim() : '';
   if (!ad_id) return NextResponse.json({ error: 'Missing ad_id' }, { status: 400 });
 
-  const { data: existing } = await service.from('advertisements').select('id, advertiser_id, status').eq('id', ad_id).maybeSingle();
+  const { data: existing } = await service
+    .from('advertisements')
+    .select('id, advertiser_id, status, tier, billing_cycle')
+    .eq('id', ad_id)
+    .maybeSingle();
 
-  const ex = existing as { advertiser_id: string; status: string } | null;
+  const ex = existing as { advertiser_id: string; status: string; tier?: string; billing_cycle?: string } | null;
   if (!ex) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
@@ -169,16 +182,18 @@ export async function PATCH(req: NextRequest) {
     updates.destination_url = u;
   }
   if (typeof body.image_url === 'string') updates.image_url = body.image_url.trim() || null;
-  if (body.format && AD_PRICING[body.format as AdFormat]) updates.format = body.format;
-  if (body.tier && ['one_off', 'monthly', 'annual'].includes(body.tier)) {
-    updates.tier = body.tier;
-    const f = (updates.format || body.format) as AdFormat;
-    const t = body.tier as AdTier;
-    if (AD_PRICING[f]?.[t]) {
-      updates.price_gbp = getAdPriceGbp(f, t);
-      updates.package_price_pence = Math.round(getAdPriceGbp(f, t) * 100);
-      updates.package_days = t === 'one_off' ? getOneOffDurationDays(f) : 30;
-    }
+
+  const nextTier = isPlacementTier(body.tier) ? body.tier : ex.tier;
+  const nextBilling = isBillingCycle(body.billing_cycle) ? body.billing_cycle : ex.billing_cycle;
+  if (isPlacementTier(nextTier) && isBillingCycle(nextBilling)) {
+    updates.tier = nextTier;
+    updates.billing_cycle = nextBilling;
+    updates.format = formatForPlacementTier(nextTier);
+    updates.annual_discount_applied = nextBilling === 'annual';
+    const price = getCheckoutPriceGbp(nextTier, nextBilling);
+    updates.price_gbp = price;
+    updates.package_price_pence = Math.round(price * 100);
+    updates.package_days = nextBilling === 'annual' ? 365 : 30;
   }
 
   const { error: upErr } = await service.from('advertisements').update(updates).eq('id', ad_id);

@@ -128,15 +128,18 @@ export async function POST(req: NextRequest) {
 
       const { data: ad } = await supabase
         .from('advertisements')
-        .select('id, title, tier, expires_at, renewal_count, advertiser_id')
+        .select('id, title, tier, billing_cycle, expires_at, renewal_count, advertiser_id')
         .eq('stripe_subscription_id', subId)
         .maybeSingle();
 
       if (!ad) return NextResponse.json({ received: true });
 
       const a = ad as Record<string, unknown>;
-      const tier = String(a.tier || 'monthly');
-      const addDays = tier === 'annual' ? 365 : 30;
+      const billing =
+        typeof a.billing_cycle === 'string' && a.billing_cycle
+          ? String(a.billing_cycle)
+          : String(a.tier || 'monthly');
+      const addDays = billing === 'annual' ? 365 : 30;
       const prev = a.expires_at ? new Date(String(a.expires_at)) : new Date();
       const base = prev > new Date() ? prev : new Date();
       const nextExpiry = new Date(base.getTime() + addDays * 24 * 60 * 60 * 1000);
@@ -148,6 +151,7 @@ export async function POST(req: NextRequest) {
           status: 'active',
           expires_at: nextExpiry.toISOString(),
           ends_at: nextExpiry.toISOString(),
+          expiry_date: nextExpiry.toISOString().slice(0, 10),
           renewal_count: renewals,
           updated_at: new Date().toISOString(),
         })
@@ -173,7 +177,7 @@ export async function POST(req: NextRequest) {
           name,
           email,
           String(a.title || 'Your ad'),
-          tier,
+          billing,
           nextBill,
           `£${amount}`
         );

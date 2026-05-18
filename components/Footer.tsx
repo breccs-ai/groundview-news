@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import { Twitter, Linkedin, Facebook, Youtube } from 'lucide-react';
 import { CATEGORIES } from '@/lib/supabase';
+import AdSlot from '@/components/ads/AdSlot';
 
 export default function Footer() {
   return (
     <footer style={{ backgroundColor: '#0f1f3d' }} className="text-gray-300 mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+        <AdSlot zone="footer" variant="footer" />
+      </div>
       {/* Top section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
