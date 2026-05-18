@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { classifyReferrer } from '@/lib/referrer-source';
+import { getServiceSupabase } from '@/lib/supabase-service';
+import {
+  fetchArticleMetrics,
+  hasSessionView,
+  incrementArticleViews,
+} from '@/lib/article-metrics';
 
-function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function siteHost(): string {
   try {
@@ -20,7 +21,7 @@ function siteHost(): string {
 
 export async function POST(
   req: NextRequest,
-  context: { params: { slug: string } },
+  context: { params: { slug: string } }
 ) {
   const slug = decodeURIComponent(context.params.slug || '').trim();
   if (!slug) {
@@ -39,30 +40,42 @@ export async function POST(
 
   const { data: article, error: artErr } = await supabase
     .from('articles')
-    .select('id, author_id')
+    .select('id, author_id, views')
     .eq('slug', slug)
+    .eq('status', 'published')
     .maybeSingle();
 
   if (artErr || !article) {
     return NextResponse.json({ error: 'Article not found' }, { status: 404 });
   }
 
-  const art = article as { id: string; author_id: string | null };
-  const referrer = typeof body.referrer === 'string' ? body.referrer : '';
-  const referrer_source = classifyReferrer(referrer, siteHost());
+  const art = article as { id: string; author_id: string | null; views?: number };
   const sessionId =
     typeof body.session_id === 'string' && body.session_id.trim()
       ? body.session_id.trim().slice(0, 128)
       : `anon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-  const { error: rpcErr } = await supabase.rpc('increment_article_views', {
-    article_slug: slug,
-  });
-
-  if (rpcErr) {
-    console.error('[articles/view]', rpcErr.message);
-    return NextResponse.json({ error: rpcErr.message }, { status: 400 });
+  const alreadyViewed = await hasSessionView(supabase, art.id, sessionId);
+  if (alreadyViewed) {
+    const metrics = await fetchArticleMetrics(supabase, slug);
+    return NextResponse.json({
+      ok: true,
+      views: metrics?.views ?? (Number(art.views) || 0),
+      recorded: false,
+    });
   }
+
+  let views: number;
+  try {
+    views = await incrementArticleViews(supabase, slug);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Could not increment views';
+    console.error('[articles/view] increment', message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  const referrer = typeof body.referrer === 'string' ? body.referrer : '';
+  const referrer_source = classifyReferrer(referrer, siteHost());
 
   const { error: insErr } = await supabase.from('article_views').insert({
     article_id: art.id,
@@ -75,7 +88,15 @@ export async function POST(
 
   if (insErr) {
     console.error('[articles/view] article_views insert', insErr.message);
+    if (insErr.code === '23505') {
+      const metrics = await fetchArticleMetrics(supabase, slug);
+      return NextResponse.json({
+        ok: true,
+        views: metrics?.views ?? views,
+        recorded: false,
+      });
+    }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, views, recorded: true });
 }

@@ -1,21 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatStatCount } from '@/lib/format-stats';
-
 type Props = {
   slug: string;
   articleId: string;
   initialViews: number;
 };
 
-function getOrCreateSessionId(): string {
-  const key = 'gvn_reader_session';
+const SESSION_KEY = 'gvn_reader_session';
+
+export function getOrCreateReaderSessionId(): string {
   try {
-    const existing = sessionStorage.getItem(key);
+    const existing = sessionStorage.getItem(SESSION_KEY);
     if (existing) return existing;
     const id = `rs_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-    sessionStorage.setItem(key, id);
+    sessionStorage.setItem(SESSION_KEY, id);
     return id;
   } catch {
     return `rs_${Date.now()}`;
@@ -25,33 +25,59 @@ function getOrCreateSessionId(): string {
 export default function ArticleReadersLine({ slug, articleId, initialViews }: Props) {
   const [displayViews, setDisplayViews] = useState(initialViews);
 
+  const refreshFromDb = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/articles/${encodeURIComponent(slug)}/metrics`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as { views?: number };
+      if (typeof body.views === 'number' && Number.isFinite(body.views)) {
+        setDisplayViews(body.views);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [slug]);
+
   useEffect(() => {
-    const sessionKey = `viewed_article_${slug}`;
+    void refreshFromDb();
+  }, [refreshFromDb, initialViews]);
+
+  useEffect(() => {
+    const viewedKey = `viewed_article_${slug}`;
     try {
       if (typeof window === 'undefined') return;
-      if (sessionStorage.getItem(sessionKey)) return;
 
-      const sessionId = getOrCreateSessionId();
-      const referrer = typeof document !== 'undefined' ? document.referrer : '';
+      const sessionId = getOrCreateReaderSessionId();
+      const referrer = document.referrer || '';
 
       void fetch(`/api/articles/${encodeURIComponent(slug)}/view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, referrer }),
       })
-        .then((res) => {
-          if (res.ok) {
-            sessionStorage.setItem(sessionKey, 'true');
-            setDisplayViews((v) => v + 1);
+        .then(async (res) => {
+          const body = (await res.json().catch(() => ({}))) as {
+            views?: number;
+            recorded?: boolean;
+          };
+          if (res.ok && typeof body.views === 'number') {
+            setDisplayViews(body.views);
+            if (body.recorded !== false) {
+              sessionStorage.setItem(viewedKey, 'true');
+            }
+          } else if (sessionStorage.getItem(viewedKey)) {
+            void refreshFromDb();
           }
         })
         .catch(() => {
-          /* ignore */
+          void refreshFromDb();
         });
     } catch {
       /* ignore */
     }
-  }, [slug, articleId]);
+  }, [slug, articleId, refreshFromDb]);
 
   return (
     <span className="text-sm text-gray-600 tabular-nums">

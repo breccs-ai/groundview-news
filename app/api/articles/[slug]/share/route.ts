@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import type { SharePlatform } from '@/lib/article-shares';
+import { getServiceSupabase } from '@/lib/supabase-service';
+import { fetchArticleMetrics, incrementArticleShare } from '@/lib/article-metrics';
 
-function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const PLATFORMS: SharePlatform[] = ['twitter', 'facebook', 'linkedin', 'whatsapp'];
 
 export async function POST(
   req: NextRequest,
-  context: { params: { slug: string } },
+  context: { params: { slug: string } }
 ) {
   const slug = decodeURIComponent(context.params.slug || '').trim();
   if (!slug) {
@@ -31,33 +28,40 @@ export async function POST(
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  const { data: article } = await supabase.from('articles').select('id').eq('slug', slug).maybeSingle();
+  const { data: article } = await supabase
+    .from('articles')
+    .select('id')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle();
+
   const articleId = (article as { id: string } | null)?.id;
+  if (!articleId) {
+    return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+  }
 
-  const { error } = await supabase.rpc('increment_article_shares', {
-    article_slug: slug,
-    platform_name: platform,
+  let shares;
+  try {
+    shares = await incrementArticleShare(supabase, slug, platform);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Could not record share';
+    console.error('[articles/share]', message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  const sessionId =
+    typeof body.session_id === 'string' && body.session_id.trim()
+      ? body.session_id.trim().slice(0, 128)
+      : null;
+
+  const { error: logErr } = await supabase.from('article_shares').insert({
+    article_id: articleId,
+    share_channel: platform,
+    session_id: sessionId,
   });
-
-  if (error) {
-    console.error('[articles/share]', error.message);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (logErr) {
+    console.error('[articles/share] article_shares insert', logErr.message);
   }
 
-  if (articleId) {
-    const sessionId =
-      typeof body.session_id === 'string' && body.session_id.trim()
-        ? body.session_id.trim().slice(0, 128)
-        : null;
-    const { error: logErr } = await supabase.from('article_shares').insert({
-      article_id: articleId,
-      share_channel: platform,
-      session_id: sessionId,
-    });
-    if (logErr) {
-      console.error('[articles/share] article_shares insert', logErr.message);
-    }
-  }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, shares });
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Twitter, Linkedin } from 'lucide-react';
 import type { ArticleSharesCounts, SharePlatform } from '@/lib/article-shares';
 import { formatStatCount } from '@/lib/format-stats';
+import { getOrCreateReaderSessionId } from '@/components/ArticleReadersLine';
 
 type Props = {
   slug: string;
@@ -12,23 +13,12 @@ type Props = {
   articleId?: string;
 };
 
-// Share tracking records platform click counts only. No user identification data is stored or transmitted. Compliant with GDPR Article 6.
-
 function FacebookIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
     </svg>
   );
-}
-
-function shareSessionId(): string | undefined {
-  try {
-    const key = 'gvn_reader_session';
-    return sessionStorage.getItem(key) || undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export default function ArticleShareSection({ slug, title, initialShares }: Props) {
@@ -40,6 +30,24 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
   const encodedShareUrl = useMemo(() => encodeURIComponent(shareUrl), [shareUrl]);
   const encodedTitle = useMemo(() => encodeURIComponent(title), [title]);
 
+  const refreshFromDb = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/metrics`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as { shares?: ArticleSharesCounts };
+      if (body.shares) setCounts(body.shares);
+    } catch {
+      /* ignore */
+    }
+  }, [cleanSlug]);
+
+  useEffect(() => {
+    setCounts(initialShares);
+    void refreshFromDb();
+  }, [initialShares, refreshFromDb]);
+
   const shareUrls = useMemo(
     () => ({
       twitter: `https://twitter.com/intent/tweet?url=${encodedShareUrl}&text=${encodedTitle}`,
@@ -47,34 +55,32 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedShareUrl}`,
       whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${shareUrl}`)}`,
     }),
-    [encodedShareUrl, encodedTitle, shareUrl, title],
+    [encodedShareUrl, encodedTitle, shareUrl, title]
   );
 
-  const bump = useCallback((platform: SharePlatform) => {
-    setCounts((c) => ({
-      ...c,
-      [platform]: c[platform] + 1,
-      total: c.total + 1,
-    }));
-  }, []);
-
   const onShare = useCallback(
-    (platform: SharePlatform) => {
-      bump(platform);
-      void (async () => {
-        try {
-          await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/share`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platform, session_id: shareSessionId() }),
-          });
-        } catch {
-          /* ignore server failure; optimistic count already applied */
+    async (platform: SharePlatform) => {
+      try {
+        const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/share`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform,
+            session_id: getOrCreateReaderSessionId(),
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { shares?: ArticleSharesCounts };
+        if (res.ok && body.shares) {
+          setCounts(body.shares);
+        } else {
+          void refreshFromDb();
         }
-      })();
+      } catch {
+        void refreshFromDb();
+      }
       window.open(shareUrls[platform], '_blank', 'noopener,noreferrer');
     },
-    [bump, shareUrls, cleanSlug],
+    [shareUrls, cleanSlug, refreshFromDb]
   );
 
   const row: { platform: SharePlatform; label: string; icon: ReactNode }[] = [
@@ -103,7 +109,7 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
           <button
             key={platform}
             type="button"
-            onClick={() => onShare(platform)}
+            onClick={() => void onShare(platform)}
             aria-label={`Share on ${label}`}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors text-sm"
           >
@@ -117,4 +123,3 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
     </div>
   );
 }
-

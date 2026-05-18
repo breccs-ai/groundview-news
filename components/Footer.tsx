@@ -215,7 +215,7 @@ export default function Footer() {
           href="/admin"
           className="text-[10px] text-gray-600 hover:text-gray-500 transition-colors"
         >
-          Staff login
+          Admin login
         </Link>
       </div>
     </footer>
