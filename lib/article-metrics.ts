@@ -9,22 +9,62 @@ const DEFAULT_SHARES: ArticleSharesCounts = {
   total: 0,
 };
 
+async function countSharesFromEvents(
+  supabase: SupabaseClient,
+  articleId: string
+): Promise<ArticleSharesCounts> {
+  const counts: ArticleSharesCounts = { ...DEFAULT_SHARES };
+  const { data, error } = await supabase
+    .from('article_shares')
+    .select('share_channel')
+    .eq('article_id', articleId);
+
+  if (error || !data) return counts;
+
+  for (const row of data) {
+    const ch = String((row as { share_channel?: string }).share_channel || '') as SharePlatform;
+    if (ch === 'twitter' || ch === 'facebook' || ch === 'linkedin' || ch === 'whatsapp') {
+      counts[ch]++;
+    }
+  }
+
+  counts.total = counts.twitter + counts.facebook + counts.linkedin + counts.whatsapp;
+  return counts;
+}
+
+function resolveArticleShares(
+  jsonbShares: ArticleSharesCounts,
+  eventShares: ArticleSharesCounts
+): ArticleSharesCounts {
+  const eventTotal =
+    eventShares.twitter + eventShares.facebook + eventShares.linkedin + eventShares.whatsapp;
+  if (eventTotal > 0) return eventShares;
+
+  return jsonbShares;
+}
+
 export async function fetchArticleMetrics(
   supabase: SupabaseClient,
   slug: string
 ): Promise<{ views: number; shares: ArticleSharesCounts } | null> {
   const { data, error } = await supabase
     .from('articles')
-    .select('views, shares')
+    .select('id, views, shares')
     .eq('slug', slug)
     .eq('status', 'published')
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as { views?: number; shares?: unknown };
+  const row = data as { id?: string; views?: number; shares?: unknown };
+  const jsonbShares = parseArticleShares(row.shares);
+  const articleId = row.id;
+  const eventShares = articleId
+    ? await countSharesFromEvents(supabase, articleId)
+    : { ...DEFAULT_SHARES };
+
   return {
     views: Math.max(0, Number(row.views) || 0),
-    shares: parseArticleShares(row.shares),
+    shares: resolveArticleShares(jsonbShares, eventShares),
   };
 }
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Twitter, Linkedin } from 'lucide-react';
 import type { ArticleSharesCounts, SharePlatform } from '@/lib/article-shares';
+import { incrementShareCount, withComputedShareTotal } from '@/lib/article-shares';
 import { formatStatCount } from '@/lib/format-stats';
 import { getOrCreateReaderSessionId } from '@/components/ArticleReadersLine';
 
@@ -11,6 +12,10 @@ type Props = {
   title: string;
   initialShares: ArticleSharesCounts;
   articleId?: string;
+};
+
+type MetricsResponse = {
+  shares?: ArticleSharesCounts;
 };
 
 function isMobileDevice(): boolean {
@@ -84,6 +89,11 @@ function openPlatformShare(platform: SharePlatform, articleTitle: string, articl
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+function sharesFromMetricsBody(body: MetricsResponse): ArticleSharesCounts | null {
+  if (!body.shares || typeof body.shares !== 'object') return null;
+  return withComputedShareTotal(body.shares);
+}
+
 function FacebookIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -93,8 +103,12 @@ function FacebookIcon({ size = 18 }: { size?: number }) {
 }
 
 export default function ArticleShareSection({ slug, title, initialShares }: Props) {
-  const [counts, setCounts] = useState<ArticleSharesCounts>(initialShares);
+  const [counts, setCounts] = useState<ArticleSharesCounts>(() =>
+    withComputedShareTotal(initialShares)
+  );
   const [resolvedArticleUrl, setResolvedArticleUrl] = useState<string | null>(null);
+  const countsRef = useRef(counts);
+  countsRef.current = counts;
 
   const cleanSlug = useMemo(() => slug.split('?')[0].split('#')[0], [slug]);
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com').replace(/\/$/, '');
@@ -107,51 +121,55 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
 
   const articleUrl = resolvedArticleUrl ?? fallbackArticleUrl;
 
-  const refreshFromDb = useCallback(async () => {
+  const refreshFromDb = useCallback(async (): Promise<ArticleSharesCounts | null> => {
     try {
       const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/metrics`, {
         cache: 'no-store',
       });
-      if (!res.ok) return;
-      const body = (await res.json()) as { shares?: ArticleSharesCounts };
-      if (body.shares) setCounts(body.shares);
+      if (!res.ok) return null;
+      const body = (await res.json()) as MetricsResponse;
+      const shares = sharesFromMetricsBody(body);
+      if (shares) setCounts(shares);
+      return shares;
     } catch {
-      /* ignore */
+      return null;
     }
   }, [cleanSlug]);
 
   useEffect(() => {
-    setCounts(initialShares);
     void refreshFromDb();
-  }, [initialShares, refreshFromDb]);
-
-  const recordShare = useCallback(
-    async (platform: SharePlatform) => {
-      try {
-        const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/share`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            platform,
-            session_id: getOrCreateReaderSessionId(),
-          }),
-        });
-        const body = (await res.json().catch(() => ({}))) as { shares?: ArticleSharesCounts };
-        if (res.ok && body.shares) {
-          setCounts(body.shares);
-        } else {
-          void refreshFromDb();
-        }
-      } catch {
-        void refreshFromDb();
-      }
-    },
-    [cleanSlug, refreshFromDb]
-  );
+  }, [refreshFromDb]);
 
   const onShare = useCallback(
     (platform: SharePlatform) => {
-      void recordShare(platform);
+      const previous = countsRef.current;
+      setCounts((current) => incrementShareCount(current, platform));
+
+      void (async () => {
+        try {
+          const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              platform,
+              session_id: getOrCreateReaderSessionId(),
+            }),
+          });
+          const body = (await res.json().catch(() => ({}))) as MetricsResponse & { ok?: boolean };
+
+          if (!res.ok) {
+            setCounts(previous);
+            return;
+          }
+
+          const fromPost = sharesFromMetricsBody(body);
+          if (fromPost) setCounts(fromPost);
+
+          await refreshFromDb();
+        } catch {
+          setCounts(previous);
+        }
+      })();
 
       if (canUseWebShare()) {
         void navigator
@@ -167,7 +185,7 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
 
       openPlatformShare(platform, title, articleUrl);
     },
-    [articleUrl, title, recordShare]
+    [articleUrl, title, cleanSlug, refreshFromDb]
   );
 
   const row: { platform: SharePlatform; label: string; icon: ReactNode }[] = [
@@ -210,4 +228,3 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
     </div>
   );
 }
-
