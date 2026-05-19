@@ -13,6 +13,77 @@ type Props = {
   articleId?: string;
 };
 
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+function canUseWebShare(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.share === 'function' && isMobileDevice();
+}
+
+function buildPlatformShareUrl(platform: SharePlatform, articleTitle: string, articleUrl: string): string {
+  const mobile = isMobileDevice();
+
+  switch (platform) {
+    case 'twitter': {
+      const text = encodeURIComponent(`${articleTitle} ${articleUrl}`);
+      return mobile
+        ? `twitter://post?message=${text}`
+        : `https://twitter.com/intent/tweet?text=${text}`;
+    }
+    case 'facebook':
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`;
+    case 'linkedin':
+      return `https://www.linkedin.com/sharing/share-offsite?url=${encodeURIComponent(articleUrl)}`;
+    case 'whatsapp': {
+      const text = encodeURIComponent(`${articleTitle} - ${articleUrl}`);
+      return mobile ? `whatsapp://send?text=${text}` : `https://api.whatsapp.com/send?text=${text}`;
+    }
+  }
+}
+
+function openWhatsAppShare(articleTitle: string, articleUrl: string): void {
+  const text = encodeURIComponent(`${articleTitle} - ${articleUrl}`);
+  const webUrl = `https://api.whatsapp.com/send?text=${text}`;
+
+  if (!isMobileDevice()) {
+    window.open(webUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  let appOpened = false;
+  const onHide = () => {
+    if (document.hidden) appOpened = true;
+  };
+  document.addEventListener('visibilitychange', onHide);
+
+  window.location.href = `whatsapp://send?text=${text}`;
+
+  window.setTimeout(() => {
+    document.removeEventListener('visibilitychange', onHide);
+    if (!appOpened) {
+      window.location.href = webUrl;
+    }
+  }, 1200);
+}
+
+function openPlatformShare(platform: SharePlatform, articleTitle: string, articleUrl: string): void {
+  if (platform === 'whatsapp') {
+    openWhatsAppShare(articleTitle, articleUrl);
+    return;
+  }
+
+  const url = buildPlatformShareUrl(platform, articleTitle, articleUrl);
+
+  if (isMobileDevice()) {
+    window.location.href = url;
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function FacebookIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -23,12 +94,18 @@ function FacebookIcon({ size = 18 }: { size?: number }) {
 
 export default function ArticleShareSection({ slug, title, initialShares }: Props) {
   const [counts, setCounts] = useState<ArticleSharesCounts>(initialShares);
+  const [resolvedArticleUrl, setResolvedArticleUrl] = useState<string | null>(null);
 
   const cleanSlug = useMemo(() => slug.split('?')[0].split('#')[0], [slug]);
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com').replace(/\/$/, '');
-  const shareUrl = useMemo(() => `${siteUrl}/articles/${cleanSlug}`, [siteUrl, cleanSlug]);
-  const encodedShareUrl = useMemo(() => encodeURIComponent(shareUrl), [shareUrl]);
-  const encodedTitle = useMemo(() => encodeURIComponent(title), [title]);
+  const fallbackArticleUrl = useMemo(() => `${siteUrl}/articles/${cleanSlug}`, [siteUrl, cleanSlug]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setResolvedArticleUrl(`${window.location.origin}${window.location.pathname}`);
+  }, [cleanSlug]);
+
+  const articleUrl = resolvedArticleUrl ?? fallbackArticleUrl;
 
   const refreshFromDb = useCallback(async () => {
     try {
@@ -48,17 +125,7 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
     void refreshFromDb();
   }, [initialShares, refreshFromDb]);
 
-  const shareUrls = useMemo(
-    () => ({
-      twitter: `https://twitter.com/intent/tweet?url=${encodedShareUrl}&text=${encodedTitle}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedShareUrl}`,
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${shareUrl}`)}`,
-    }),
-    [encodedShareUrl, encodedTitle, shareUrl, title]
-  );
-
-  const onShare = useCallback(
+  const recordShare = useCallback(
     async (platform: SharePlatform) => {
       try {
         const res = await fetch(`/api/articles/${encodeURIComponent(cleanSlug)}/share`, {
@@ -78,9 +145,29 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
       } catch {
         void refreshFromDb();
       }
-      window.open(shareUrls[platform], '_blank', 'noopener,noreferrer');
     },
-    [shareUrls, cleanSlug, refreshFromDb]
+    [cleanSlug, refreshFromDb]
+  );
+
+  const onShare = useCallback(
+    (platform: SharePlatform) => {
+      void recordShare(platform);
+
+      if (canUseWebShare()) {
+        void navigator
+          .share({ title, url: articleUrl })
+          .catch((err: unknown) => {
+            if (err instanceof Error && err.name === 'AbortError') {
+              return;
+            }
+            openPlatformShare(platform, title, articleUrl);
+          });
+        return;
+      }
+
+      openPlatformShare(platform, title, articleUrl);
+    },
+    [articleUrl, title, recordShare]
   );
 
   const row: { platform: SharePlatform; label: string; icon: ReactNode }[] = [
@@ -109,7 +196,7 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
           <button
             key={platform}
             type="button"
-            onClick={() => void onShare(platform)}
+            onClick={() => onShare(platform)}
             aria-label={`Share on ${label}`}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors text-sm"
           >
@@ -123,3 +210,4 @@ export default function ArticleShareSection({ slug, title, initialShares }: Prop
     </div>
   );
 }
+
