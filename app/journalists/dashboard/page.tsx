@@ -51,10 +51,6 @@ function monthUtcBounds(d = new Date()) {
   return { start, next };
 }
 
-function formatMoneyGBP(n: number) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(n);
-}
-
 function statusBadge(status: string) {
   const map: Record<string, { label: string; className: string }> = {
     published: { label: 'Published', className: 'bg-green-100 text-green-800' },
@@ -100,14 +96,10 @@ export default function JournalistDashboardPage() {
   const [portalBlocked, setPortalBlocked] = useState(false);
   const [monthArticlesPublished, setMonthArticlesPublished] = useState(0);
   const [monthViewsEstimate, setMonthViewsEstimate] = useState(0);
-  const [monthEarningsEstimate, setMonthEarningsEstimate] = useState<number | null>(null);
-  const [monthShareWeightedViews, setMonthShareWeightedViews] = useState<number | null>(null);
 
   const [totalPublished, setTotalPublished] = useState(0);
   const [totalViews, setTotalViews] = useState(0);
-  const [totalPaidEarnings, setTotalPaidEarnings] = useState(0);
 
-  const [revenueShareRowCount, setRevenueShareRowCount] = useState<number | null>(null);
   const [submittedThisMonth, setSubmittedThisMonth] = useState(0);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -188,58 +180,19 @@ export default function JournalistDashboardPage() {
     const sumViews = allPub.reduce((s, a) => s + (Number(a.views) || 0), 0);
     setTotalViews(sumViews);
 
-    const { count: shareTotal, error: shareCntErr } = await supabase
-      .from('journalist_revenue_shares')
-      .select('*', { count: 'exact', head: true })
-      .eq('journalist_id', user.id);
+    const { data: monthArts } = await supabase
+      .from('articles')
+      .select('views')
+      .eq('author_id', user.id)
+      .eq('status', 'published')
+      .gte('published_at', monthStart)
+      .lt('published_at', monthNext);
 
-    setRevenueShareRowCount(shareCntErr ? null : shareTotal ?? 0);
-
-    const { data: monthShares } = await supabase
-      .from('journalist_revenue_shares')
-      .select('amount_earned, weighted_views, month_start')
-      .eq('journalist_id', user.id)
-      .gte('month_start', monthStart)
-      .lt('month_start', monthNext)
-      .order('month_start', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    type ShareRow = { amount_earned?: number; weighted_views?: number };
-    const ms = monthShares as ShareRow | null;
-
-    if (ms) {
-      setMonthEarningsEstimate(Number(ms.amount_earned) || 0);
-      setMonthShareWeightedViews(Number(ms.weighted_views) || 0);
-      setMonthViewsEstimate(Number(ms.weighted_views) || 0);
-    } else {
-      const { data: monthArts } = await supabase
-        .from('articles')
-        .select('views')
-        .eq('author_id', user.id)
-        .eq('status', 'published')
-        .gte('published_at', monthStart)
-        .lt('published_at', monthNext);
-
-      const mv = ((monthArts || []) as { views?: number | null }[]).reduce(
-        (s, a) => s + (Number(a.views) || 0),
-        0
-      );
-      setMonthViewsEstimate(mv);
-      setMonthEarningsEstimate(null);
-      setMonthShareWeightedViews(null);
-    }
-
-    const { data: paidShares } = await supabase
-      .from('journalist_revenue_shares')
-      .select('amount_earned, status')
-      .eq('journalist_id', user.id);
-
-    const rows = (paidShares || []) as { amount_earned?: number; status?: string }[];
-    const paidSum = rows
-      .filter((r) => (r.status || '').toLowerCase() === 'paid')
-      .reduce((s, r) => s + (Number(r.amount_earned) || 0), 0);
-    setTotalPaidEarnings(paidSum);
+    const monthViews = ((monthArts || []) as { views?: number | null }[]).reduce(
+      (s, a) => s + (Number(a.views) || 0),
+      0
+    );
+    setMonthViewsEstimate(monthViews);
 
     setLoading(false);
   }, [router]);
@@ -427,11 +380,11 @@ export default function JournalistDashboardPage() {
             </section>
           )}
 
-          {/* Earnings */}
+          {/* Publishing stats — neutral, no payment messaging */}
           <section className="border border-gray-200 rounded-sm overflow-hidden">
             <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-widest">
-                Earnings
+                Publishing stats
               </h2>
             </div>
             <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-8 text-sm">
@@ -441,26 +394,12 @@ export default function JournalistDashboardPage() {
                 </h3>
                 <ul className="space-y-2 text-gray-800">
                   <li>
-                    <span className="text-gray-500">Articles published (this month):</span>{' '}
+                    <span className="text-gray-500">Articles published:</span>{' '}
                     <span className="font-semibold">{monthArticlesPublished}</span>
                   </li>
                   <li>
-                    <span className="text-gray-500">
-                      {monthShareWeightedViews != null ? 'Weighted views (statement):' : 'Views (on articles published this month):'}
-                    </span>{' '}
-                    <span className="font-semibold">
-                      {monthShareWeightedViews != null
-                        ? Math.round(monthShareWeightedViews)
-                        : monthViewsEstimate}
-                    </span>
-                  </li>
-                  <li>
-                    <span className="text-gray-500">Estimated earnings:</span>{' '}
-                    <span className="font-semibold">
-                      {monthEarningsEstimate != null
-                        ? formatMoneyGBP(monthEarningsEstimate)
-                        : '—'}
-                    </span>
+                    <span className="text-gray-500">Views on articles published this month:</span>{' '}
+                    <span className="font-semibold">{monthViewsEstimate}</span>
                   </li>
                 </ul>
               </div>
@@ -477,21 +416,9 @@ export default function JournalistDashboardPage() {
                     <span className="text-gray-500">Total views (all articles):</span>{' '}
                     <span className="font-semibold">{totalViews}</span>
                   </li>
-                  <li>
-                    <span className="text-gray-500">Total earnings paid:</span>{' '}
-                    <span className="font-semibold">{formatMoneyGBP(totalPaidEarnings)}</span>
-                  </li>
                 </ul>
               </div>
             </div>
-            {revenueShareRowCount === 0 ? (
-              <div className="px-5 pb-5">
-                <p className="text-sm text-gray-600 bg-amber-50 border border-amber-100 rounded-sm px-4 py-3">
-                  Earnings are calculated on the 1st of each month based on your article performance.
-                  Keep publishing to start earning.
-                </p>
-              </div>
-            ) : null}
           </section>
 
           {/* Articles */}

@@ -167,22 +167,21 @@ export default function WriteForUsPage() {
           </div>
         </section>
 
-        {/* Future earnings */}
+        {/* Our community */}
         <section className="py-16 sm:py-20 border-b border-gray-100">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700 mb-3">
-              Future earnings
+              Our community
             </p>
             <h2
               className="text-3xl sm:text-4xl font-bold text-gray-900 mb-5"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
             >
-              Grow with us
+              Join the conversation
             </h2>
             <p className="text-base text-gray-700 leading-relaxed">
-              Ground View News is building a global community of independent writers. As our
-              readership grows, so does the opportunity for contributors who are part of it from
-              the beginning. Start writing today — no setup required.
+              Ground View News is building a global community of independent writers covering
+              stories that matter. Join us and make your voice heard.
             </p>
           </div>
         </section>
