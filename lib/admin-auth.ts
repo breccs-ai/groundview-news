@@ -24,12 +24,23 @@ export function slugify(title: string): string {
     .slice(0, 80);
 }
 
+// Order mirrors lib/supabase.ts CATEGORIES. Keep these two in sync.
 export const CATEGORY_OPTIONS = [
-  { value: 'africa-diaspora', label: 'Africa & Diaspora' },
   { value: 'world-politics', label: 'World Politics' },
+  { value: 'economy', label: 'Business & Economy' },
+  { value: 'financial-news-banking', label: 'Financial News & Banking' },
+  { value: 'sports', label: 'Sports' },
+  { value: 'africa-diaspora', label: 'Africa & Diaspora' },
+  { value: 'science-technology', label: 'Science & Technology' },
+  { value: 'culture-society', label: 'Culture & Society' },
+  { value: 'human-interest', label: 'Human Interest' },
+  { value: 'environment-climate', label: 'Environment & Climate' },
+  { value: 'health-medicine', label: 'Health & Medicine' },
+  { value: 'law-justice', label: 'Law & Justice' },
+  { value: 'education', label: 'Education' },
+  { value: 'travel-migration', label: 'Travel & Migration' },
+  { value: 'commentary', label: 'Opinion & Commentary' },
   { value: 'human-rights', label: 'Human Rights' },
-  { value: 'economy', label: 'Economy' },
-  { value: 'commentary', label: 'Commentary' },
 ];
 
 /** Values must match DB `articles_label_check` / editorial dropdowns. */
@@ -46,13 +57,26 @@ export const LABEL_OPTIONS = [
 
 export type ArticleLabel = (typeof LABEL_OPTIONS)[number];
 
-/** Allowed `articles.category` slug values. */
+/**
+ * Allowed `articles.category` slug values.
+ * `human-rights` is retained for legacy articles already filed under it.
+ */
 export const ARTICLE_CATEGORY_SLUGS = [
-  'africa-diaspora',
   'world-politics',
-  'human-rights',
   'economy',
+  'financial-news-banking',
+  'sports',
+  'africa-diaspora',
+  'science-technology',
+  'culture-society',
+  'human-interest',
+  'environment-climate',
+  'health-medicine',
+  'law-justice',
+  'education',
+  'travel-migration',
   'commentary',
+  'human-rights',
 ] as const;
 
 export function normalizeArticleLabel(input: string | undefined | null): ArticleLabel {

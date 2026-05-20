@@ -8,15 +8,23 @@ import { COUNTRIES } from '@/lib/countries';
 
 const NAVY = '#0f1f3d';
 
+// Must remain identical to COVERAGE_AREAS on app/write-for-us/page.tsx so the landing tiles
+// and the application checkboxes always match.
 const CATEGORY_OPTIONS = [
   'World Politics',
   'Business & Economy',
+  'Financial News & Banking',
   'Sports',
-  'Banking & Finance',
   'Africa & Diaspora',
   'Science & Technology',
   'Culture & Society',
   'Human Interest',
+  'Environment & Climate',
+  'Health & Medicine',
+  'Law & Justice',
+  'Education',
+  'Travel & Migration',
+  'Opinion & Commentary',
   'Other',
 ] as const;
 

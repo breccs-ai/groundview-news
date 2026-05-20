@@ -7,14 +7,23 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 
+// Aligned with the writer onboarding category list — see app/write-for-us/apply/page.tsx.
 const EXPERTISE_OPTIONS = [
   'World Politics',
-  'Human Rights',
-  'Economy',
-  'Business',
-  'Science',
-  'Culture',
-  'Commentary',
+  'Business & Economy',
+  'Financial News & Banking',
+  'Sports',
+  'Africa & Diaspora',
+  'Science & Technology',
+  'Culture & Society',
+  'Human Interest',
+  'Environment & Climate',
+  'Health & Medicine',
+  'Law & Justice',
+  'Education',
+  'Travel & Migration',
+  'Opinion & Commentary',
+  'Other',
 ] as const;
 
 type ExpertiseOption = (typeof EXPERTISE_OPTIONS)[number];

@@ -20,12 +20,19 @@ export const metadata: Metadata = {
 const COVERAGE_AREAS: { title: string; description: string }[] = [
   { title: 'World Politics', description: 'Elections, foreign policy, geopolitical analysis.' },
   { title: 'Business & Economy', description: 'Markets, trade, macroeconomic commentary.' },
+  { title: 'Financial News & Banking', description: 'Central banks, regulation, fintech, capital markets.' },
   { title: 'Sports', description: 'Reporting and opinion across major leagues and global tournaments.' },
-  { title: 'Banking & Finance', description: 'Central banks, regulation, fintech, financial markets.' },
   { title: 'Africa & Diaspora', description: 'Stories from across Africa and its diaspora communities.' },
   { title: 'Science & Technology', description: 'Research, innovation, and the impact of new tech.' },
   { title: 'Culture & Society', description: 'Identity, the arts, social change.' },
   { title: 'Human Interest', description: 'Personal stories that illuminate the wider world.' },
+  { title: 'Environment & Climate', description: 'Climate change, biodiversity, sustainability.' },
+  { title: 'Health & Medicine', description: 'Public health, medical research, healthcare systems.' },
+  { title: 'Law & Justice', description: 'Courts, legal reform, civil rights, accountability.' },
+  { title: 'Education', description: 'Policy, access, teaching, and learning at every level.' },
+  { title: 'Travel & Migration', description: 'Movement of people, places, borders, and belonging.' },
+  { title: 'Opinion & Commentary', description: 'Sharp argument on the questions that matter most.' },
+  { title: 'Other', description: 'Got a story that does not fit a box? Pitch it.' },
 ];
 
 const HOW_IT_WORKS: { step: string; title: string; description: string }[] = [
@@ -173,9 +180,9 @@ export default function WriteForUsPage() {
               Grow with us
             </h2>
             <p className="text-base text-gray-700 leading-relaxed">
-              As Ground View News grows, writers will earn a share of advertising revenue
-              proportional to their article views. No KYC or payment setup required to start
-              writing today.
+              Ground View News is building a global community of independent writers. As our
+              readership grows, so does the opportunity for contributors who are part of it from
+              the beginning. Start writing today — no setup required.
             </p>
           </div>
         </section>

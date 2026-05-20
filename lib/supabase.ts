@@ -61,15 +61,18 @@ export type Category = {
   border: string;
 };
 
+/**
+ * Article routing categories.
+ *
+ * The order here drives the public navbar and the article submission dropdown.
+ * Keep this list aligned with the writer-facing category list (see /write-for-us page tiles
+ * and /write-for-us/apply checkboxes). "Other" is intentionally NOT a routing slug — articles
+ * tagged "Other" by writers should be filed under the most appropriate concrete category by
+ * the editor when approving.
+ *
+ * Legacy slugs like `human-rights` are preserved so existing articles stay routable.
+ */
 export const CATEGORIES: Category[] = [
-  {
-    slug: 'africa-diaspora',
-    label: 'Africa & Diaspora',
-    color: '#B8860B',
-    bg: 'bg-amber-100',
-    text: 'text-amber-800',
-    border: 'border-amber-400',
-  },
   {
     slug: 'world-politics',
     label: 'World Politics',
@@ -79,28 +82,117 @@ export const CATEGORIES: Category[] = [
     border: 'border-blue-400',
   },
   {
-    slug: 'human-rights',
-    label: 'Human Rights',
-    color: '#B91C1C',
-    bg: 'bg-red-100',
-    text: 'text-red-800',
-    border: 'border-red-400',
-  },
-  {
     slug: 'economy',
-    label: 'Economy',
+    label: 'Business & Economy',
     color: '#15803D',
     bg: 'bg-green-100',
     text: 'text-green-800',
     border: 'border-green-400',
   },
   {
+    slug: 'financial-news-banking',
+    label: 'Financial News & Banking',
+    color: '#0F766E',
+    bg: 'bg-teal-100',
+    text: 'text-teal-800',
+    border: 'border-teal-400',
+  },
+  {
+    slug: 'sports',
+    label: 'Sports',
+    color: '#C2410C',
+    bg: 'bg-orange-100',
+    text: 'text-orange-800',
+    border: 'border-orange-400',
+  },
+  {
+    slug: 'africa-diaspora',
+    label: 'Africa & Diaspora',
+    color: '#B8860B',
+    bg: 'bg-amber-100',
+    text: 'text-amber-800',
+    border: 'border-amber-400',
+  },
+  {
+    slug: 'science-technology',
+    label: 'Science & Technology',
+    color: '#4338CA',
+    bg: 'bg-indigo-100',
+    text: 'text-indigo-800',
+    border: 'border-indigo-400',
+  },
+  {
+    slug: 'culture-society',
+    label: 'Culture & Society',
+    color: '#BE185D',
+    bg: 'bg-pink-100',
+    text: 'text-pink-800',
+    border: 'border-pink-400',
+  },
+  {
+    slug: 'human-interest',
+    label: 'Human Interest',
+    color: '#BE123C',
+    bg: 'bg-rose-100',
+    text: 'text-rose-800',
+    border: 'border-rose-400',
+  },
+  {
+    slug: 'environment-climate',
+    label: 'Environment & Climate',
+    color: '#047857',
+    bg: 'bg-emerald-100',
+    text: 'text-emerald-800',
+    border: 'border-emerald-400',
+  },
+  {
+    slug: 'health-medicine',
+    label: 'Health & Medicine',
+    color: '#0369A1',
+    bg: 'bg-sky-100',
+    text: 'text-sky-800',
+    border: 'border-sky-400',
+  },
+  {
+    slug: 'law-justice',
+    label: 'Law & Justice',
+    color: '#6D28D9',
+    bg: 'bg-violet-100',
+    text: 'text-violet-800',
+    border: 'border-violet-400',
+  },
+  {
+    slug: 'education',
+    label: 'Education',
+    color: '#A16207',
+    bg: 'bg-yellow-100',
+    text: 'text-yellow-800',
+    border: 'border-yellow-400',
+  },
+  {
+    slug: 'travel-migration',
+    label: 'Travel & Migration',
+    color: '#0E7490',
+    bg: 'bg-cyan-100',
+    text: 'text-cyan-800',
+    border: 'border-cyan-400',
+  },
+  {
     slug: 'commentary',
-    label: 'Commentary',
+    label: 'Opinion & Commentary',
     color: '#475569',
     bg: 'bg-slate-100',
     text: 'text-slate-700',
     border: 'border-slate-400',
+  },
+  // Legacy — kept so existing articles already filed under this slug stay routable.
+  {
+    slug: 'human-rights',
+    label: 'Human Rights',
+    color: '#B91C1C',
+    bg: 'bg-red-100',
+    text: 'text-red-800',
+    border: 'border-red-400',
   },
 ];
 
