@@ -19,7 +19,6 @@ const NAVY = '#0f1f3d';
 
 const PRIMARY_LINKS: { href: string; label: string }[] = [
   { href: '/about', label: 'About' },
-  { href: '/write-for-us', label: 'Write for Us' },
   { href: '/advertiser/register', label: 'Advertise' },
 ];
 
@@ -170,7 +169,7 @@ export default function Navbar() {
                   aria-haspopup="true"
                   className={`inline-flex items-center gap-1 px-3 py-2 rounded ${sectionsLinkClass} hover:bg-white/10`}
                 >
-                  Sections
+                  Categories
                   <ChevronDown
                     size={14}
                     className={`opacity-80 transition-transform ${sectionsOpen ? 'rotate-180' : ''}`}
@@ -458,7 +457,7 @@ export default function Navbar() {
                     aria-controls="mobile-sections"
                     className="w-full flex items-center justify-between px-3 py-3 min-h-11 text-base font-medium text-gray-100 hover:text-white hover:bg-white/10 rounded"
                   >
-                    Sections
+                    Categories
                     <ChevronDown
                       size={16}
                       className={`opacity-80 transition-transform ${mobileSectionsOpen ? 'rotate-180' : ''}`}

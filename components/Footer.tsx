@@ -179,6 +179,11 @@ export default function Footer() {
                   Writer Portal
                 </Link>
               </li>
+              <li>
+                <Link href="/write-for-us" className={linkClass}>
+                  Write for Us
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
