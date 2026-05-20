@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function CommentaryBanner() {
   return (
     <div className="w-full bg-gray-100 border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-2">
         <p className="text-xs text-gray-500 text-center leading-relaxed">
           Ground View News publishes independent commentary and opinion. Articles reflect the
           views of individual authors.{' '}

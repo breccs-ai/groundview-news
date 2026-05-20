@@ -140,7 +140,7 @@ export default function Navbar() {
         className={`sticky top-0 z-50 transition-shadow duration-200 ${scrolled ? 'shadow-lg' : ''}`}
         style={{ backgroundColor: NAVY }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="h-16 flex items-center justify-between gap-4">
             {/* Logo */}
             <Link href="/" className="flex-shrink-0 group min-w-0" aria-label="Ground View News home">

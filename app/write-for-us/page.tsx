@@ -60,7 +60,7 @@ export default function WriteForUsPage() {
       <main className="bg-white">
         {/* Hero */}
         <section style={{ backgroundColor: NAVY }} className="py-20 sm:py-24">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <div className="max-w-4xl mx-auto px-4 md:px-8 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-400 mb-4">
               Writers Programme
             </p>
@@ -94,7 +94,7 @@ export default function WriteForUsPage() {
 
         {/* What we cover */}
         <section className="py-16 sm:py-20 border-b border-gray-100">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto px-4 md:px-8">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700 mb-3">
                 What we cover
@@ -130,7 +130,7 @@ export default function WriteForUsPage() {
 
         {/* How it works */}
         <section id="how-it-works" className="py-16 sm:py-20 bg-gray-50 border-b border-gray-100">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto px-4 md:px-8">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700 mb-3">
                 How it works
@@ -169,7 +169,7 @@ export default function WriteForUsPage() {
 
         {/* Our community */}
         <section className="py-16 sm:py-20 border-b border-gray-100">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <div className="max-w-3xl mx-auto px-4 md:px-8 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700 mb-3">
               Our community
             </p>
@@ -188,7 +188,7 @@ export default function WriteForUsPage() {
 
         {/* Closing CTA */}
         <section style={{ backgroundColor: NAVY }} className="py-14">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <div className="max-w-3xl mx-auto px-4 md:px-8 text-center">
             <h2
               className="text-2xl sm:text-3xl font-bold text-white"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}

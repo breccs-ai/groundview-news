@@ -33,7 +33,7 @@ export default async function HomePage() {
       <Navbar />
 
       <main>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
           <AdSlot zone="homepage_featured" variant="featured" className="mb-6" />
         </div>
 
@@ -41,7 +41,7 @@ export default async function HomePage() {
 
         {secondary.length > 0 && (
           <section className="bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
+            <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
               <div>
                 <div className="mb-8">
                   <CategoryFilter />
@@ -99,7 +99,7 @@ export default async function HomePage() {
         )}
 
         <div style={{ backgroundColor: '#0f1f3d' }} className="py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p
               className="text-white text-lg md:text-xl font-semibold"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}

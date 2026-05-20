@@ -13,12 +13,12 @@ const colHeading =
 export default function Footer() {
   return (
     <footer style={{ backgroundColor: '#0f1f3d' }} className="text-gray-200 mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8">
         <AdSlot zone="footer" variant="footer" />
       </div>
 
       {/* Brand strip */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pt-10">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 pb-8 border-b border-white/10">
           <div className="max-w-xl">
             <div className="mb-3">
@@ -82,7 +82,7 @@ export default function Footer() {
       </div>
 
       {/* 4-column link grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
           {/* Column 1 — Sections (all 15) */}
           <div>
@@ -200,7 +200,7 @@ export default function Footer() {
 
       {/* Copyright bar */}
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-300">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-5 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-300">
           <p>&copy; 2026 Ground View News. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center sm:justify-end">
             <Link href="/privacy-policy" className="hover:text-white transition-colors">
@@ -226,7 +226,7 @@ export default function Footer() {
       </div>
 
       {/* Staff login — intentionally small + low contrast */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-4 text-center">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pb-4 text-center">
         <Link
           href="/admin"
           className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"

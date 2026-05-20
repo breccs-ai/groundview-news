@@ -8,14 +8,16 @@ type Props = {
 };
 
 export default function CategoryFilter({ active }: Props) {
+  const inactiveClasses =
+    'bg-gray-100 text-[#0f1f3d] border-gray-200 hover:bg-gray-200 hover:border-gray-300';
+  const activeClasses = 'bg-gray-900 text-white border-gray-900';
+
   return (
     <div className="flex flex-wrap items-center gap-1.5 w-full max-w-full">
       <Link
         href="/"
         className={`px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
-          !active
-            ? 'bg-gray-900 text-white border-gray-900'
-            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'
+          !active ? activeClasses : inactiveClasses
         }`}
       >
         All
@@ -25,9 +27,7 @@ export default function CategoryFilter({ active }: Props) {
           key={cat.slug}
           href={`/category/${cat.slug}`}
           className={`px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
-            active === cat.slug
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'
+            active === cat.slug ? activeClasses : inactiveClasses
           }`}
         >
           {cat.label}

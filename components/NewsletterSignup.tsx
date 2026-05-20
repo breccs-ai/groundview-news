@@ -108,7 +108,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
 
   return (
     <section id="newsletter" className="py-16 bg-gray-900">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+      <div className="max-w-3xl mx-auto px-4 md:px-8 text-center">
         <div className="flex justify-center mb-4">
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400">
             <Mail size={14} />

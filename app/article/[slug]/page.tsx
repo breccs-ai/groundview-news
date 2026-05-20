@@ -66,7 +66,7 @@ export default async function ArticlePage({ params }: Props) {
 
       <main className="bg-white">
         {/* Article header */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-6">
+        <div className="max-w-3xl mx-auto px-4 md:px-8 pt-10 pb-6">
           <div className="mb-4">
             <CategoryBadge category={article.category} label={article.label} size="md" />
           </div>
@@ -108,7 +108,7 @@ export default async function ArticlePage({ params }: Props) {
 
         {/* Featured image */}
         {article.featured_image_url && (
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
+          <div className="max-w-5xl mx-auto px-4 md:px-8 mb-8">
             <div className="relative w-full aspect-[16/8] overflow-hidden rounded-sm bg-gray-100">
               <img
                 src={article.featured_image_url}
@@ -120,7 +120,7 @@ export default async function ArticlePage({ params }: Props) {
         )}
 
         {/* Article body + sidebar ads */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
           <div className="max-w-[720px] lg:max-w-none mx-auto lg:mx-0 px-2 md:px-0">
           <ArticleBodyRenderer body={article.body} injectMidAd />
 
@@ -144,7 +144,7 @@ export default async function ArticlePage({ params }: Props) {
         </div>
 
         {/* Article disclaimer */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-8">
+        <div className="max-w-3xl mx-auto px-4 md:px-8 pb-8">
           <div className="bg-gray-50 border border-gray-200 rounded-sm px-5 py-4">
             <p className="text-xs text-gray-500 leading-relaxed">
               <strong className="text-gray-600">Editorial note:</strong> This article represents
@@ -170,7 +170,7 @@ export default async function ArticlePage({ params }: Props) {
         {/* Related articles */}
         {relatedArticles.length > 0 && (
           <section className="border-t border-gray-100 bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+            <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
               <h2
                 className="text-xl font-bold text-gray-900 mb-8"
                 style={{ fontFamily: 'Playfair Display, Georgia, serif' }}

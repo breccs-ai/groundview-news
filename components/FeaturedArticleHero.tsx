@@ -56,7 +56,7 @@ export default function FeaturedArticleHero({ articles }: Props) {
 
   return (
     <section className="bg-white border-b border-gray-100">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 pb-12">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 pt-10 pb-12">
         <article
           className={`transition-opacity duration-500 ease-in-out ${visible ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setPaused(true)}

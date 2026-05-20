@@ -45,7 +45,7 @@ export default async function CategoryPage({ params }: Props) {
       <main className="bg-white">
         {/* Page header */}
         <div style={{ backgroundColor: '#0f1f3d' }} className="py-12">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto px-4 md:px-8">
             <span
               className={`inline-flex items-center text-xs font-semibold uppercase tracking-widest rounded-sm px-2.5 py-1 mb-4 ${meta.bg} ${meta.text}`}
             >
@@ -65,12 +65,12 @@ export default async function CategoryPage({ params }: Props) {
 
         {/* Category filter tabs */}
         <div className="border-b border-gray-100 bg-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+          <div className="max-w-4xl mx-auto px-4 md:px-8 py-4">
             <CategoryFilter active={category} />
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 py-12">
           {featured && (
             <>
               {/* Featured article */}
