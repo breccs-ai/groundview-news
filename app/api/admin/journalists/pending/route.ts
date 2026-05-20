@@ -25,7 +25,9 @@ export async function GET() {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name, pen_name, bio, expertise, created_at')
+    .select(
+      'id, email, full_name, pen_name, bio, expertise, phone, country, how_heard_about, created_at'
+    )
     .eq('role', 'journalist')
     .eq('subscription_status', 'pending_approval')
     .order('created_at', { ascending: true });

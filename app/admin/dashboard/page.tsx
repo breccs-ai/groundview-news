@@ -20,6 +20,7 @@ type Article = {
   published_at: string | null;
   created_at: string;
   author_name: string;
+  author_id: string | null;
 };
 
 type ToastMsg = { type: 'success' | 'error'; text: string };
@@ -33,6 +34,9 @@ type PendingJournalist = {
   email: string;
   bio: string | null;
   expertise: string[] | null;
+  phone: string | null;
+  country: string | null;
+  how_heard_about: string | null;
   created_at: string;
 };
 
@@ -120,7 +124,7 @@ export default function AdminDashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from('articles')
-      .select('id, title, slug, category, label, status, published_at, created_at, author_name')
+      .select('id, title, slug, category, label, status, published_at, created_at, author_name, author_id')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -267,6 +271,22 @@ export default function AdminDashboard() {
     fetchArticles();
   };
 
+  const handleApproveWriterArticle = async (article: Article) => {
+    const res = await fetch('/api/admin/articles/approve-for-publish', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ article_id: article.id }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast('error', body.error || 'Could not approve article.');
+      return;
+    }
+    showToast('success', `"${article.title}" approved — writer notified to publish.`);
+    fetchArticles();
+  };
+
   const handlePublish = async (article: Article) => {
     const now = new Date().toISOString();
     const { error } = await supabase
@@ -345,11 +365,13 @@ export default function AdminDashboard() {
       draft: 'bg-gray-100 text-gray-600',
       pending: 'bg-amber-100 text-amber-800',
       pending_editorial: 'bg-amber-100 text-amber-900',
+      approved_pending_publish: 'bg-emerald-100 text-emerald-900',
       quarantined: 'bg-orange-100 text-orange-900',
       rejected: 'bg-red-100 text-red-800',
     };
     const labels: Record<string, string> = {
       pending_editorial: 'Pending Editorial Review',
+      approved_pending_publish: 'Approved — Awaiting Writer Publish',
       quarantined: 'Quarantined',
     };
     const text = labels[status] || status.replace(/_/g, ' ');
@@ -466,27 +488,32 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Reject journalist modal */}
+      {/* Reject writer modal */}
       {rejecting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-white rounded-sm shadow-xl p-6 max-w-md w-full">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-gray-900 text-sm">Reject journalist application</p>
+                <p className="font-semibold text-gray-900 text-sm">Reject writer application</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {rejecting.full_name} ({rejecting.email})
                 </p>
               </div>
             </div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">Reason *</label>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">
+              Internal note (optional)
+            </label>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={4}
               className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors resize-none"
-              placeholder="Explain briefly why this application is not approved."
+              placeholder="For internal records only — the writer receives a generic rejection email."
             />
+            <p className="text-xs text-gray-500 mt-2">
+              The writer receives a polite, generic rejection that does not share this note.
+            </p>
             <div className="flex gap-3 justify-end mt-4">
               <button
                 onClick={() => { setRejecting(null); setRejectReason(''); }}
@@ -497,10 +524,6 @@ export default function AdminDashboard() {
               <button
                 onClick={async () => {
                   const reason = rejectReason.trim();
-                  if (reason.length < 3) {
-                    showToast('error', 'Please provide a rejection reason.');
-                    return;
-                  }
                   const journalist = rejecting;
                   setRejecting(null);
                   setRejectReason('');
@@ -808,12 +831,12 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Pending journalist applications */}
+      {/* Pending writer applications */}
       <div className="mb-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
-              Pending Journalist Applications
+              Pending Writer Applications
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">{pendingJournalists.length} pending</p>
           </div>
@@ -837,8 +860,9 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">Applicant</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden md:table-cell">Contact</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden md:table-cell">Categories</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden lg:table-cell">Bio</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500 hidden md:table-cell">Expertise</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-widest text-gray-500">Applied</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -848,11 +872,16 @@ export default function AdminDashboard() {
                     <tr key={j.id} className="hover:bg-gray-50 transition-colors align-top">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{j.full_name}</p>
-                        {j.pen_name && <p className="text-xs text-gray-500 mt-0.5">{j.pen_name}</p>}
+                        {j.pen_name && (
+                          <p className="text-xs text-gray-700 mt-0.5">
+                            Pen name: <span className="font-medium">{j.pen_name}</span>
+                          </p>
+                        )}
                         <p className="text-xs text-gray-400 mt-1">{j.email}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell max-w-md">
-                        <p className="line-clamp-3">{j.bio || '—'}</p>
+                      <td className="px-4 py-3 hidden md:table-cell text-xs text-gray-600 whitespace-nowrap">
+                        <p>{j.phone || '—'}</p>
+                        <p className="text-gray-500">{j.country || '—'}</p>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1.5 max-w-sm">
@@ -866,6 +895,9 @@ export default function AdminDashboard() {
                             ))
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell max-w-md">
+                        <p className="line-clamp-3">{j.bio || '—'}</p>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(j.created_at)}
@@ -1030,11 +1062,19 @@ export default function AdminDashboard() {
                             <>
                               <button
                                 type="button"
-                                onClick={() => handlePublish(article)}
-                                title="Approve and publish"
+                                onClick={() =>
+                                  article.author_id
+                                    ? handleApproveWriterArticle(article)
+                                    : handlePublish(article)
+                                }
+                                title={
+                                  article.author_id
+                                    ? 'Approve — writer will publish'
+                                    : 'Approve and publish'
+                                }
                                 className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
                               >
-                                Approve
+                                {article.author_id ? 'Approve' : 'Approve & Publish'}
                               </button>
                               <button
                                 type="button"
@@ -1071,14 +1111,29 @@ export default function AdminDashboard() {
                                 >
                                   <Globe size={14} />
                                 </button>
+                              ) : article.status === 'approved_pending_publish' ? (
+                                <span
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-sm bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  title="Writer must click Publish from their dashboard."
+                                >
+                                  Awaiting writer
+                                </span>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handlePublish(article)}
-                                  title="Publish"
+                                  onClick={() =>
+                                    article.author_id
+                                      ? handleApproveWriterArticle(article)
+                                      : handlePublish(article)
+                                  }
+                                  title={
+                                    article.author_id
+                                      ? 'Approve — writer will publish'
+                                      : 'Publish'
+                                  }
                                   className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
                                 >
-                                  Publish
+                                  {article.author_id ? 'Approve' : 'Publish'}
                                 </button>
                               )}
                               <Link

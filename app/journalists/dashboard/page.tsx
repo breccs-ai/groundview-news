@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import { supabase, getCategoryMeta } from '@/lib/supabase';
 import { hasJournalistRole } from '@/lib/profile-roles';
-import { Plus, Eye, Pencil, ChevronDown } from 'lucide-react';
+import { Plus, Eye, Pencil, ChevronDown, MessageSquare, Send } from 'lucide-react';
 
 const GOLD = '#D4AF37';
 const NAVY = '#0f1f3d';
@@ -63,6 +63,10 @@ function statusBadge(status: string) {
       label: 'Editorial review',
       className: 'bg-amber-100 text-amber-900',
     },
+    approved_pending_publish: {
+      label: 'Approved — Ready to Publish',
+      className: 'bg-emerald-100 text-emerald-800',
+    },
     draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700' },
     rejected: { label: 'Rejected', className: 'bg-red-100 text-red-800' },
     quarantined: { label: 'Quarantined', className: 'bg-orange-100 text-orange-900' },
@@ -105,6 +109,8 @@ export default function JournalistDashboardPage() {
 
   const [revenueShareRowCount, setRevenueShareRowCount] = useState<number | null>(null);
   const [submittedThisMonth, setSubmittedThisMonth] = useState(0);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -242,6 +248,40 @@ export default function JournalistDashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
+  const publishNow = async (article: ArticleRow) => {
+    setPublishError(null);
+    setPublishingId(article.id);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        router.push('/journalists/login');
+        return;
+      }
+      const res = await fetch('/api/articles', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: article.id,
+          status: 'published',
+          slug: article.slug,
+          title: article.title,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPublishError(body.error || 'Could not publish article.');
+        return;
+      }
+      await loadDashboard();
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/journalists/login');
@@ -259,7 +299,7 @@ export default function JournalistDashboardPage() {
               <p className="text-sm text-gray-300">
                 Wrong portal for this account.{' '}
                 <Link href="/journalists/login" className="text-amber-400 underline font-semibold">
-                  Sign in with a journalist account
+                  Sign in with a writer account
                 </Link>
               </p>
               <button
@@ -273,7 +313,7 @@ export default function JournalistDashboardPage() {
           </div>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-4">
             <p className="text-gray-900 font-medium">
-              This email is registered as an advertiser account. Please use your journalist account.
+              This email is registered as an advertiser account. Please use your writer account.
             </p>
           </div>
         </main>
@@ -290,7 +330,7 @@ export default function JournalistDashboardPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-1">
-                Journalist Portal
+                Writer Portal
               </p>
               <h1
                 className="text-2xl md:text-3xl font-bold text-white"
@@ -339,6 +379,13 @@ export default function JournalistDashboardPage() {
             >
               Editorial Guidelines
             </Link>
+            <Link
+              href="/journalists/feedback"
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-sm border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              <MessageSquare size={16} />
+              Share feedback
+            </Link>
           </section>
 
           {/* Account status */}
@@ -373,7 +420,7 @@ export default function JournalistDashboardPage() {
               {!isApproved && (
                 <div className="sm:col-span-2 lg:col-span-4 pt-2 border-t border-gray-200">
                   <p className="text-sm text-gray-700">
-                    Your journalist account is awaiting editorial approval. You’ll receive an email within 48 hours.
+                    Your writer account is awaiting editorial approval. You will receive an email within 24 hours.
                   </p>
                 </div>
               )}
@@ -478,11 +525,14 @@ export default function JournalistDashboardPage() {
                   const cat = getCategoryMeta(article.category);
                   const canPublicLink = article.status === 'published' && article.slug;
                   const isDraft = article.status === 'draft';
+                  const isReadyToPublish = article.status === 'approved_pending_publish';
 
                   return (
                     <div
                       key={article.id}
-                      className="border border-gray-200 rounded-sm bg-white overflow-hidden"
+                      className={`border rounded-sm bg-white overflow-hidden ${
+                        isReadyToPublish ? 'border-emerald-300 shadow-sm' : 'border-gray-200'
+                      }`}
                     >
                       <div className="p-4 flex flex-col lg:flex-row lg:items-center gap-4 lg:justify-between">
                         <div className="min-w-0 flex-1 space-y-2">
@@ -512,7 +562,7 @@ export default function JournalistDashboardPage() {
                             <span>
                               {article.published_at
                                 ? `Published ${fmtDate(article.published_at)}`
-                                : 'Draft'}
+                                : `Submitted ${fmtDate(article.created_at)}`}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Eye size={14} className="text-gray-400" />
@@ -521,6 +571,17 @@ export default function JournalistDashboardPage() {
                           </div>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-2">
+                          {isReadyToPublish && (
+                            <button
+                              type="button"
+                              onClick={() => void publishNow(article)}
+                              disabled={publishingId === article.id}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors disabled:opacity-60"
+                            >
+                              <Send size={14} />
+                              {publishingId === article.id ? 'Publishing…' : 'Publish Now'}
+                            </button>
+                          )}
                           {isDraft && (
                             <Link
                               href={`/journalists/submit?id=${encodeURIComponent(article.id)}`}
@@ -532,6 +593,17 @@ export default function JournalistDashboardPage() {
                           )}
                         </div>
                       </div>
+
+                      {isReadyToPublish ? (
+                        <div className="border-t border-emerald-100 bg-emerald-50/60 px-4 py-2 text-xs text-emerald-900">
+                          Editor approved. Click <strong>Publish Now</strong> to take it live.
+                        </div>
+                      ) : null}
+                      {publishError && publishingId === article.id ? (
+                        <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-800">
+                          {publishError}
+                        </div>
+                      ) : null}
 
                       {article.status === 'rejected' && article.rejection_reason?.trim() ? (
                         <details className="group border-t border-gray-100 bg-red-50/40 px-4 py-2">

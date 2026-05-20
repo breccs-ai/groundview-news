@@ -12,6 +12,27 @@ function getServiceSupabase() {
   return createClient(url, key);
 }
 
+/**
+ * Pen-name resolution: every writer article must display the writer's pen_name.
+ * Falls back to full_name if pen_name is unset. Returns null when the profile lookup fails.
+ */
+async function resolveWriterByline(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  userId: string
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('pen_name, full_name')
+    .eq('id', userId)
+    .maybeSingle();
+  const row = data as { pen_name?: string | null; full_name?: string | null } | null;
+  const penName = (row?.pen_name || '').trim();
+  if (penName) return penName;
+  const fullName = (row?.full_name || '').trim();
+  return fullName || null;
+}
+
 async function triggerRevalidate(req: NextRequest, slug?: string) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
   await fetch(`${baseUrl}/api/revalidate`, {
@@ -138,6 +159,14 @@ export async function POST(req: NextRequest) {
     const supabase = getServiceSupabase();
     if (!supabase) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
 
+    // Force the byline on every writer article to come from the writer's pen_name.
+    if (actor.kind === 'journalist') {
+      const byline = await resolveWriterByline(supabase, actor.user.id);
+      if (byline) {
+        payload.author_name = byline;
+      }
+    }
+
     const title = String(payload.title || '').trim();
     const baseSlug = generateSlug(title) || 'article';
     let slug = baseSlug;
@@ -248,6 +277,11 @@ export async function PATCH(req: NextRequest) {
         payload.editorial_category = (existing as { editorial_category?: string }).editorial_category ?? 'general';
       }
       applyJournalistEditorialRouting(payload as Record<string, unknown>);
+
+      const byline = await resolveWriterByline(supabase, actor.user.id);
+      if (byline) {
+        payload.author_name = byline;
+      }
     } else {
       const ec = normalizeEditorialCategory((payload as Record<string, unknown>).editorial_category);
       (payload as Record<string, unknown>).editorial_category = ec;

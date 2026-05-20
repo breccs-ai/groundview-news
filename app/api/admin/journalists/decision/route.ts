@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import {
+  WRITER_EMAIL_FROM,
+  applicationApprovedEmail,
+  applicationRejectedEmail,
+} from '@/lib/writer-emails';
 
 const ADMIN_COOKIE = 'gvn_admin_session';
 const ADMIN_COOKIE_VALUE = 'authenticated';
@@ -33,9 +38,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  if (action === 'reject' && (!reason || reason.trim().length < 3)) {
-    return NextResponse.json({ error: 'Rejection reason is required.' }, { status: 400 });
-  }
+  // We no longer require a reason on reject — the writer-facing rejection email is intentionally
+  // generic. Reasons are still accepted for internal logging but not echoed in the email.
+  void reason;
 
   const supabase = getServiceSupabase();
 
@@ -59,41 +64,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: updateErr.message }, { status: 400 });
   }
 
+  const profileRow = profile as {
+    id: string;
+    email: string;
+    full_name: string;
+    pen_name: string | null;
+  };
+
   if (action === 'approve') {
-    await sendEmail(
-      profile.email,
-      'Welcome to Ground View News — Your Account is Approved',
-      `
-        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
-          <p>Congratulations. Your journalist account has been approved.</p>
-          <p>You can now log in and submit articles at <a href="https://groundviewnews.com/journalists/login">groundviewnews.com/journalists/login</a>.</p>
-          <p>Please read our editorial guidelines before submitting your first article.</p>
-        </div>
-      `.trim()
-    );
+    const tmpl = applicationApprovedEmail({
+      fullName: profileRow.full_name || '',
+      penName: profileRow.pen_name || profileRow.full_name || '',
+    });
+    await sendEmail(profileRow.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM);
   } else {
-    await sendEmail(
-      profile.email,
-      'Ground View News — Journalist Application Update',
-      `
-        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
-          <p>Thank you for applying to Ground View News. After review, we’re not able to approve your journalist account at this time.</p>
-          <p><strong>Reason:</strong> ${escapeHtml(reason!.trim())}</p>
-          <p>You’re welcome to reapply in the future with updated details.</p>
-        </div>
-      `.trim()
-    );
+    const tmpl = applicationRejectedEmail({ fullName: profileRow.full_name || '' });
+    await sendEmail(profileRow.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM);
   }
 
   return NextResponse.json({ ok: true, subscription_status: nextStatus });
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 

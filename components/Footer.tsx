@@ -128,6 +128,14 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/write-for-us"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Write for Us
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/advertise"
                   className="text-sm text-gray-400 hover:text-white transition-colors"
                 >
@@ -210,7 +218,14 @@ export default function Footer() {
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-4 text-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-4 text-center flex items-center justify-center gap-4">
+        <Link
+          href="/write-for-us"
+          className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          Write for Us
+        </Link>
+        <span className="text-[10px] text-gray-700">·</span>
         <Link
           href="/admin"
           className="text-[10px] text-gray-600 hover:text-gray-500 transition-colors"

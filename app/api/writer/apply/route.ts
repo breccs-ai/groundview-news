@@ -1,0 +1,177 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/email';
+import {
+  WRITER_EMAIL_FROM,
+  applicationReceivedEmail,
+  escapeHtml,
+} from '@/lib/writer-emails';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+type ApplyBody = {
+  full_name?: string;
+  pen_name?: string;
+  email?: string;
+  password?: string;
+  phone?: string;
+  country?: string;
+  bio?: string;
+  categories?: string[];
+  how_heard_about?: string | null;
+};
+
+export async function POST(req: NextRequest) {
+  let body: ApplyBody;
+  try {
+    body = (await req.json()) as ApplyBody;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+  }
+
+  const full_name = String(body.full_name || '').trim();
+  const pen_name = String(body.pen_name || '').trim();
+  const email = String(body.email || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  const phone = String(body.phone || '').trim();
+  const country = String(body.country || '').trim();
+  const bio = String(body.bio || '').trim();
+  const categories = Array.isArray(body.categories)
+    ? body.categories.map((c) => String(c).trim()).filter(Boolean).slice(0, 16)
+    : [];
+  const how_heard_about =
+    body.how_heard_about === null || body.how_heard_about === undefined
+      ? null
+      : String(body.how_heard_about).trim() || null;
+
+  if (!full_name || !pen_name || !email || !phone || !country || !bio || categories.length === 0) {
+    return NextResponse.json({ error: 'Please complete all required fields.' }, { status: 400 });
+  }
+  if (password.length < 8) {
+    return NextResponse.json(
+      { error: 'Password must be at least 8 characters.' },
+      { status: 400 }
+    );
+  }
+  if (bio.length > 300) {
+    return NextResponse.json({ error: 'Bio must be 300 characters or less.' }, { status: 400 });
+  }
+
+  const supabase = getServiceSupabase();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 });
+  }
+
+  // Check whether this email already has an auth user.
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id, roles, subscription_status')
+    .eq('email', email)
+    .maybeSingle();
+
+  let userId: string | undefined = (existingProfile as { id?: string } | null)?.id;
+
+  if (!userId) {
+    const created = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name, pen_name, source: 'writer_application' },
+    });
+    if (created.error || !created.data.user) {
+      const msg = created.error?.message || '';
+      if (msg.toLowerCase().includes('already')) {
+        return NextResponse.json(
+          {
+            error:
+              'An account with this email already exists. Please sign in and add writer access from your dashboard.',
+          },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: msg || 'Could not create your account.' },
+        { status: 400 }
+      );
+    }
+    userId = created.data.user.id;
+  }
+
+  const existingRow = existingProfile as {
+    id: string;
+    roles?: string[] | null;
+    subscription_status?: string | null;
+  } | null;
+
+  const baseProfile: Record<string, unknown> = {
+    full_name,
+    pen_name,
+    bio,
+    phone,
+    country,
+    how_heard_about,
+    expertise: categories,
+    role: 'journalist',
+  };
+
+  if (existingRow) {
+    const currentRoles = [...(existingRow.roles || []).map(String)];
+    if (!currentRoles.includes('journalist')) currentRoles.push('journalist');
+    const sub = (existingRow.subscription_status || '').toLowerCase();
+
+    const update: Record<string, unknown> = { ...baseProfile, roles: currentRoles };
+    if (sub !== 'active') {
+      update.subscription_status = 'pending_approval';
+      update.subscription_tier = 'free';
+    }
+
+    const { error: upErr } = await supabase.from('profiles').update(update).eq('id', existingRow.id);
+    if (upErr) {
+      return NextResponse.json({ error: upErr.message }, { status: 400 });
+    }
+  } else {
+    const { error: insertErr } = await supabase.from('profiles').insert({
+      id: userId,
+      email,
+      ...baseProfile,
+      roles: ['journalist'],
+      subscription_status: 'pending_approval',
+      subscription_tier: 'free',
+    });
+    if (insertErr) {
+      return NextResponse.json({ error: insertErr.message }, { status: 400 });
+    }
+  }
+
+  const confirmation = applicationReceivedEmail({ fullName: full_name });
+  await sendEmail(email, confirmation.subject, confirmation.html, WRITER_EMAIL_FROM);
+
+  // Notify the editorial inbox so admins can act quickly.
+  await sendEmail(
+    'info@groundviewnews.com',
+    'New writer application received',
+    `
+      <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height:1.5;">
+        <h2 style="margin:0 0 12px;">New writer application</h2>
+        <p style="margin:0 0 6px;"><strong>Name:</strong> ${escapeHtml(full_name)}</p>
+        <p style="margin:0 0 6px;"><strong>Pen name:</strong> ${escapeHtml(pen_name)}</p>
+        <p style="margin:0 0 6px;"><strong>Email:</strong> ${escapeHtml(email)}</p>
+        <p style="margin:0 0 6px;"><strong>Phone:</strong> ${escapeHtml(phone)}</p>
+        <p style="margin:0 0 6px;"><strong>Country:</strong> ${escapeHtml(country)}</p>
+        <p style="margin:0 0 6px;"><strong>Categories:</strong> ${escapeHtml(categories.join(', '))}</p>
+        ${how_heard_about ? `<p style="margin:0 0 6px;"><strong>Source:</strong> ${escapeHtml(how_heard_about)}</p>` : ''}
+        <p style="margin:12px 0 0;white-space:pre-wrap;">${escapeHtml(bio)}</p>
+      </div>
+    `.trim()
+  );
+
+  return NextResponse.json({ ok: true });
+}

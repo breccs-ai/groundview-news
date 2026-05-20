@@ -152,42 +152,9 @@ export async function POST(req: NextRequest) {
     const score = clampInt(Number(assessment.quality_score ?? 0), 0, 100);
     const recommendation = String(assessment.recommendation || '').toLowerCase();
 
-    if (score > 70) {
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('articles')
-        .update({
-          status: 'published',
-          published_at: now,
-          moderation_score: assessment,
-        })
-        .eq('id', article_id);
-
-      if (error) {
-        console.error('[articles/review] Publish update failed:', error.message);
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-
-      await triggerRevalidate(req, slug);
-
-      await sendOutcomeEmail({
-        to: getAuthorEmail(article),
-        outcome: 'published',
-        title,
-        slug,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        outcome: 'published' satisfies ReviewOutcome,
-        message: `Your article "${title}" has been published.`,
-        url: `https://groundviewnews.com/article/${slug}`,
-        slug,
-        assessment,
-      });
-    }
-
-    if (score >= 50 && score <= 70) {
+    // Writers no longer get auto-published — high-scoring articles still go to the admin queue
+    // so an editor can review and explicitly approve them for publishing.
+    if (score >= 50) {
       const { error } = await supabase
         .from('articles')
         .update({

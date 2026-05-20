@@ -128,6 +128,16 @@ export default function Navbar() {
                 </Link>
               ))}
               <Link
+                href="/write-for-us"
+                className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-150 ${
+                  pathname === '/write-for-us' || pathname?.startsWith('/write-for-us/')
+                    ? 'text-white bg-white/15'
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Write for Us
+              </Link>
+              <Link
                 href="/advertiser/register"
                 className={`px-3 py-1.5 text-sm font-medium rounded transition-colors duration-150 ${
                   pathname === '/advertiser/register'
@@ -190,7 +200,7 @@ export default function Navbar() {
                             className="block px-3 py-2 text-sm text-gray-200 hover:bg-white/10"
                             onClick={() => setAccountDropdownOpen(false)}
                           >
-                            My Journalist Portal
+                            My Writer Portal
                           </Link>
                         ) : null}
                         {acct.hasAdvertiser ? (
@@ -274,6 +284,12 @@ export default function Navbar() {
               </Link>
             ))}
             <Link
+              href="/write-for-us"
+              className="px-3 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
+            >
+              Write for Us
+            </Link>
+            <Link
               href="/advertiser/register"
               className="px-3 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
             >
@@ -301,7 +317,7 @@ export default function Navbar() {
                 </Link>
                 {acct.hasJournalist ? (
                   <Link href="/journalists/dashboard" className="block px-3 py-2 text-sm text-gray-300 hover:text-white">
-                    My Journalist Portal
+                    My Writer Portal
                   </Link>
                 ) : null}
                 {acct.hasAdvertiser ? (
