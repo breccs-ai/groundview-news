@@ -4,6 +4,22 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Global horizontal-overflow guard.
+ * Nothing on the public site should ever push the document wider than the
+ * viewport. Internal scroll containers (admin tables, article tables) still
+ * scroll within their own bounds; the body itself never does. */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

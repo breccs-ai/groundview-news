@@ -9,10 +9,10 @@ type Props = {
 
 export default function CategoryFilter({ active }: Props) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="flex flex-wrap items-center gap-1.5 w-full max-w-full">
       <Link
         href="/"
-        className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
+        className={`px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
           !active
             ? 'bg-gray-900 text-white border-gray-900'
             : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'
@@ -24,7 +24,7 @@ export default function CategoryFilter({ active }: Props) {
         <Link
           key={cat.slug}
           href={`/category/${cat.slug}`}
-          className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
+          className={`px-4 py-2 text-sm font-medium rounded-sm border transition-colors duration-150 ${
             active === cat.slug
               ? 'bg-gray-900 text-white border-gray-900'
               : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'
