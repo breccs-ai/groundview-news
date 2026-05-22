@@ -76,11 +76,11 @@ export default async function CategoryPage({ params }: Props) {
               {/* Featured article */}
               <article className="mb-12 pb-12 border-b border-gray-200">
                 {featured.featured_image_url && (
-                  <div className="w-full aspect-[16/8] overflow-hidden rounded-sm bg-gray-100 mb-7">
+                  <div className="w-full rounded-sm bg-gray-100 mb-7">
                     <img
                       src={featured.featured_image_url}
                       alt={featured.title}
-                      className="w-full h-full object-cover"
+                      className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
                     />
                   </div>
                 )}

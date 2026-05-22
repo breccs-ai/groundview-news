@@ -539,11 +539,11 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
             {form.featured_image_url && (
               <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
-                <div className="relative w-full aspect-[16/8] overflow-hidden rounded-sm bg-gray-100">
+                <div className="w-full rounded-sm bg-gray-100">
                   <img
                     src={form.featured_image_url}
                     alt={form.title}
-                    className="w-full h-full object-cover"
+                    className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
                   />
                 </div>
               </div>
@@ -929,11 +929,11 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </p>
             )}
             {form.featured_image_url && (
-              <div className="mt-3 w-full aspect-video overflow-hidden rounded-sm bg-gray-100">
+              <div className="mt-3 w-full rounded-sm bg-gray-100">
                 <img
                   src={form.featured_image_url}
                   alt="Featured preview"
-                  className="w-full h-full object-cover"
+                  className="block w-auto max-w-full h-auto max-h-[320px] mx-auto rounded-sm"
                 />
               </div>
             )}

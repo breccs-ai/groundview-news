@@ -992,8 +992,12 @@ function JournalistSubmitInner() {
             </div>
 
             {form.featured_image_url && (
-              <div className="mb-8">
-                <img src={form.featured_image_url} alt="" className="w-full rounded-sm object-cover max-h-[420px]" />
+              <div className="mb-8 w-full rounded-sm bg-gray-100">
+                <img
+                  src={form.featured_image_url}
+                  alt=""
+                  className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
+                />
               </div>
             )}
 

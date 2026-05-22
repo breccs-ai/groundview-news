@@ -109,11 +109,11 @@ export default async function ArticlePage({ params }: Props) {
         {/* Featured image */}
         {article.featured_image_url && (
           <div className="max-w-5xl mx-auto px-4 md:px-8 mb-8">
-            <div className="relative w-full aspect-[16/8] overflow-hidden rounded-sm bg-gray-100">
+            <div className="w-full rounded-sm bg-gray-100">
               <img
                 src={article.featured_image_url}
                 alt={article.title}
-                className="w-full h-full object-cover"
+                className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
               />
             </div>
           </div>
