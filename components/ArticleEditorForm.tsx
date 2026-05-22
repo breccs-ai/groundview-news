@@ -19,7 +19,12 @@ import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import CategoryBadge from '@/components/CategoryBadge';
 import type { ArticleBody } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { Save, Globe, ArrowLeft, Eye, X, Trash2 } from 'lucide-react';
+import {
+  ARTICLE_IMAGE_UPLOAD_ACCEPT,
+  ARTICLE_IMAGE_UPLOAD_MAX_BYTES,
+  ARTICLE_IMAGE_UPLOAD_MAX_MB,
+} from '@/lib/article-image-constraints';
+import { Save, Globe, ArrowLeft, Eye, X, Trash2, Upload } from 'lucide-react';
 
 type ArticleForm = {
   title: string;
@@ -77,6 +82,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
   const [imageGenLoading, setImageGenLoading] = useState(false);
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [imageGenNotice, setImageGenNotice] = useState<{ ok: boolean; text: string } | null>(
     null
   );
@@ -183,6 +189,58 @@ export default function ArticleEditorForm({ articleId }: Props) {
       });
     } finally {
       setImageGenLoading(false);
+    }
+  };
+
+  const uploadFeaturedImage = async (file: File | null) => {
+    setImageGenNotice(null);
+    if (!file) return;
+
+    if (!ARTICLE_IMAGE_UPLOAD_ACCEPT.split(',').includes(file.type)) {
+      setImageGenNotice({
+        ok: false,
+        text: 'Upload failed. Use JPEG, PNG, or WebP only.',
+      });
+      return;
+    }
+
+    if (file.size > ARTICLE_IMAGE_UPLOAD_MAX_BYTES) {
+      setImageGenNotice({
+        ok: false,
+        text: `Upload failed. Image must be ${ARTICLE_IMAGE_UPLOAD_MAX_MB}MB or smaller.`,
+      });
+      return;
+    }
+
+    setImageUploadLoading(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('title', form.title || file.name);
+
+      const res = await fetch('/api/articles/upload-image', {
+        method: 'POST',
+        credentials: 'include',
+        body,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.imageUrl) {
+        setImageGenNotice({
+          ok: false,
+          text: json.error || 'Upload failed. Please try another image.',
+        });
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
+      setImageGenNotice({ ok: true, text: 'Image uploaded successfully' });
+    } catch {
+      setImageGenNotice({
+        ok: false,
+        text: 'Upload failed. Please try another image.',
+      });
+    } finally {
+      setImageUploadLoading(false);
     }
   };
 
@@ -834,11 +892,32 @@ export default function ArticleEditorForm({ articleId }: Props) {
               <button
                 type="button"
                 onClick={() => generateFeaturedImage()}
-                disabled={imageGenLoading}
+                disabled={imageGenLoading || imageUploadLoading}
                 className="inline-flex shrink-0 items-center justify-center px-4 py-2 text-sm font-semibold rounded-sm text-[#1a1a1a] bg-[#d4af37] hover:bg-[#c9a227] transition-colors disabled:opacity-60 disabled:pointer-events-none"
               >
                 {imageGenLoading ? 'Generating image...' : 'Generate Image'}
               </button>
+              <label
+                className={`inline-flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-sm border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-gray-900 transition-colors ${
+                  imageGenLoading || imageUploadLoading
+                    ? 'opacity-60 pointer-events-none'
+                    : 'cursor-pointer'
+                }`}
+              >
+                <Upload size={14} aria-hidden />
+                {imageUploadLoading ? 'Uploading...' : 'Upload Image'}
+                <input
+                  type="file"
+                  accept={ARTICLE_IMAGE_UPLOAD_ACCEPT}
+                  className="sr-only"
+                  disabled={imageGenLoading || imageUploadLoading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    e.currentTarget.value = '';
+                    void uploadFeaturedImage(file);
+                  }}
+                />
+              </label>
             </div>
             {imageGenNotice && (
               <p
