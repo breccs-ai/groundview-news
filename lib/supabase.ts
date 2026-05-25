@@ -82,7 +82,7 @@ export const CATEGORIES: Category[] = [
     border: 'border-blue-400',
   },
   {
-    slug: 'economy',
+    slug: 'business-economy',
     label: 'Business & Economy',
     color: '#15803D',
     bg: 'bg-green-100',
@@ -178,7 +178,7 @@ export const CATEGORIES: Category[] = [
     border: 'border-cyan-400',
   },
   {
-    slug: 'commentary',
+    slug: 'opinion-commentary',
     label: 'Opinion & Commentary',
     color: '#475569',
     bg: 'bg-slate-100',
@@ -196,9 +196,38 @@ export const CATEGORIES: Category[] = [
   },
 ];
 
+/**
+ * Legacy slug → metadata. NOT iterated by UI components (navbar dropdown, footer,
+ * etc.) so writers no longer see these as selectable options, but URLs like
+ * /category/economy and /category/commentary remain routable, and any article
+ * still stored under the legacy slug renders with the correct badge label and
+ * colour palette via `getCategoryMeta`.
+ *
+ * New articles default to the new slugs: `business-economy`, `opinion-commentary`.
+ */
+export const LEGACY_CATEGORIES: Category[] = [
+  {
+    slug: 'economy',
+    label: 'Business & Economy',
+    color: '#15803D',
+    bg: 'bg-green-100',
+    text: 'text-green-800',
+    border: 'border-green-400',
+  },
+  {
+    slug: 'commentary',
+    label: 'Opinion & Commentary',
+    color: '#475569',
+    bg: 'bg-slate-100',
+    text: 'text-slate-700',
+    border: 'border-slate-400',
+  },
+];
+
 export function getCategoryMeta(slug: string): Category {
   return (
-    CATEGORIES.find((c) => c.slug === slug) || {
+    CATEGORIES.find((c) => c.slug === slug) ||
+    LEGACY_CATEGORIES.find((c) => c.slug === slug) || {
       slug,
       label: slug,
       color: '#64748b',

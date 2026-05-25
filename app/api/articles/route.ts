@@ -253,7 +253,7 @@ export async function PATCH(req: NextRequest) {
     if (Object.prototype.hasOwnProperty.call(p, 'category')) {
       const v = p.category;
       if (v === '' || v === undefined || v === null) {
-        p.category = 'commentary';
+        p.category = 'opinion-commentary';
       }
     }
 

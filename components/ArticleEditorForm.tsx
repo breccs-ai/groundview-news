@@ -46,7 +46,7 @@ const EMPTY_FORM: ArticleForm = {
   title: '',
   subtitle: '',
   author_name: 'Ground View Editor',
-  category: 'commentary',
+  category: 'opinion-commentary',
   label: 'Commentary',
   excerpt: '',
   featured_image_url: '',

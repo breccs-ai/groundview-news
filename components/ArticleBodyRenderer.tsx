@@ -307,7 +307,7 @@ export function MarkdownBodyContent({ markdown, wrapperClassName, injectMidAd }:
   );
 
   return (
-    <div className={`article-markdown-body mx-auto max-w-[720px] ${wrapperClassName || ''}`}>
+    <div className={`article-markdown-body w-full max-w-full ${wrapperClassName || ''}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>
         {markdown}
       </ReactMarkdown>
@@ -319,7 +319,7 @@ export default function ArticleBodyRenderer({ body, injectMidAd }: Props) {
   const markdown = storedBodyToEditorMarkdown(body as unknown).trim();
 
   if (!markdown) {
-    return <p className="text-gray-400 italic mx-auto max-w-[720px]">No content available.</p>;
+    return <p className="text-gray-400 italic w-full max-w-full">No content available.</p>;
   }
 
   return <MarkdownBodyContent markdown={markdown} injectMidAd={injectMidAd} />;

@@ -63,7 +63,7 @@ async function main() {
         body: JSON.stringify({
           title,
           excerpt: String(article.excerpt || ''),
-          category: String(article.category || 'commentary'),
+          category: String(article.category || 'opinion-commentary'),
         }),
       });
     } catch (e) {

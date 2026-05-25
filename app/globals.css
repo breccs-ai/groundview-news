@@ -20,6 +20,13 @@ body {
   box-sizing: border-box;
 }
 
+/* Default media to fluid scaling so nothing forces a wider layout. */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -76,6 +83,49 @@ body {
 
   .article-markdown-body {
     font-family: Georgia, 'Times New Roman', serif;
+    width: 100%;
+    max-width: 100%;
+    /* Long URLs, foreign words, and pasted strings must wrap rather than
+     * push the column wider than the viewport. */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .article-markdown-body p,
+  .article-markdown-body h1,
+  .article-markdown-body h2,
+  .article-markdown-body h3,
+  .article-markdown-body h4,
+  .article-markdown-body h5,
+  .article-markdown-body h6,
+  .article-markdown-body li,
+  .article-markdown-body blockquote,
+  .article-markdown-body a {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .article-markdown-body img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* Scroll long code blocks and wide tables inside their own container
+   * rather than letting them break the page layout. */
+  .article-markdown-body pre,
+  .article-markdown-body code {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .article-markdown-body table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   .article-markdown-body p.markdown-first-p::first-letter {

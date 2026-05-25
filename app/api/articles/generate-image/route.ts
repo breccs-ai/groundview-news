@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const category =
       typeof body.category === 'string' && body.category.trim()
         ? body.category.trim()
-        : 'commentary';
+        : 'opinion-commentary';
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });

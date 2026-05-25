@@ -27,7 +27,7 @@ export function slugify(title: string): string {
 // Order mirrors lib/supabase.ts CATEGORIES. Keep these two in sync.
 export const CATEGORY_OPTIONS = [
   { value: 'world-politics', label: 'World Politics' },
-  { value: 'economy', label: 'Business & Economy' },
+  { value: 'business-economy', label: 'Business & Economy' },
   { value: 'financial-news-banking', label: 'Financial News & Banking' },
   { value: 'sports', label: 'Sports' },
   { value: 'africa-diaspora', label: 'Africa & Diaspora' },
@@ -39,7 +39,7 @@ export const CATEGORY_OPTIONS = [
   { value: 'law-justice', label: 'Law & Justice' },
   { value: 'education', label: 'Education' },
   { value: 'travel-migration', label: 'Travel & Migration' },
-  { value: 'commentary', label: 'Opinion & Commentary' },
+  { value: 'opinion-commentary', label: 'Opinion & Commentary' },
   { value: 'human-rights', label: 'Human Rights' },
 ];
 
@@ -58,12 +58,15 @@ export const LABEL_OPTIONS = [
 export type ArticleLabel = (typeof LABEL_OPTIONS)[number];
 
 /**
- * Allowed `articles.category` slug values.
- * `human-rights` is retained for legacy articles already filed under it.
+ * Allowed `articles.category` slug values for validation/normalisation.
+ * Includes the 15 current writer-facing slugs plus the legacy `economy` and
+ * `commentary` slugs so already-published articles continue to validate when
+ * being edited. New articles default to the new slugs (see
+ * `normalizeArticleCategory`).
  */
 export const ARTICLE_CATEGORY_SLUGS = [
   'world-politics',
-  'economy',
+  'business-economy',
   'financial-news-banking',
   'sports',
   'africa-diaspora',
@@ -75,8 +78,11 @@ export const ARTICLE_CATEGORY_SLUGS = [
   'law-justice',
   'education',
   'travel-migration',
-  'commentary',
+  'opinion-commentary',
   'human-rights',
+  // Legacy — retained for existing rows. Not offered to new writers via CATEGORY_OPTIONS.
+  'economy',
+  'commentary',
 ] as const;
 
 export function normalizeArticleLabel(input: string | undefined | null): ArticleLabel {
@@ -89,8 +95,10 @@ export function normalizeArticleLabel(input: string | undefined | null): Article
 
 export function normalizeArticleCategory(input: string | undefined | null): string {
   const t = typeof input === 'string' ? input.trim() : '';
-  if (!t) return 'commentary';
-  return (ARTICLE_CATEGORY_SLUGS as readonly string[]).includes(t) ? t : 'commentary';
+  if (!t) return 'opinion-commentary';
+  return (ARTICLE_CATEGORY_SLUGS as readonly string[]).includes(t)
+    ? t
+    : 'opinion-commentary';
 }
 
 export const STATUS_OPTIONS = ['draft', 'pending', 'pending_editorial', 'published'];

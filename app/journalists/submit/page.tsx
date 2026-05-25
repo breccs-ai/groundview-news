@@ -125,7 +125,7 @@ function JournalistSubmitInner() {
         body: JSON.stringify({
           title: form.title,
           excerpt: form.excerpt,
-          category: form.category || 'commentary',
+          category: form.category || 'opinion-commentary',
         }),
       });
       const json = await res.json().catch(() => ({}));

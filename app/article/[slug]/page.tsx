@@ -120,27 +120,37 @@ export default async function ArticlePage({ params }: Props) {
         )}
 
         {/* Article body + sidebar ads */}
-        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10">
-          <div className="max-w-[720px] lg:max-w-none mx-auto lg:mx-0 px-2 md:px-0">
-          <ArticleBodyRenderer body={article.body} injectMidAd />
+        <div className="w-full max-w-[1280px] mx-auto px-4 md:px-8 pb-12">
+          <div className="grid grid-cols-1 gap-8 lg:gap-10 lg:grid-cols-[240px_minmax(0,1fr)_240px]">
+            {/* Left sidebar — desktop only, reserved for balance and rotated ads */}
+            <aside className="hidden lg:block min-w-0">
+              <AdSlot zone="article_sidebar" variant="sidebar" className="sticky top-24" />
+            </aside>
 
-          <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
-            <div>
-              <CategoryBadge category={article.category} label={article.label} />
-              {article.author_name && (
-                <p className="mt-2 text-xs text-gray-400">By {article.author_name}</p>
-              )}
+            {/* Main content — centred, never exceeds 720px on desktop */}
+            <div className="min-w-0 w-full mx-auto lg:max-w-[720px]">
+              <ArticleBodyRenderer body={article.body} injectMidAd />
+
+              <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
+                <div>
+                  <CategoryBadge category={article.category} label={article.label} />
+                  {article.author_name && (
+                    <p className="mt-2 text-xs text-gray-400">By {article.author_name}</p>
+                  )}
+                </div>
+                <ArticleShareSection
+                  slug={article.slug}
+                  title={article.title}
+                  initialShares={sharesParsed}
+                />
+              </div>
             </div>
-            <ArticleShareSection
-              slug={article.slug}
-              title={article.title}
-              initialShares={sharesParsed}
-            />
+
+            {/* Right sidebar — desktop only, matches left width */}
+            <aside className="hidden lg:block min-w-0">
+              <AdSlot zone="article_sidebar" variant="sidebar" className="sticky top-24" />
+            </aside>
           </div>
-          </div>
-          <aside className="hidden lg:block">
-            <AdSlot zone="article_sidebar" variant="sidebar" className="sticky top-24" />
-          </aside>
         </div>
 
         {/* Article disclaimer */}
