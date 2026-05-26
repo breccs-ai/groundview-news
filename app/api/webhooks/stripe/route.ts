@@ -7,6 +7,8 @@ import {
   payment_failed,
   subscription_cancelled,
 } from '@/lib/emails/advertiser-emails';
+import { computeExpiry, getProfileByEmail } from '@/lib/subscription';
+import { READER_SUBSCRIPTION_METADATA_VALUE } from '@/lib/stripe';
 
 export const runtime = 'nodejs';
 
@@ -77,6 +79,15 @@ export async function POST(req: NextRequest) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       const meta = session.metadata || {};
+
+      // Reader-subscription flow (Part 3 of the monetisation layer).
+      // Keyed on metadata.purpose so it never interferes with the existing
+      // advertiser/journalist checkout flows.
+      if (meta.purpose === READER_SUBSCRIPTION_METADATA_VALUE) {
+        await handleReaderCheckoutCompleted(stripe, supabase, session);
+        return NextResponse.json({ received: true });
+      }
+
       const adId = typeof meta.ad_id === 'string' ? meta.ad_id : '';
       if (!adId) {
         return NextResponse.json({ received: true });
@@ -125,6 +136,11 @@ export async function POST(req: NextRequest) {
 
       const subId = invoiceSubscriptionId(invoice);
       if (!subId) return NextResponse.json({ received: true });
+
+      // Route reader-subscription renewals separately. We only extend the
+      // expiry — no advertiser-style email is sent here.
+      const handledReader = await handleReaderInvoicePaid(stripe, supabase, subId);
+      if (handledReader) return NextResponse.json({ received: true });
 
       const { data: ad } = await supabase
         .from('advertisements')
@@ -189,6 +205,11 @@ export async function POST(req: NextRequest) {
       const subId = invoiceSubscriptionId(invoice);
       if (!subId) return NextResponse.json({ received: true });
 
+      // Reader-subscription past-due handling: flip the profile flag and
+      // exit before the advertiser branch runs.
+      const handledReader = await handleReaderInvoicePaymentFailed(stripe, supabase, subId);
+      if (handledReader) return NextResponse.json({ received: true });
+
       const { data: ad } = await supabase
         .from('advertisements')
         .select('id, title, advertiser_id')
@@ -240,6 +261,13 @@ export async function POST(req: NextRequest) {
 
     if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object as Stripe.Subscription;
+
+      // Reader-subscription cancellation: routed by sub.metadata.purpose
+      // (set on the original Checkout session). Falls back to the advertiser
+      // path when no reader profile is found.
+      const handledReader = await handleReaderSubscriptionDeleted(supabase, sub);
+      if (handledReader) return NextResponse.json({ received: true });
+
       const { data: ad } = await supabase
         .from('advertisements')
         .select('id, title, expires_at, advertiser_id')
@@ -278,4 +306,197 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+// ---------------------------------------------------------------------------
+// Reader subscription helpers (Part 3 of the monetisation layer)
+// ---------------------------------------------------------------------------
+
+type ReaderSupabase = NonNullable<ReturnType<typeof getServiceSupabase>>;
+
+/**
+ * Resolve which auth.users row the subscription belongs to. Priority order:
+ *   1. metadata.gvn_user_id (set if the buyer was signed in at checkout)
+ *   2. existing profiles row matching the buyer email
+ *   3. provision a brand-new auth user + profile via the admin API
+ *
+ * Returns null on hard failure; otherwise the resolved user id is suitable
+ * for use as a profile primary key.
+ */
+async function resolveReaderUserId(
+  supabase: ReaderSupabase,
+  email: string,
+  metadataUserId?: string,
+): Promise<string | null> {
+  if (metadataUserId) return metadataUserId;
+  const trimmed = email.trim();
+  if (!trimmed) return null;
+
+  const existing = await getProfileByEmail(supabase, trimmed);
+  if (existing) return existing.id;
+
+  // Anonymous checkout flow: provision an auth user so the subscription has
+  // a profile row to attach to. email_confirm:true so the reader can sign
+  // in via Supabase's magic-link flow without a separate verification step.
+  try {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: trimmed,
+      email_confirm: true,
+    });
+    if (error) {
+      console.error('[stripe webhook] auth.admin.createUser failed', error);
+      return null;
+    }
+    const newId = data.user?.id ?? null;
+    if (!newId) return null;
+
+    // Ensure a profile row exists. ON CONFLICT is overkill — profiles.id FK
+    // cascades from auth.users so no row exists yet for this id.
+    await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: newId,
+          email: trimmed,
+          role: 'reader',
+          subscription_status: 'free',
+        },
+        { onConflict: 'id' },
+      );
+
+    return newId;
+  } catch (e) {
+    console.error('[stripe webhook] reader provision error', e);
+    return null;
+  }
+}
+
+async function handleReaderCheckoutCompleted(
+  stripe: Stripe,
+  supabase: ReaderSupabase,
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const meta = session.metadata || {};
+  const plan: 'monthly' | 'annual' = meta.plan === 'annual' ? 'annual' : 'monthly';
+  const email =
+    (typeof session.customer_details?.email === 'string' && session.customer_details.email) ||
+    (typeof session.customer_email === 'string' && session.customer_email) ||
+    '';
+
+  const userId = await resolveReaderUserId(
+    supabase,
+    email,
+    typeof meta.gvn_user_id === 'string' ? meta.gvn_user_id : undefined,
+  );
+  if (!userId) {
+    console.warn('[stripe webhook] reader checkout: no user id resolved', { email });
+    return;
+  }
+
+  const startedAt = new Date();
+  const expiresAt = computeExpiry(plan, startedAt);
+
+  // For monthly: capture the subscription id so future invoice events route
+  // back via stripe_subscription_id.
+  const subId =
+    typeof session.subscription === 'string'
+      ? session.subscription
+      : session.subscription && typeof session.subscription === 'object'
+        ? (session.subscription as Stripe.Subscription).id
+        : null;
+  const customerId =
+    typeof session.customer === 'string'
+      ? session.customer
+      : session.customer && typeof session.customer === 'object'
+        ? (session.customer as Stripe.Customer).id
+        : null;
+
+  await supabase
+    .from('profiles')
+    .update({
+      subscription_status: 'active',
+      subscription_plan: plan,
+      subscription_started_at: startedAt.toISOString(),
+      subscription_expires_at: expiresAt.toISOString(),
+      ...(customerId ? { stripe_customer_id: customerId } : {}),
+      ...(subId ? { stripe_subscription_id: subId } : {}),
+    })
+    .eq('id', userId);
+}
+
+async function handleReaderInvoicePaid(
+  stripe: Stripe,
+  supabase: ReaderSupabase,
+  subId: string,
+): Promise<boolean> {
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subId);
+  } catch {
+    return false;
+  }
+  const purpose = sub.metadata?.purpose;
+  if (purpose !== READER_SUBSCRIPTION_METADATA_VALUE) return false;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, subscription_expires_at')
+    .eq('stripe_subscription_id', subId)
+    .maybeSingle();
+
+  const row = profile as { id: string; subscription_expires_at: string | null } | null;
+  if (!row) return true; // routed correctly, just nothing to update
+
+  // Extend expiry from the later of "now" and the current expiry. Monthly
+  // only — annual is a one-off payment and never produces invoice.paid renewals.
+  const baseDate = row.subscription_expires_at
+    ? new Date(row.subscription_expires_at)
+    : new Date();
+  const from = baseDate.getTime() > Date.now() ? baseDate : new Date();
+  const nextExpiry = computeExpiry('monthly', from);
+
+  await supabase
+    .from('profiles')
+    .update({
+      subscription_status: 'active',
+      subscription_expires_at: nextExpiry.toISOString(),
+    })
+    .eq('id', row.id);
+
+  return true;
+}
+
+async function handleReaderInvoicePaymentFailed(
+  stripe: Stripe,
+  supabase: ReaderSupabase,
+  subId: string,
+): Promise<boolean> {
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subId);
+  } catch {
+    return false;
+  }
+  if (sub.metadata?.purpose !== READER_SUBSCRIPTION_METADATA_VALUE) return false;
+
+  await supabase
+    .from('profiles')
+    .update({ subscription_status: 'past_due' })
+    .eq('stripe_subscription_id', subId);
+
+  return true;
+}
+
+async function handleReaderSubscriptionDeleted(
+  supabase: ReaderSupabase,
+  sub: Stripe.Subscription,
+): Promise<boolean> {
+  if (sub.metadata?.purpose !== READER_SUBSCRIPTION_METADATA_VALUE) return false;
+
+  await supabase
+    .from('profiles')
+    .update({ subscription_status: 'cancelled' })
+    .eq('stripe_subscription_id', sub.id);
+
+  return true;
 }

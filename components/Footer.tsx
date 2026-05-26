@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Twitter, Linkedin, Facebook, Youtube } from 'lucide-react';
 import { CATEGORIES } from '@/lib/supabase';
 import AdSlot from '@/components/ads/AdSlot';
+import FooterSubscribeNudge from '@/components/FooterSubscribeNudge';
 
 // Brighter text color than the previous text-gray-400/500 to meet WCAG AA
 // contrast on the navy (#0f1f3d) background.
@@ -197,6 +198,9 @@ export default function Footer() {
           .
         </p>
       </div>
+
+      {/* Subscription nudge — single line, hidden for active subscribers */}
+      <FooterSubscribeNudge />
 
       {/* Copyright bar */}
       <div className="border-t border-white/10">

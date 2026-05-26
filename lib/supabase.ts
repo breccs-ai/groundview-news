@@ -32,6 +32,12 @@ export type Article = {
   /** Per-platform share counts + total; see `parseArticleShares` in lib/article-shares.ts */
   shares?: unknown;
   published_at: string;
+  /**
+   * Subscriber early-access threshold. When `publish_at > now`, free readers
+   * see a soft "Subscribers are reading this now" banner on the article page
+   * but are never blocked from reading. When NULL or in the past, no banner.
+   */
+  publish_at?: string | null;
   created_at: string;
 };
 

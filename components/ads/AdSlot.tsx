@@ -5,6 +5,7 @@ import AdBanner from '@/components/ads/AdBanner';
 import type { ActiveAd } from '@/lib/advertiser/active-ads';
 import { pickWeightedAd } from '@/lib/advertiser/active-ads';
 import type { AdZone } from '@/lib/advertiser/placements';
+import { useSubscription } from '@/lib/hooks/useSubscription';
 
 const ROTATE_MS = 30_000;
 
@@ -27,6 +28,7 @@ async function track(adId: string, event: 'view' | 'click') {
 }
 
 export default function AdSlot({ zone, variant = 'sidebar', className = '' }: Props) {
+  const { isSubscriber } = useSubscription();
   const [pool, setPool] = useState<ActiveAd[]>([]);
   const [current, setCurrent] = useState<ActiveAd | null>(null);
   const impressed = useRef<Set<string>>(new Set());
@@ -40,6 +42,14 @@ export default function AdSlot({ zone, variant = 'sidebar', className = '' }: Pr
   }, []);
 
   useEffect(() => {
+    // Active subscribers never see ads — skip the fetch entirely so we don't
+    // even hit /api/ads/display for paying readers.
+    if (isSubscriber) {
+      setPool([]);
+      setCurrent(null);
+      return;
+    }
+
     let cancelled = false;
     void fetch(`/api/ads/display?zone=${encodeURIComponent(zone)}`)
       .then((r) => r.json())
@@ -55,7 +65,7 @@ export default function AdSlot({ zone, variant = 'sidebar', className = '' }: Pr
     return () => {
       cancelled = true;
     };
-  }, [zone]);
+  }, [zone, isSubscriber]);
 
   useEffect(() => {
     if (pool.length <= 1) return;
@@ -70,6 +80,7 @@ export default function AdSlot({ zone, variant = 'sidebar', className = '' }: Pr
     void track(current.id, 'view');
   }, [current?.id]);
 
+  if (isSubscriber) return null;
   if (!current) return null;
 
   return (

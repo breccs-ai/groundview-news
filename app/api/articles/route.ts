@@ -64,6 +64,27 @@ const EDITORIAL_BYPASS_CATEGORIES = [
   'political-commentary',
 ] as const;
 
+/** Subscriber early-access window. Free readers see a soft nudge banner; subscribers see the article immediately. */
+const EARLY_ACCESS_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * When an article transitions to `status: 'published'` AND the caller did not
+ * already provide a `publish_at`, set `publish_at = published_at + 24h` so the
+ * EarlyAccessBanner shows for the first day. Mutates the payload in place.
+ */
+function applyEarlyAccessPublishAt(payload: Record<string, unknown>): void {
+  if (payload.status !== 'published') return;
+  if (Object.prototype.hasOwnProperty.call(payload, 'publish_at')) return;
+
+  const publishedAt =
+    typeof payload.published_at === 'string' && payload.published_at
+      ? new Date(payload.published_at)
+      : new Date();
+  if (Number.isNaN(publishedAt.getTime())) return;
+
+  payload.publish_at = new Date(publishedAt.getTime() + EARLY_ACCESS_WINDOW_MS).toISOString();
+}
+
 export async function GET(req: NextRequest) {
   try {
     const actor = await resolveArticlesActor(req);
@@ -173,6 +194,9 @@ export async function POST(req: NextRequest) {
     payload.slug = slug;
 
     delete payload.id;
+
+    // Early-access window: set publish_at = published_at + 24h when publishing.
+    applyEarlyAccessPublishAt(payload);
 
     const maxAttempts = 6;
 
@@ -286,6 +310,10 @@ export async function PATCH(req: NextRequest) {
       const ec = normalizeEditorialCategory((payload as Record<string, unknown>).editorial_category);
       (payload as Record<string, unknown>).editorial_category = ec;
     }
+
+    // Early-access window: server-applies publish_at when this PATCH flips
+    // status to 'published'. Honoured for both admin and journalist paths.
+    applyEarlyAccessPublishAt(payload as Record<string, unknown>);
 
     const { error } = await supabase.from('articles').update(payload).eq('id', id);
 

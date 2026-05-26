@@ -14,6 +14,8 @@ import ArticleCard from '@/components/ArticleCard';
 import NewsletterSignup from '@/components/NewsletterSignup';
 import ArticleReadersLine from '@/components/ArticleReadersLine';
 import ArticleShareSection from '@/components/ArticleShareSection';
+import SubscriptionPromptBanner from '@/components/SubscriptionPromptBanner';
+import EarlyAccessBanner from '@/components/EarlyAccessBanner';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
@@ -129,6 +131,7 @@ export default async function ArticlePage({ params }: Props) {
 
             {/* Main content — centred, never exceeds 720px on desktop */}
             <div className="min-w-0 w-full mx-auto lg:max-w-[720px]">
+              <EarlyAccessBanner publishAt={article.publish_at ?? null} />
               <ArticleBodyRenderer body={article.body} injectMidAd />
 
               <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
@@ -175,6 +178,11 @@ export default async function ArticlePage({ params }: Props) {
               </a>
             </p>
           </div>
+        </div>
+
+        {/* Subscription prompt — non-blocking, dismissable, hidden for active subscribers */}
+        <div className="max-w-3xl mx-auto px-4 md:px-8">
+          <SubscriptionPromptBanner />
         </div>
 
         {/* Related articles */}
