@@ -20,6 +20,25 @@ async function ensureBucket(supabase: SupabaseClient) {
   });
   if (error && !/already exists|duplicate/i.test(String(error.message))) {
     console.warn('[generate-image] createBucket:', error.message);
+    const errAny = error as any;
+    console.error(
+      '[generate-image] Supabase createBucket detail:',
+      JSON.stringify(
+        {
+          name: errAny?.name,
+          message: errAny?.message,
+          status: errAny?.status ?? errAny?.statusCode,
+          statusCode: errAny?.statusCode,
+          error: errAny?.error,
+          cause: errAny?.cause,
+          details: errAny?.details,
+          hint: errAny?.hint,
+          code: errAny?.code,
+        },
+        null,
+        2
+      )
+    );
   }
 }
 
@@ -83,6 +102,20 @@ export async function POST(req: NextRequest) {
       });
     } catch (error: any) {
       console.error('[generate-image] OpenAI error:', error?.message || error);
+      console.error(
+        '[generate-image] OpenAI 400 detail:',
+        JSON.stringify(
+          {
+            status: error?.status,
+            code: error?.code,
+            type: error?.type,
+            message: error?.message,
+            error: error?.error,
+          },
+          null,
+          2
+        )
+      );
       return NextResponse.json(
         {
           error: 'Image generation failed',
@@ -160,6 +193,28 @@ export async function POST(req: NextRequest) {
 
     if (uploadErr) {
       console.error('[generate-image] Storage upload:', uploadErr.message);
+      const uploadErrAny = uploadErr as any;
+      console.error(
+        '[generate-image] Supabase upload detail:',
+        JSON.stringify(
+          {
+            name: uploadErrAny?.name,
+            message: uploadErrAny?.message,
+            status: uploadErrAny?.status ?? uploadErrAny?.statusCode,
+            statusCode: uploadErrAny?.statusCode,
+            error: uploadErrAny?.error,
+            cause: uploadErrAny?.cause,
+            details: uploadErrAny?.details,
+            hint: uploadErrAny?.hint,
+            code: uploadErrAny?.code,
+            objectPath,
+            contentType,
+            bufferBytes: buffer.byteLength,
+          },
+          null,
+          2
+        )
+      );
       return NextResponse.json(
         {
           error: 'Image generation failed',
