@@ -174,18 +174,25 @@ export default function ArticleEditorForm({ articleId }: Props) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.imageUrl) {
+        const detail = typeof json?.detail === 'string' ? json.detail : null;
+        const code = typeof json?.code === 'string' ? json.code : null;
         setImageGenNotice({
           ok: false,
-          text: 'Image generation failed. Please try again.',
+          text: detail
+            ? `Image generation failed: ${detail}${code ? ` (${code})` : ''}`
+            : 'Image generation failed. Please try again.',
         });
         return;
       }
       setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
       setImageGenNotice({ ok: true, text: 'Image generated successfully' });
-    } catch {
+    } catch (e) {
       setImageGenNotice({
         ok: false,
-        text: 'Image generation failed. Please try again.',
+        text:
+          e instanceof Error
+            ? `Image generation failed: ${e.message}`
+            : 'Image generation failed. Please try again.',
       });
     } finally {
       setImageGenLoading(false);

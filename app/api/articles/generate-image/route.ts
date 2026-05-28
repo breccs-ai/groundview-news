@@ -5,6 +5,7 @@ import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { generateSlug } from '@/lib/slug';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 function getServiceSupabase(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -80,28 +81,61 @@ export async function POST(req: NextRequest) {
         quality: 'standard',
         style: 'natural',
       });
-    } catch (e) {
-      console.error('[generate-image] OpenAI error:', e);
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 502 });
+    } catch (error: any) {
+      console.error('[generate-image] OpenAI error:', error?.message || error);
+      return NextResponse.json(
+        {
+          error: 'Image generation failed',
+          detail: error?.message || 'Unknown error',
+          code: error?.code,
+          type: error?.type,
+          status: error?.status || 502,
+        },
+        { status: error?.status || 502 }
+      );
     }
 
     const tempUrl = imageResponse.data?.[0]?.url;
     if (!tempUrl) {
       console.error('[generate-image] No image URL in OpenAI response');
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 502 });
+      return NextResponse.json(
+        {
+          error: 'Image generation failed',
+          detail: 'OpenAI returned no image URL',
+          code: 'no_image_url',
+          status: 502,
+        },
+        { status: 502 }
+      );
     }
 
     let downloadRes: Response;
     try {
       downloadRes = await fetch(tempUrl);
-    } catch (e) {
-      console.error('[generate-image] Download fetch error:', e);
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 502 });
+    } catch (error: any) {
+      console.error('[generate-image] Download fetch error:', error?.message || error);
+      return NextResponse.json(
+        {
+          error: 'Image generation failed',
+          detail: error?.message || 'Failed to download generated image',
+          code: 'download_fetch_error',
+          status: 502,
+        },
+        { status: 502 }
+      );
     }
 
     if (!downloadRes.ok) {
       console.error('[generate-image] Download failed', downloadRes.status);
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 502 });
+      return NextResponse.json(
+        {
+          error: 'Image generation failed',
+          detail: `Failed to download generated image (HTTP ${downloadRes.status})`,
+          code: 'download_failed',
+          status: 502,
+        },
+        { status: 502 }
+      );
     }
 
     const arrayBuffer = await downloadRes.arrayBuffer();
@@ -126,14 +160,31 @@ export async function POST(req: NextRequest) {
 
     if (uploadErr) {
       console.error('[generate-image] Storage upload:', uploadErr.message);
-      return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: 'Image generation failed',
+          detail: uploadErr.message || 'Storage upload failed',
+          code: 'storage_upload_failed',
+          status: 500,
+        },
+        { status: 500 }
+      );
     }
 
     const { data: pub } = supabase.storage.from('article-images').getPublicUrl(objectPath);
 
     return NextResponse.json({ imageUrl: pub.publicUrl });
-  } catch (e) {
-    console.error('[generate-image]', e);
-    return NextResponse.json({ error: 'Image generation failed' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[generate-image]', error?.message || error);
+    return NextResponse.json(
+      {
+        error: 'Image generation failed',
+        detail: error?.message || 'Unknown error',
+        code: error?.code,
+        type: error?.type,
+        status: error?.status || 500,
+      },
+      { status: error?.status || 500 }
+    );
   }
 }
