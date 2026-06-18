@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
  * ```sql
  * ALTER TABLE articles ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
  * ALTER TABLE articles ADD COLUMN IF NOT EXISTS shares jsonb DEFAULT '{"twitter": 0, "facebook": 0, "linkedin": 0, "whatsapp": 0, "total": 0}'::jsonb;
+ * ALTER TABLE articles ADD COLUMN IF NOT EXISTS article_images jsonb DEFAULT '[]'::jsonb;
  * ```
  */
 
@@ -27,6 +28,8 @@ export type Article = {
   body: ArticleBody;
   excerpt: string;
   featured_image_url: string;
+  /** Up to three uploaded image URLs. Apply the article_images Supabase migration before use. */
+  article_images?: unknown;
   /** Page-view counter; increment via RPC from client once per session. */
   views?: number | null;
   /** Per-platform share counts + total; see `parseArticleShares` in lib/article-shares.ts */

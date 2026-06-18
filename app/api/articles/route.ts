@@ -85,6 +85,15 @@ function applyEarlyAccessPublishAt(payload: Record<string, unknown>): void {
   payload.publish_at = new Date(publishedAt.getTime() + EARLY_ACCESS_WINDOW_MS).toISOString();
 }
 
+function normalizeArticleImages(payload: Record<string, unknown>): void {
+  if (!Object.prototype.hasOwnProperty.call(payload, 'article_images')) return;
+  payload.article_images = Array.isArray(payload.article_images)
+    ? payload.article_images
+        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+        .slice(0, 3)
+    : [];
+}
+
 export async function GET(req: NextRequest) {
   try {
     const actor = await resolveArticlesActor(req);
@@ -137,6 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     let payload = { ...(incoming as Record<string, unknown>) };
+    normalizeArticleImages(payload);
 
     if (actor.kind === 'journalist') {
       const aid = payload.author_id;
@@ -266,6 +276,7 @@ export async function PATCH(req: NextRequest) {
 
     const { id, ...payload } = body as { id?: string } & Record<string, unknown>;
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    normalizeArticleImages(payload);
 
     const p = payload as Record<string, unknown>;
     if (Object.prototype.hasOwnProperty.call(p, 'label')) {

@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
+import ArticleImageSlots from '@/components/ArticleImageSlots';
 import { supabase } from '@/lib/supabase';
 import { hasJournalistRole } from '@/lib/profile-roles';
 import { CATEGORIES } from '@/lib/supabase';
@@ -17,11 +18,10 @@ import {
 } from '@/lib/article-markdown';
 import { EDITORIAL_CATEGORY_OPTIONS, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import {
-  ARTICLE_IMAGE_UPLOAD_ACCEPT,
-  ARTICLE_IMAGE_UPLOAD_MAX_BYTES,
-  ARTICLE_IMAGE_UPLOAD_MAX_MB,
-} from '@/lib/article-image-constraints';
-import { X, Eye, Save, Upload } from 'lucide-react';
+  uploadArticleImages,
+  validateArticleImage,
+} from '@/lib/article-image-upload';
+import { X, Eye, Save } from 'lucide-react';
 
 const LABEL_OPTIONS = ['Commentary', 'Opinion', 'In Depth', 'Analysis', 'Editorial'];
 
@@ -65,11 +65,21 @@ function JournalistSubmitInner() {
   const [loadingBoot, setLoadingBoot] = useState(true);
   const [loadingDraftSave, setLoadingDraftSave] = useState(false);
   const [loadingPublish, setLoadingPublish] = useState(false);
-  const [imageGenLoading, setImageGenLoading] = useState(false);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
-  const [imageGenNotice, setImageGenNotice] = useState<{ ok: boolean; text: string } | null>(
+  const [imageNotice, setImageNotice] = useState<{ ok: boolean; text: string } | null>(
     null
   );
+  const [articleImageUrls, setArticleImageUrls] = useState<Array<string | null>>([
+    null,
+    null,
+    null,
+  ]);
+  const [articleImageFiles, setArticleImageFiles] = useState<Array<File | null>>([
+    null,
+    null,
+    null,
+  ]);
+  const [articleImagesTouched, setArticleImagesTouched] = useState(false);
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [bootError, setBootError] = useState('');
@@ -107,102 +117,39 @@ function JournalistSubmitInner() {
     router.push('/journalists/login');
   };
 
-  const generateFeaturedImage = async () => {
-    if (!accessToken) return;
-    setImageGenNotice(null);
-    if (!form.title.trim()) {
-      setImageGenNotice({
-        ok: false,
-        text: 'Image generation failed. Please try again.',
-      });
-      return;
-    }
-    setImageGenLoading(true);
-    try {
-      const res = await fetch('/api/articles/generate-image', {
-        method: 'POST',
-        headers: jsonAuthHeaders(accessToken),
-        body: JSON.stringify({
-          title: form.title,
-          excerpt: form.excerpt,
-          category: form.category || 'opinion-commentary',
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.imageUrl) {
-        const detail = typeof json?.detail === 'string' ? json.detail : null;
-        const code = typeof json?.code === 'string' ? json.code : null;
-        setImageGenNotice({
-          ok: false,
-          text: detail
-            ? `Image generation failed: ${detail}${code ? ` (${code})` : ''}`
-            : 'Image generation failed. Please try again.',
-        });
-        return;
-      }
-      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
-      setImageGenNotice({ ok: true, text: 'Image generated successfully' });
-    } catch (e) {
-      setImageGenNotice({
-        ok: false,
-        text:
-          e instanceof Error
-            ? `Image generation failed: ${e.message}`
-            : 'Image generation failed. Please try again.',
-      });
-    } finally {
-      setImageGenLoading(false);
-    }
-  };
-
-  const uploadFeaturedImage = async (file: File | null) => {
-    if (!accessToken) return;
-    setImageGenNotice(null);
-    if (!file) return;
-
-    if (!ARTICLE_IMAGE_UPLOAD_ACCEPT.split(',').includes(file.type)) {
-      setImageGenNotice({
-        ok: false,
-        text: 'Upload failed. Use JPEG, PNG, or WebP only.',
-      });
-      return;
-    }
-
-    if (file.size > ARTICLE_IMAGE_UPLOAD_MAX_BYTES) {
-      setImageGenNotice({
-        ok: false,
-        text: `Upload failed. Image must be ${ARTICLE_IMAGE_UPLOAD_MAX_MB}MB or smaller.`,
-      });
-      return;
+  const resolveImagesForSave = async () => {
+    if (!accessToken) {
+      return {
+        articleImages: articleImageUrls.filter((url): url is string => Boolean(url)),
+        featuredImageUrl: form.featured_image_url,
+      };
     }
 
     setImageUploadLoading(true);
+    setImageNotice(null);
     try {
-      const body = new FormData();
-      body.append('file', file);
-      body.append('title', form.title || file.name);
-
-      const res = await fetch('/api/articles/upload-image', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body,
+      const result = await uploadArticleImages({
+        title: form.title,
+        files: articleImageFiles,
+        existingUrls: articleImageUrls,
+        authorization: accessToken,
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.imageUrl) {
-        setImageGenNotice({
+      const paddedUrls: Array<string | null> = [...result.urls];
+      while (paddedUrls.length < 3) paddedUrls.push(null);
+      const featuredImageUrl =
+        result.urls[0] ||
+        (result.hadFailure || !articleImagesTouched ? form.featured_image_url : '');
+
+      setArticleImageUrls(paddedUrls);
+      setArticleImageFiles([null, null, null]);
+      setForm((prev) => ({ ...prev, featured_image_url: featuredImageUrl }));
+      if (result.hadFailure) {
+        setImageNotice({
           ok: false,
-          text: json.error || 'Upload failed. Please try another image.',
+          text: 'One or more images could not be uploaded. The article will still be saved.',
         });
-        return;
       }
-
-      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
-      setImageGenNotice({ ok: true, text: 'Image uploaded successfully' });
-    } catch {
-      setImageGenNotice({
-        ok: false,
-        text: 'Upload failed. Please try another image.',
-      });
+      return { articleImages: result.urls, featuredImageUrl };
     } finally {
       setImageUploadLoading(false);
     }
@@ -307,6 +254,7 @@ function JournalistSubmitInner() {
           label?: string;
           excerpt?: string;
           featured_image_url?: string;
+          article_images?: unknown;
           body?: unknown;
           author_name?: string;
           id?: string;
@@ -317,6 +265,16 @@ function JournalistSubmitInner() {
           return;
         }
         setArticleId(article.id || draftId);
+        const storedImages = Array.isArray(article.article_images)
+          ? article.article_images
+              .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+              .slice(0, 3)
+          : [];
+        setArticleImageUrls([
+          storedImages[0] || null,
+          storedImages[1] || null,
+          storedImages[2] || null,
+        ]);
         setForm({
           title: article.title || '',
           subtitle: article.subtitle || '',
@@ -362,7 +320,7 @@ function JournalistSubmitInner() {
     setSubmissionSuccess(null);
   };
 
-  const buildPayload = useCallback(() => {
+  const buildPayload = useCallback((articleImages: string[], featuredImageUrl: string) => {
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
@@ -371,7 +329,8 @@ function JournalistSubmitInner() {
       editorial_category: form.editorial_category,
       label: form.label,
       excerpt: form.excerpt.trim(),
-      featured_image_url: form.featured_image_url.trim(),
+      featured_image_url: featuredImageUrl || null,
+      article_images: articleImages,
       body: markdownBodyPayload(form.bodyText),
       author_id: userId!,
     };
@@ -384,7 +343,6 @@ function JournalistSubmitInner() {
     form.editorial_category,
     form.label,
     form.excerpt,
-    form.featured_image_url,
     userId,
   ]);
 
@@ -396,7 +354,8 @@ function JournalistSubmitInner() {
     }
     setLoadingDraftSave(true);
     try {
-      const payload = buildPayload();
+      const images = await resolveImagesForSave();
+      const payload = buildPayload(images.articleImages, images.featuredImageUrl);
       /** Route handler uses SUPABASE_SERVICE_ROLE_KEY for DB writes — the key stays server-side only. */
       const headers = jsonAuthHeaders(accessToken);
 
@@ -466,7 +425,8 @@ function JournalistSubmitInner() {
     setBootError('');
 
     try {
-      const payload = buildPayload();
+      const images = await resolveImagesForSave();
+      const payload = buildPayload(images.articleImages, images.featuredImageUrl);
       const headers = jsonAuthHeaders(accessToken);
       let id = articleId;
       let finalSlug = '';
@@ -789,56 +749,47 @@ function JournalistSubmitInner() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
-                  Featured Image URL (optional)
+                  Article Images (optional — up to 3)
                 </label>
-                <div className="flex flex-wrap gap-2 items-stretch sm:items-center">
-                  <input
-                    type="url"
-                    name="featured_image_url"
-                    value={form.featured_image_url}
-                    onChange={handleChange}
-                    className="flex-1 min-w-[12rem] border border-gray-300 rounded-sm px-3 py-2.5 text-sm"
-                    placeholder="https://…"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => generateFeaturedImage()}
-                    disabled={imageGenLoading || imageUploadLoading || !accessToken}
-                    className="inline-flex shrink-0 items-center justify-center px-4 py-2.5 rounded-sm text-sm font-semibold text-[#1a1a1a] disabled:opacity-60 disabled:pointer-events-none"
-                    style={{ backgroundColor: GOLD }}
-                  >
-                    {imageGenLoading ? 'Generating image...' : 'Generate Image'}
-                  </button>
-                  <label
-                    className={`inline-flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-sm border border-gray-300 text-sm font-semibold text-gray-700 hover:border-gray-500 hover:text-gray-900 transition-colors ${
-                      imageGenLoading || imageUploadLoading || !accessToken
-                        ? 'opacity-60 pointer-events-none'
-                        : 'cursor-pointer'
-                    }`}
-                  >
-                    <Upload size={14} aria-hidden />
-                    {imageUploadLoading ? 'Uploading...' : 'Upload Image'}
-                    <input
-                      type="file"
-                      accept={ARTICLE_IMAGE_UPLOAD_ACCEPT}
-                      className="sr-only"
-                      disabled={imageGenLoading || imageUploadLoading || !accessToken}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        e.currentTarget.value = '';
-                        void uploadFeaturedImage(file);
-                      }}
-                    />
-                  </label>
-                </div>
-                {imageGenNotice && (
+                <ArticleImageSlots
+                  files={articleImageFiles}
+                  urls={articleImageUrls}
+                  disabled={imageUploadLoading || !accessToken}
+                  onFileChange={(index, file) => {
+                    if (!file) return;
+                    const validationError = validateArticleImage(file);
+                    if (validationError) {
+                      setImageNotice({ ok: false, text: validationError });
+                      return;
+                    }
+                    setArticleImageFiles((prev) =>
+                      prev.map((current, slot) => (slot === index ? file : current))
+                    );
+                    setArticleImagesTouched(true);
+                    setImageNotice(null);
+                  }}
+                  onClear={(index) => {
+                    setArticleImageFiles((prev) =>
+                      prev.map((file, slot) => (slot === index ? null : file))
+                    );
+                    setArticleImageUrls((prev) =>
+                      prev.map((url, slot) => (slot === index ? null : url))
+                    );
+                    setArticleImagesTouched(true);
+                    setImageNotice(null);
+                  }}
+                />
+                {imageNotice && (
                   <p
                     className={`mt-2 text-xs font-medium ${
-                      imageGenNotice.ok ? 'text-green-700' : 'text-red-600'
+                      imageNotice.ok ? 'text-green-700' : 'text-red-600'
                     }`}
                   >
-                    {imageGenNotice.text}
+                    {imageNotice.text}
                   </p>
+                )}
+                {imageUploadLoading && (
+                  <p className="mt-2 text-xs font-medium text-gray-600">Uploading images…</p>
                 )}
               </div>
 
@@ -998,10 +949,10 @@ function JournalistSubmitInner() {
               <span>{readMinutes} min read</span>
             </div>
 
-            {form.featured_image_url && (
+            {(articleImageUrls[0] || form.featured_image_url) && (
               <div className="mb-8 w-full rounded-sm bg-gray-100">
                 <img
-                  src={form.featured_image_url}
+                  src={articleImageUrls[0] || form.featured_image_url}
                   alt=""
                   className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
                 />
@@ -1009,7 +960,10 @@ function JournalistSubmitInner() {
             )}
 
             <div className="max-w-[720px] mx-auto px-0 sm:px-0">
-              <ArticleBodyRenderer body={{ markdown: form.bodyText }} />
+              <ArticleBodyRenderer
+                body={{ markdown: form.bodyText }}
+                inlineImages={articleImageUrls.slice(1).filter((url): url is string => Boolean(url))}
+              />
             </div>
           </div>
         </div>

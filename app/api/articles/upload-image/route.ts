@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
-import { generateSlug } from '@/lib/slug';
 import {
   ARTICLE_IMAGE_ALLOWED_TYPES,
   ARTICLE_IMAGE_BUCKET,
@@ -53,12 +52,6 @@ function detectImageType(bytes: Uint8Array): ArticleImageContentType | null {
   return null;
 }
 
-function extensionForType(type: ArticleImageContentType) {
-  if (type === 'image/jpeg') return '.jpg';
-  if (type === 'image/png') return '.png';
-  return '.webp';
-}
-
 export async function POST(req: NextRequest) {
   try {
     const actor = await resolveArticlesActor(req);
@@ -73,10 +66,17 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData().catch(() => null);
     const file = formData?.get('file');
-    const title = String(formData?.get('title') || '').trim();
+    const requestedSlug = String(formData?.get('slug') || '').trim();
+    const requestedIndex = Number(formData?.get('index'));
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Image file is required.' }, { status: 400 });
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requestedSlug)) {
+      return NextResponse.json({ error: 'A valid article slug is required.' }, { status: 400 });
+    }
+    if (!Number.isInteger(requestedIndex) || requestedIndex < 1 || requestedIndex > 3) {
+      return NextResponse.json({ error: 'Image index must be between 1 and 3.' }, { status: 400 });
     }
 
     if (file.size <= 0) {
@@ -107,11 +107,7 @@ export async function POST(req: NextRequest) {
 
     await ensureBucket(supabase);
 
-    const owner = actor.kind === 'journalist' ? actor.user.id : 'admin';
-    const baseSlug = generateSlug(title) || generateSlug(file.name) || 'article-image';
-    const objectPath = `articles/uploads/${owner}/${baseSlug}-${Date.now()}${extensionForType(
-      detectedType
-    )}`;
+    const objectPath = `article-images/${requestedSlug}-img${requestedIndex}-${Date.now()}.png`;
 
     const { error: uploadErr } = await supabase.storage
       .from(ARTICLE_IMAGE_BUCKET)

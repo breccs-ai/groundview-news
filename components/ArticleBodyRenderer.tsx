@@ -14,6 +14,8 @@ type Props = {
   body: ArticleBody;
   /** Insert in-article ad slot after the third paragraph when true. */
   injectMidAd?: boolean;
+  /** Image URLs to insert through the body. The hero image is rendered by the page. */
+  inlineImages?: string[];
 };
 
 const GEORGIA = { fontFamily: "Georgia, 'Times New Roman', serif" };
@@ -21,7 +23,8 @@ const PLAYFAIR = { fontFamily: "'Playfair Display', Georgia, serif" };
 
 function buildMarkdownComponents(
   getParagraphIndex: () => number,
-  injectMidAd?: boolean
+  injectMidAd?: boolean,
+  imagePlacements: Array<{ afterParagraph: number; url: string }> = []
 ): Components {
   return {
     h1: ({ children, ...props }) => (
@@ -104,13 +107,33 @@ function buildMarkdownComponents(
           {children}
         </p>
       );
-      if (injectMidAd && idx === 2) {
+      const imagesAfterParagraph = imagePlacements.filter(
+        (placement) => placement.afterParagraph === idx + 1
+      );
+      const showAd = injectMidAd && idx === 2;
+
+      if (showAd || imagesAfterParagraph.length > 0) {
         return (
           <>
             {paragraph}
-            <div className="my-10">
-              <AdSlot zone="article_in_content" variant="inline" />
-            </div>
+            {showAd && (
+              <div className="my-10">
+                <AdSlot zone="article_in_content" variant="inline" />
+              </div>
+            )}
+            {imagesAfterParagraph.map((placement) => (
+              <figure key={placement.url} className="my-10">
+                <img
+                  src={placement.url}
+                  alt=""
+                  className="mx-auto block h-auto max-h-[640px] w-auto max-w-full rounded-sm"
+                  loading="lazy"
+                />
+                <figcaption className="mt-2 min-h-[1.25rem] text-center text-sm italic text-gray-500">
+                  {' '}
+                </figcaption>
+              </figure>
+            ))}
           </>
         );
       }
@@ -290,11 +313,51 @@ type MarkdownInnerProps = {
   markdown: string;
   wrapperClassName?: string;
   injectMidAd?: boolean;
+  inlineImages?: string[];
 };
 
-export function MarkdownBodyContent({ markdown, wrapperClassName, injectMidAd }: MarkdownInnerProps) {
+function countMarkdownParagraphs(markdown: string): number {
+  let inFence = false;
+  return markdown
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter((block) => {
+      if (block.startsWith('```') || block.startsWith('~~~')) {
+        inFence = !inFence;
+        return false;
+      }
+      if (inFence || !block) return false;
+      return !/^(#{1,6}\s|>|[-*+]\s|\d+\.\s|---+$|!\[|<)/.test(block);
+    }).length;
+}
+
+function buildImagePlacements(markdown: string, inlineImages: string[]) {
+  const images = inlineImages.filter(Boolean).slice(0, 2);
+  if (images.length === 0) return [];
+
+  const paragraphCount = Math.max(1, countMarkdownParagraphs(markdown));
+  if (images.length === 1) {
+    return [{ afterParagraph: Math.ceil(paragraphCount / 2), url: images[0] }];
+  }
+
+  return [
+    { afterParagraph: Math.ceil(paragraphCount / 3), url: images[0] },
+    { afterParagraph: Math.ceil((paragraphCount * 2) / 3), url: images[1] },
+  ];
+}
+
+export function MarkdownBodyContent({
+  markdown,
+  wrapperClassName,
+  injectMidAd,
+  inlineImages = [],
+}: MarkdownInnerProps) {
   const paragraphIndexRef = useRef(0);
   paragraphIndexRef.current = 0;
+  const imagePlacements = useMemo(
+    () => buildImagePlacements(markdown, inlineImages),
+    [markdown, inlineImages]
+  );
 
   const components = useMemo(
     () =>
@@ -302,8 +365,8 @@ export function MarkdownBodyContent({ markdown, wrapperClassName, injectMidAd }:
         const idx = paragraphIndexRef.current;
         paragraphIndexRef.current += 1;
         return idx;
-      }, injectMidAd),
-    [markdown, injectMidAd],
+      }, injectMidAd, imagePlacements),
+    [injectMidAd, imagePlacements],
   );
 
   return (
@@ -315,12 +378,18 @@ export function MarkdownBodyContent({ markdown, wrapperClassName, injectMidAd }:
   );
 }
 
-export default function ArticleBodyRenderer({ body, injectMidAd }: Props) {
+export default function ArticleBodyRenderer({ body, injectMidAd, inlineImages = [] }: Props) {
   const markdown = storedBodyToEditorMarkdown(body as unknown).trim();
 
   if (!markdown) {
     return <p className="text-gray-400 italic w-full max-w-full">No content available.</p>;
   }
 
-  return <MarkdownBodyContent markdown={markdown} injectMidAd={injectMidAd} />;
+  return (
+    <MarkdownBodyContent
+      markdown={markdown}
+      injectMidAd={injectMidAd}
+      inlineImages={inlineImages}
+    />
+  );
 }

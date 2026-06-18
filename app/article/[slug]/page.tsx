@@ -53,6 +53,14 @@ export default async function ArticlePage({ params }: Props) {
   const article = await getArticleBySlug(params.slug);
   if (!article) notFound();
 
+  const articleImages = Array.isArray(article.article_images)
+    ? article.article_images
+        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+        .slice(0, 3)
+    : [];
+  const heroImageUrl = articleImages[0] || article.featured_image_url || '';
+  const inlineImages = articleImages.slice(1);
+
   const cookieStore = cookies();
   const showAdminEditFab =
     cookieStore.get(ADMIN_COOKIE)?.value === ADMIN_COOKIE_VALUE;
@@ -109,11 +117,11 @@ export default async function ArticlePage({ params }: Props) {
         </div>
 
         {/* Featured image */}
-        {article.featured_image_url && (
+        {heroImageUrl && (
           <div className="max-w-5xl mx-auto px-4 md:px-8 mb-8">
             <div className="w-full rounded-sm bg-gray-100">
               <img
-                src={article.featured_image_url}
+                src={heroImageUrl}
                 alt={article.title}
                 className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
               />
@@ -132,7 +140,11 @@ export default async function ArticlePage({ params }: Props) {
             {/* Main content — centred, never exceeds 720px on desktop */}
             <div className="min-w-0 w-full mx-auto lg:max-w-[720px]">
               <EarlyAccessBanner publishAt={article.publish_at ?? null} />
-              <ArticleBodyRenderer body={article.body} injectMidAd />
+              <ArticleBodyRenderer
+                body={article.body}
+                injectMidAd
+                inlineImages={inlineImages}
+              />
 
               <div className="mt-10 pt-6 border-t border-gray-100 space-y-6">
                 <div>

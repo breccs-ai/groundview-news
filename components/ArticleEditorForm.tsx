@@ -16,15 +16,15 @@ import {
   wordCountMarkdownExcludingSyntax,
 } from '@/lib/article-markdown';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
+import ArticleImageSlots from '@/components/ArticleImageSlots';
 import CategoryBadge from '@/components/CategoryBadge';
 import type { ArticleBody } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import {
-  ARTICLE_IMAGE_UPLOAD_ACCEPT,
-  ARTICLE_IMAGE_UPLOAD_MAX_BYTES,
-  ARTICLE_IMAGE_UPLOAD_MAX_MB,
-} from '@/lib/article-image-constraints';
-import { Save, Globe, ArrowLeft, Eye, X, Trash2, Upload } from 'lucide-react';
+  uploadArticleImages,
+  validateArticleImage,
+} from '@/lib/article-image-upload';
+import { Save, Globe, ArrowLeft, Eye, X, Trash2 } from 'lucide-react';
 
 type ArticleForm = {
   title: string;
@@ -81,11 +81,21 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const [saveMsg, setSaveMsg] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
-  const [imageGenLoading, setImageGenLoading] = useState(false);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
-  const [imageGenNotice, setImageGenNotice] = useState<{ ok: boolean; text: string } | null>(
+  const [imageNotice, setImageNotice] = useState<{ ok: boolean; text: string } | null>(
     null
   );
+  const [articleImageUrls, setArticleImageUrls] = useState<Array<string | null>>([
+    null,
+    null,
+    null,
+  ]);
+  const [articleImageFiles, setArticleImageFiles] = useState<Array<File | null>>([
+    null,
+    null,
+    null,
+  ]);
+  const [articleImagesTouched, setArticleImagesTouched] = useState(false);
 
   const loadArticle = useCallback(async () => {
     if (!articleId) return;
@@ -112,6 +122,16 @@ export default function ArticleEditorForm({ articleId }: Props) {
     );
 
     const rawStatus = typeof data.status === 'string' ? data.status : 'draft';
+    const storedImages = Array.isArray(data.article_images)
+      ? data.article_images
+          .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+          .slice(0, 3)
+      : [];
+    setArticleImageUrls([
+      storedImages[0] || null,
+      storedImages[1] || null,
+      storedImages[2] || null,
+    ]);
 
     setForm({
       title: String(data.title || ''),
@@ -151,107 +171,37 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaveStatus('idle');
   };
 
-  const generateFeaturedImage = async () => {
-    setImageGenNotice(null);
-    if (!form.title.trim()) {
-      setImageGenNotice({
-        ok: false,
-        text: 'Image generation failed. Please try again.',
-      });
-      return;
-    }
-    setImageGenLoading(true);
-    try {
-      const res = await fetch('/api/articles/generate-image', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          excerpt: form.excerpt,
-          category: normalizeArticleCategory(form.category),
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.imageUrl) {
-        const detail = typeof json?.detail === 'string' ? json.detail : null;
-        const code = typeof json?.code === 'string' ? json.code : null;
-        setImageGenNotice({
-          ok: false,
-          text: detail
-            ? `Image generation failed: ${detail}${code ? ` (${code})` : ''}`
-            : 'Image generation failed. Please try again.',
-        });
-        return;
-      }
-      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
-      setImageGenNotice({ ok: true, text: 'Image generated successfully' });
-    } catch (e) {
-      setImageGenNotice({
-        ok: false,
-        text:
-          e instanceof Error
-            ? `Image generation failed: ${e.message}`
-            : 'Image generation failed. Please try again.',
-      });
-    } finally {
-      setImageGenLoading(false);
-    }
-  };
-
-  const uploadFeaturedImage = async (file: File | null) => {
-    setImageGenNotice(null);
-    if (!file) return;
-
-    if (!ARTICLE_IMAGE_UPLOAD_ACCEPT.split(',').includes(file.type)) {
-      setImageGenNotice({
-        ok: false,
-        text: 'Upload failed. Use JPEG, PNG, or WebP only.',
-      });
-      return;
-    }
-
-    if (file.size > ARTICLE_IMAGE_UPLOAD_MAX_BYTES) {
-      setImageGenNotice({
-        ok: false,
-        text: `Upload failed. Image must be ${ARTICLE_IMAGE_UPLOAD_MAX_MB}MB or smaller.`,
-      });
-      return;
-    }
-
+  const resolveImagesForSave = async () => {
     setImageUploadLoading(true);
+    setImageNotice(null);
     try {
-      const body = new FormData();
-      body.append('file', file);
-      body.append('title', form.title || file.name);
-
-      const res = await fetch('/api/articles/upload-image', {
-        method: 'POST',
-        credentials: 'include',
-        body,
+      const result = await uploadArticleImages({
+        title: form.title,
+        files: articleImageFiles,
+        existingUrls: articleImageUrls,
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.imageUrl) {
-        setImageGenNotice({
+      const paddedUrls: Array<string | null> = [...result.urls];
+      while (paddedUrls.length < 3) paddedUrls.push(null);
+      const featuredImageUrl =
+        result.urls[0] ||
+        (result.hadFailure || !articleImagesTouched ? form.featured_image_url : '');
+
+      setArticleImageUrls(paddedUrls);
+      setArticleImageFiles([null, null, null]);
+      setForm((prev) => ({ ...prev, featured_image_url: featuredImageUrl }));
+      if (result.hadFailure) {
+        setImageNotice({
           ok: false,
-          text: json.error || 'Upload failed. Please try another image.',
+          text: 'One or more images could not be uploaded. The article will still be saved.',
         });
-        return;
       }
-
-      setForm((prev) => ({ ...prev, featured_image_url: String(json.imageUrl) }));
-      setImageGenNotice({ ok: true, text: 'Image uploaded successfully' });
-    } catch {
-      setImageGenNotice({
-        ok: false,
-        text: 'Upload failed. Please try another image.',
-      });
+      return { articleImages: result.urls, featuredImageUrl };
     } finally {
       setImageUploadLoading(false);
     }
   };
 
-  const buildContentPayload = () => {
+  const buildContentPayload = (articleImages: string[], featuredImageUrl: string) => {
     const body = markdownBodyPayload(form.bodyText);
     const category = normalizeArticleCategory(form.category);
     const label = normalizeArticleLabel(form.label);
@@ -262,7 +212,8 @@ export default function ArticleEditorForm({ articleId }: Props) {
       category,
       label,
       excerpt: form.excerpt.trim(),
-      featured_image_url: form.featured_image_url.trim(),
+      featured_image_url: featuredImageUrl || null,
+      article_images: articleImages,
       body,
     };
   };
@@ -279,7 +230,8 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaving(true);
     setSaveStatus('idle');
 
-    const content = buildContentPayload();
+    const images = await resolveImagesForSave();
+    const content = buildContentPayload(images.articleImages, images.featuredImageUrl);
     const res = await fetch('/api/articles', {
       method: 'PATCH',
       credentials: 'include',
@@ -417,6 +369,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     const category = normalizeArticleCategory(form.category);
     const label = normalizeArticleLabel(form.label);
 
+    const images = await resolveImagesForSave();
     const payload = {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
@@ -424,7 +377,8 @@ export default function ArticleEditorForm({ articleId }: Props) {
       category,
       label,
       excerpt: form.excerpt.trim(),
-      featured_image_url: form.featured_image_url.trim(),
+      featured_image_url: images.featuredImageUrl || null,
+      article_images: images.articleImages,
       body,
       status,
       ...(publishNow || status === 'published' ? { published_at: now } : {}),
@@ -544,11 +498,11 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </div>
             </div>
 
-            {form.featured_image_url && (
+            {(articleImageUrls[0] || form.featured_image_url) && (
               <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
                 <div className="w-full rounded-sm bg-gray-100">
                   <img
-                    src={form.featured_image_url}
+                    src={articleImageUrls[0] || form.featured_image_url}
                     alt={form.title}
                     className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
                   />
@@ -558,7 +512,12 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
               {form.bodyText ? (
-                <ArticleBodyRenderer body={previewArticleBody} />
+                <ArticleBodyRenderer
+                  body={previewArticleBody}
+                  inlineImages={articleImageUrls
+                    .slice(1)
+                    .filter((url): url is string => Boolean(url))}
+                />
               ) : (
                 <p className="text-gray-300 italic">No body content yet.</p>
               )}
@@ -885,64 +844,47 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
-              Featured Image URL
+              Article Images (optional — up to 3)
             </label>
-            <div className="flex flex-wrap gap-2 items-stretch sm:items-center">
-              <input
-                type="url"
-                name="featured_image_url"
-                value={form.featured_image_url}
-                onChange={handleField}
-                className="flex-1 min-w-[12rem] border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
-                placeholder="https://images.pexels.com/…"
-              />
-              <button
-                type="button"
-                onClick={() => generateFeaturedImage()}
-                disabled={imageGenLoading || imageUploadLoading}
-                className="inline-flex shrink-0 items-center justify-center px-4 py-2 text-sm font-semibold rounded-sm text-[#1a1a1a] bg-[#d4af37] hover:bg-[#c9a227] transition-colors disabled:opacity-60 disabled:pointer-events-none"
-              >
-                {imageGenLoading ? 'Generating image...' : 'Generate Image'}
-              </button>
-              <label
-                className={`inline-flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-sm border border-gray-300 text-gray-700 hover:border-gray-500 hover:text-gray-900 transition-colors ${
-                  imageGenLoading || imageUploadLoading
-                    ? 'opacity-60 pointer-events-none'
-                    : 'cursor-pointer'
-                }`}
-              >
-                <Upload size={14} aria-hidden />
-                {imageUploadLoading ? 'Uploading...' : 'Upload Image'}
-                <input
-                  type="file"
-                  accept={ARTICLE_IMAGE_UPLOAD_ACCEPT}
-                  className="sr-only"
-                  disabled={imageGenLoading || imageUploadLoading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    e.currentTarget.value = '';
-                    void uploadFeaturedImage(file);
-                  }}
-                />
-              </label>
-            </div>
-            {imageGenNotice && (
+            <ArticleImageSlots
+              files={articleImageFiles}
+              urls={articleImageUrls}
+              disabled={imageUploadLoading}
+              onFileChange={(index, file) => {
+                if (!file) return;
+                const validationError = validateArticleImage(file);
+                if (validationError) {
+                  setImageNotice({ ok: false, text: validationError });
+                  return;
+                }
+                setArticleImageFiles((prev) =>
+                  prev.map((current, slot) => (slot === index ? file : current))
+                );
+                setArticleImagesTouched(true);
+                setImageNotice(null);
+              }}
+              onClear={(index) => {
+                setArticleImageFiles((prev) =>
+                  prev.map((file, slot) => (slot === index ? null : file))
+                );
+                setArticleImageUrls((prev) =>
+                  prev.map((url, slot) => (slot === index ? null : url))
+                );
+                setArticleImagesTouched(true);
+                setImageNotice(null);
+              }}
+            />
+            {imageNotice && (
               <p
                 className={`mt-2 text-xs font-medium ${
-                  imageGenNotice.ok ? 'text-green-700' : 'text-red-600'
+                  imageNotice.ok ? 'text-green-700' : 'text-red-600'
                 }`}
               >
-                {imageGenNotice.text}
+                {imageNotice.text}
               </p>
             )}
-            {form.featured_image_url && (
-              <div className="mt-3 w-full rounded-sm bg-gray-100">
-                <img
-                  src={form.featured_image_url}
-                  alt="Featured preview"
-                  className="block w-auto max-w-full h-auto max-h-[320px] mx-auto rounded-sm"
-                />
-              </div>
+            {imageUploadLoading && (
+              <p className="mt-2 text-xs font-medium text-gray-600">Uploading images…</p>
             )}
           </div>
 
