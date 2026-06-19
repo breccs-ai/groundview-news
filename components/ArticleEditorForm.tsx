@@ -256,10 +256,18 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
   const publishArticle = async () => {
     if (!articleId) return;
+    if (!form.title.trim()) {
+      setSaveMsg('Title is required.');
+      setSaveStatus('error');
+      return;
+    }
+
     setSaving(true);
     setSaveStatus('idle');
     const now = new Date().toISOString();
     const published_at = loadedPublishedAt || now;
+    const images = await resolveImagesForSave();
+    const content = buildContentPayload(images.articleImages, images.featuredImageUrl);
 
     const res = await fetch('/api/articles', {
       method: 'PATCH',
@@ -267,6 +275,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: articleId,
+        ...content,
         status: 'published',
         published_at,
       }),
