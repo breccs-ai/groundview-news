@@ -295,11 +295,11 @@ export default function WriterApplyPage() {
             </Field>
 
             <Field label="Phone Number *">
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 items-center">
                 <select
                   value={form.phone_dial}
                   onChange={(e) => setField('phone_dial', e.target.value)}
-                  className={`${inputClass} w-32 shrink-0`}
+                  className="w-32 shrink-0 border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors bg-white"
                   aria-label="Country dial code"
                 >
                   {sortedCountries.map((c) => (
@@ -314,7 +314,7 @@ export default function WriterApplyPage() {
                   required
                   value={form.phone_number}
                   onChange={(e) => setField('phone_number', e.target.value)}
-                  className={`${inputClass} flex-1`}
+                  className="min-w-0 flex-1 border border-gray-300 rounded-sm px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors bg-white"
                   placeholder="20 7946 0958"
                 />
               </div>
