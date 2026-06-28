@@ -28,7 +28,7 @@ export type Article = {
   body: ArticleBody;
   excerpt: string;
   featured_image_url: string;
-  /** Up to three uploaded image URLs. Apply the article_images Supabase migration before use. */
+  /** Up to three uploaded article images with optional captions. Apply the article_images Supabase migration before use. */
   article_images?: unknown;
   /** Page-view counter; increment via RPC from client once per session. */
   views?: number | null;
@@ -42,6 +42,11 @@ export type Article = {
    */
   publish_at?: string | null;
   created_at: string;
+};
+
+export type ArticleImage = {
+  url: string;
+  caption: string;
 };
 
 /** Legacy block-based body (pre–full Markdown). Still supported for rendering migration. */

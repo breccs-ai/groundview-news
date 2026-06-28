@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CATEGORY_OPTIONS,
@@ -18,7 +18,7 @@ import {
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import ArticleImageSlots from '@/components/ArticleImageSlots';
 import CategoryBadge from '@/components/CategoryBadge';
-import type { ArticleBody } from '@/lib/supabase';
+import type { ArticleBody, ArticleImage } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import {
   uploadArticleImages,
@@ -33,6 +33,50 @@ type AuthorOption = {
   id: string;
   name: string;
 };
+
+function normalizeStoredArticleImages(value: unknown): ArticleImage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const url = entry.trim();
+        return url ? { url, caption: '' } : null;
+      }
+      if (entry && typeof entry === 'object') {
+        const image = entry as { url?: unknown; caption?: unknown };
+        const url = typeof image.url === 'string' ? image.url.trim() : '';
+        if (!url) return null;
+        return {
+          url,
+          caption: typeof image.caption === 'string' ? image.caption.trim() : '',
+        };
+      }
+      return null;
+    })
+    .filter((image): image is ArticleImage => Boolean(image))
+    .slice(0, 3);
+}
+
+function buildArticleImagesFromSlots(
+  urls: Array<string | null>,
+  captions: string[]
+): ArticleImage[] {
+  return urls
+    .slice(0, 3)
+    .map((url, index) =>
+      url?.trim()
+        ? {
+            url: url.trim(),
+            caption: captions[index]?.trim() || '',
+          }
+        : null
+    )
+    .filter((image): image is ArticleImage => Boolean(image));
+}
+
+function previewCaption(image: ArticleImage, index: number, title: string): string {
+  return image.caption.trim() || `Image ${index + 1} — ${title || 'Untitled'}`;
+}
 
 type ArticleForm = {
   title: string;
@@ -103,6 +147,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     null,
     null,
   ]);
+  const [articleImageCaptions, setArticleImageCaptions] = useState(['', '', '']);
   const [articleImagesTouched, setArticleImagesTouched] = useState(false);
   const [authorOptions, setAuthorOptions] = useState<AuthorOption[]>([
     { id: 'default-editor', name: DEFAULT_AUTHOR_NAME },
@@ -134,15 +179,16 @@ export default function ArticleEditorForm({ articleId }: Props) {
     );
 
     const rawStatus = typeof data.status === 'string' ? data.status : 'draft';
-    const storedImages = Array.isArray(data.article_images)
-      ? data.article_images
-          .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-          .slice(0, 3)
-      : [];
+    const storedImages = normalizeStoredArticleImages(data.article_images);
     setArticleImageUrls([
-      storedImages[0] || null,
-      storedImages[1] || null,
-      storedImages[2] || null,
+      storedImages[0]?.url || null,
+      storedImages[1]?.url || null,
+      storedImages[2]?.url || null,
+    ]);
+    setArticleImageCaptions([
+      storedImages[0]?.caption || '',
+      storedImages[1]?.caption || '',
+      storedImages[2]?.caption || '',
     ]);
 
     setForm({
@@ -226,6 +272,11 @@ export default function ArticleEditorForm({ articleId }: Props) {
     };
   }, [previewOpen]);
 
+  const previewArticleImages = useMemo(
+    () => buildArticleImagesFromSlots(articleImageUrls, articleImageCaptions),
+    [articleImageUrls, articleImageCaptions]
+  );
+
   const handleField = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -243,10 +294,11 @@ export default function ArticleEditorForm({ articleId }: Props) {
         files: articleImageFiles,
         existingUrls: articleImageUrls,
       });
-      const paddedUrls: Array<string | null> = [...result.urls];
+      const paddedUrls: Array<string | null> = [...result.slotUrls];
       while (paddedUrls.length < 3) paddedUrls.push(null);
+      const savedUrls = paddedUrls.filter((url): url is string => Boolean(url));
       const featuredImageUrl =
-        result.urls[0] ||
+        savedUrls[0] ||
         (result.hadFailure || !articleImagesTouched ? form.featured_image_url : '');
 
       setArticleImageUrls(paddedUrls);
@@ -258,7 +310,10 @@ export default function ArticleEditorForm({ articleId }: Props) {
           text: 'One or more images could not be uploaded. The article will still be saved.',
         });
       }
-      return { articleImages: result.urls, featuredImageUrl };
+      return {
+        articleImages: buildArticleImagesFromSlots(paddedUrls, articleImageCaptions),
+        featuredImageUrl,
+      };
     } finally {
       setImageUploadLoading(false);
     }
@@ -271,7 +326,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaveStatus('idle');
   };
 
-  const buildContentPayload = (articleImages: string[], featuredImageUrl: string) => {
+  const buildContentPayload = (articleImages: ArticleImage[], featuredImageUrl: string) => {
     const body = markdownBodyPayload(form.bodyText);
     const category = normalizeArticleCategory(form.category);
     const label = normalizeArticleLabel(form.label);
@@ -577,15 +632,20 @@ export default function ArticleEditorForm({ articleId }: Props) {
               </div>
             </div>
 
-            {(articleImageUrls[0] || form.featured_image_url) && (
+            {(previewArticleImages[0] || form.featured_image_url) && (
               <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
-                <div className="w-full rounded-sm bg-gray-100">
+                <figure className="w-full rounded-sm bg-gray-100">
                   <img
-                    src={articleImageUrls[0] || form.featured_image_url}
+                    src={previewArticleImages[0]?.url || form.featured_image_url}
                     alt={form.title}
                     className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
                   />
-                </div>
+                  <figcaption className="mt-2 text-center text-sm italic text-gray-500">
+                    {previewArticleImages[0]
+                      ? previewCaption(previewArticleImages[0], 0, form.title)
+                      : `Image 1 — ${form.title || 'Untitled'}`}
+                  </figcaption>
+                </figure>
               </div>
             )}
 
@@ -593,9 +653,12 @@ export default function ArticleEditorForm({ articleId }: Props) {
               {form.bodyText ? (
                 <ArticleBodyRenderer
                   body={previewArticleBody}
-                  inlineImages={articleImageUrls
+                  inlineImages={previewArticleImages
                     .slice(1)
-                    .filter((url): url is string => Boolean(url))}
+                    .map((image, index) => ({
+                      ...image,
+                      caption: previewCaption(image, index + 1, form.title),
+                    }))}
                 />
               ) : (
                 <p className="text-gray-300 italic">No body content yet.</p>
@@ -963,10 +1026,40 @@ export default function ArticleEditorForm({ articleId }: Props) {
                 setArticleImageUrls((prev) =>
                   prev.map((url, slot) => (slot === index ? null : url))
                 );
+                setArticleImageCaptions((prev) =>
+                  prev.map((caption, slot) => (slot === index ? '' : caption))
+                );
                 setArticleImagesTouched(true);
                 setImageNotice(null);
               }}
             />
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[0, 1, 2].map((index) => {
+                const hasImage = Boolean(articleImageFiles[index] || articleImageUrls[index]);
+                return hasImage ? (
+                  <div key={index}>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Caption (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={articleImageCaptions[index] || ''}
+                      onChange={(event) => {
+                        const value = event.currentTarget.value;
+                        setArticleImageCaptions((prev) =>
+                          prev.map((caption, slot) => (slot === index ? value : caption))
+                        );
+                        setArticleImagesTouched(true);
+                      }}
+                      className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
+                      placeholder={`Caption for image ${index + 1}`}
+                    />
+                  </div>
+                ) : (
+                  <div key={index} aria-hidden />
+                );
+              })}
+            </div>
             {imageNotice && (
               <p
                 className={`mt-2 text-xs font-medium ${

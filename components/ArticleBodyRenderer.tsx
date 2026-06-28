@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
-import type { ArticleBody } from '@/lib/supabase';
+import type { ArticleBody, ArticleImage } from '@/lib/supabase';
 import { storedBodyToEditorMarkdown } from '@/lib/article-markdown';
 import AdSlot from '@/components/ads/AdSlot';
 
@@ -14,8 +14,8 @@ type Props = {
   body: ArticleBody;
   /** Insert in-article ad slot after the third paragraph when true. */
   injectMidAd?: boolean;
-  /** Image URLs to insert through the body. The hero image is rendered by the page. */
-  inlineImages?: string[];
+  /** Images to insert through the body. The hero image is rendered by the page. */
+  inlineImages?: ArticleImage[];
 };
 
 const GEORGIA = { fontFamily: "Georgia, 'Times New Roman', serif" };
@@ -24,7 +24,7 @@ const PLAYFAIR = { fontFamily: "'Playfair Display', Georgia, serif" };
 function buildMarkdownComponents(
   getParagraphIndex: () => number,
   injectMidAd?: boolean,
-  imagePlacements: Array<{ afterParagraph: number; url: string }> = []
+  imagePlacements: Array<{ afterParagraph: number; image: ArticleImage }> = []
 ): Components {
   return {
     h1: ({ children, ...props }) => (
@@ -122,15 +122,15 @@ function buildMarkdownComponents(
               </div>
             )}
             {imagesAfterParagraph.map((placement) => (
-              <figure key={placement.url} className="my-10">
+              <figure key={placement.image.url} className="my-10">
                 <img
-                  src={placement.url}
+                  src={placement.image.url}
                   alt=""
                   className="mx-auto block h-auto max-h-[640px] w-auto max-w-full rounded-sm"
                   loading="lazy"
                 />
                 <figcaption className="mt-2 min-h-[1.25rem] text-center text-sm italic text-gray-500">
-                  {' '}
+                  {placement.image.caption}
                 </figcaption>
               </figure>
             ))}
@@ -313,7 +313,7 @@ type MarkdownInnerProps = {
   markdown: string;
   wrapperClassName?: string;
   injectMidAd?: boolean;
-  inlineImages?: string[];
+  inlineImages?: ArticleImage[];
 };
 
 function countMarkdownParagraphs(markdown: string): number {
@@ -331,18 +331,18 @@ function countMarkdownParagraphs(markdown: string): number {
     }).length;
 }
 
-function buildImagePlacements(markdown: string, inlineImages: string[]) {
-  const images = inlineImages.filter(Boolean).slice(0, 2);
+function buildImagePlacements(markdown: string, inlineImages: ArticleImage[]) {
+  const images = inlineImages.filter((image) => image.url).slice(0, 2);
   if (images.length === 0) return [];
 
   const paragraphCount = Math.max(1, countMarkdownParagraphs(markdown));
   if (images.length === 1) {
-    return [{ afterParagraph: Math.ceil(paragraphCount / 2), url: images[0] }];
+    return [{ afterParagraph: Math.ceil(paragraphCount / 2), image: images[0] }];
   }
 
   return [
-    { afterParagraph: Math.ceil(paragraphCount / 3), url: images[0] },
-    { afterParagraph: Math.ceil((paragraphCount * 2) / 3), url: images[1] },
+    { afterParagraph: Math.ceil(paragraphCount / 3), image: images[0] },
+    { afterParagraph: Math.ceil((paragraphCount * 2) / 3), image: images[1] },
   ];
 }
 

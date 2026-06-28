@@ -9,6 +9,7 @@ import CategoryBadge from '@/components/CategoryBadge';
 import ArticleBodyRenderer from '@/components/ArticleBodyRenderer';
 import ArticleImageSlots from '@/components/ArticleImageSlots';
 import { supabase } from '@/lib/supabase';
+import type { ArticleImage } from '@/lib/supabase';
 import { hasJournalistRole } from '@/lib/profile-roles';
 import { CATEGORIES } from '@/lib/supabase';
 import {
@@ -35,6 +36,50 @@ type AuthorOption = {
   id: string;
   name: string;
 };
+
+function normalizeStoredArticleImages(value: unknown): ArticleImage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const url = entry.trim();
+        return url ? { url, caption: '' } : null;
+      }
+      if (entry && typeof entry === 'object') {
+        const image = entry as { url?: unknown; caption?: unknown };
+        const url = typeof image.url === 'string' ? image.url.trim() : '';
+        if (!url) return null;
+        return {
+          url,
+          caption: typeof image.caption === 'string' ? image.caption.trim() : '',
+        };
+      }
+      return null;
+    })
+    .filter((image): image is ArticleImage => Boolean(image))
+    .slice(0, 3);
+}
+
+function buildArticleImagesFromSlots(
+  urls: Array<string | null>,
+  captions: string[]
+): ArticleImage[] {
+  return urls
+    .slice(0, 3)
+    .map((url, index) =>
+      url?.trim()
+        ? {
+            url: url.trim(),
+            caption: captions[index]?.trim() || '',
+          }
+        : null
+    )
+    .filter((image): image is ArticleImage => Boolean(image));
+}
+
+function previewCaption(image: ArticleImage, index: number, title: string): string {
+  return image.caption.trim() || `Image ${index + 1} — ${title || 'Untitled'}`;
+}
 
 type FormState = {
   title: string;
@@ -85,6 +130,7 @@ function JournalistSubmitInner() {
     null,
     null,
   ]);
+  const [articleImageCaptions, setArticleImageCaptions] = useState(['', '', '']);
   const [articleImagesTouched, setArticleImagesTouched] = useState(false);
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -181,7 +227,7 @@ function JournalistSubmitInner() {
   const resolveImagesForSave = async () => {
     if (!accessToken) {
       return {
-        articleImages: articleImageUrls.filter((url): url is string => Boolean(url)),
+        articleImages: buildArticleImagesFromSlots(articleImageUrls, articleImageCaptions),
         featuredImageUrl: form.featured_image_url,
       };
     }
@@ -195,10 +241,11 @@ function JournalistSubmitInner() {
         existingUrls: articleImageUrls,
         authorization: accessToken,
       });
-      const paddedUrls: Array<string | null> = [...result.urls];
+      const paddedUrls: Array<string | null> = [...result.slotUrls];
       while (paddedUrls.length < 3) paddedUrls.push(null);
+      const savedUrls = paddedUrls.filter((url): url is string => Boolean(url));
       const featuredImageUrl =
-        result.urls[0] ||
+        savedUrls[0] ||
         (result.hadFailure || !articleImagesTouched ? form.featured_image_url : '');
 
       setArticleImageUrls(paddedUrls);
@@ -210,7 +257,10 @@ function JournalistSubmitInner() {
           text: 'One or more images could not be uploaded. The article will still be saved.',
         });
       }
-      return { articleImages: result.urls, featuredImageUrl };
+      return {
+        articleImages: buildArticleImagesFromSlots(paddedUrls, articleImageCaptions),
+        featuredImageUrl,
+      };
     } finally {
       setImageUploadLoading(false);
     }
@@ -222,6 +272,11 @@ function JournalistSubmitInner() {
   );
 
   const readMinutes = useMemo(() => Math.max(1, Math.ceil(previewWordCount / 200)), [previewWordCount]);
+
+  const previewArticleImages = useMemo(
+    () => buildArticleImagesFromSlots(articleImageUrls, articleImageCaptions),
+    [articleImageUrls, articleImageCaptions]
+  );
 
   useEffect(() => {
     document.body.style.overflow = previewOpen || submissionSuccess ? 'hidden' : '';
@@ -326,15 +381,16 @@ function JournalistSubmitInner() {
           return;
         }
         setArticleId(article.id || draftId);
-        const storedImages = Array.isArray(article.article_images)
-          ? article.article_images
-              .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-              .slice(0, 3)
-          : [];
+        const storedImages = normalizeStoredArticleImages(article.article_images);
         setArticleImageUrls([
-          storedImages[0] || null,
-          storedImages[1] || null,
-          storedImages[2] || null,
+          storedImages[0]?.url || null,
+          storedImages[1]?.url || null,
+          storedImages[2]?.url || null,
+        ]);
+        setArticleImageCaptions([
+          storedImages[0]?.caption || '',
+          storedImages[1]?.caption || '',
+          storedImages[2]?.caption || '',
         ]);
         setForm({
           title: article.title || '',
@@ -390,7 +446,7 @@ function JournalistSubmitInner() {
     setSubmissionSuccess(null);
   };
 
-  const buildPayload = useCallback((articleImages: string[], featuredImageUrl: string) => {
+  const buildPayload = useCallback((articleImages: ArticleImage[], featuredImageUrl: string) => {
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
@@ -845,10 +901,40 @@ function JournalistSubmitInner() {
                     setArticleImageUrls((prev) =>
                       prev.map((url, slot) => (slot === index ? null : url))
                     );
+                    setArticleImageCaptions((prev) =>
+                      prev.map((caption, slot) => (slot === index ? '' : caption))
+                    );
                     setArticleImagesTouched(true);
                     setImageNotice(null);
                   }}
                 />
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[0, 1, 2].map((index) => {
+                    const hasImage = Boolean(articleImageFiles[index] || articleImageUrls[index]);
+                    return hasImage ? (
+                      <div key={index}>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Caption (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={articleImageCaptions[index] || ''}
+                          onChange={(event) => {
+                            const value = event.currentTarget.value;
+                            setArticleImageCaptions((prev) =>
+                              prev.map((caption, slot) => (slot === index ? value : caption))
+                            );
+                            setArticleImagesTouched(true);
+                          }}
+                          className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
+                          placeholder={`Caption for image ${index + 1}`}
+                        />
+                      </div>
+                    ) : (
+                      <div key={index} aria-hidden />
+                    );
+                  })}
+                </div>
                 {imageNotice && (
                   <div
                     role={imageNotice.ok ? 'status' : 'alert'}
@@ -1036,20 +1122,30 @@ function JournalistSubmitInner() {
               <span>{readMinutes} min read</span>
             </div>
 
-            {(articleImageUrls[0] || form.featured_image_url) && (
-              <div className="mb-8 w-full rounded-sm bg-gray-100">
+            {(previewArticleImages[0] || form.featured_image_url) && (
+              <figure className="mb-8 w-full rounded-sm bg-gray-100">
                 <img
-                  src={articleImageUrls[0] || form.featured_image_url}
+                  src={previewArticleImages[0]?.url || form.featured_image_url}
                   alt=""
                   className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
                 />
-              </div>
+                <figcaption className="mt-2 text-center text-sm italic text-gray-500">
+                  {previewArticleImages[0]
+                    ? previewCaption(previewArticleImages[0], 0, form.title)
+                    : `Image 1 — ${form.title || 'Untitled'}`}
+                </figcaption>
+              </figure>
             )}
 
             <div className="max-w-[720px] mx-auto px-0 sm:px-0">
               <ArticleBodyRenderer
                 body={{ markdown: form.bodyText }}
-                inlineImages={articleImageUrls.slice(1).filter((url): url is string => Boolean(url))}
+                inlineImages={previewArticleImages
+                  .slice(1)
+                  .map((image, index) => ({
+                    ...image,
+                    caption: previewCaption(image, index + 1, form.title),
+                  }))}
               />
             </div>
           </div>

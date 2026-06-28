@@ -17,6 +17,7 @@ import ArticleShareSection from '@/components/ArticleShareSection';
 import SubscriptionPromptBanner from '@/components/SubscriptionPromptBanner';
 import EarlyAccessBanner from '@/components/EarlyAccessBanner';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
+import type { ArticleImage } from '@/lib/supabase';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
 import { ADMIN_COOKIE, ADMIN_COOKIE_VALUE } from '@/lib/admin-auth';
@@ -24,6 +25,33 @@ import { ADMIN_COOKIE, ADMIN_COOKIE_VALUE } from '@/lib/admin-auth';
 type Props = {
   params: { slug: string };
 };
+
+function normalizeArticleImages(value: unknown): ArticleImage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const url = entry.trim();
+        return url ? { url, caption: '' } : null;
+      }
+      if (entry && typeof entry === 'object') {
+        const image = entry as { url?: unknown; caption?: unknown };
+        const url = typeof image.url === 'string' ? image.url.trim() : '';
+        if (!url) return null;
+        return {
+          url,
+          caption: typeof image.caption === 'string' ? image.caption.trim() : '',
+        };
+      }
+      return null;
+    })
+    .filter((image): image is ArticleImage => Boolean(image))
+    .slice(0, 3);
+}
+
+function imageCaption(image: ArticleImage, index: number, title: string): string {
+  return image.caption.trim() || `Image ${index + 1} — ${title}`;
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = await getArticleBySlug(params.slug);
@@ -61,13 +89,14 @@ export default async function ArticlePage({ params }: Props) {
     typeof article.featured_image_url === 'string' && article.featured_image_url.trim() !== ''
       ? article.featured_image_url
       : '';
-  const articleImages = Array.isArray(article.article_images)
-    ? article.article_images
-        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-        .slice(0, 3)
-    : [];
-  const heroImageUrl = articleImages[0] || legacyFeaturedImageUrl;
-  const inlineImages = articleImages.slice(1);
+  const articleImages = normalizeArticleImages(article.article_images);
+  const heroImage = articleImages[0] || (legacyFeaturedImageUrl ? { url: legacyFeaturedImageUrl, caption: '' } : null);
+  const inlineImages = articleImages
+    .slice(1)
+    .map((image, index) => ({
+      ...image,
+      caption: imageCaption(image, index + 1, article.title),
+    }));
 
   const cookieStore = cookies();
   const showAdminEditFab =
@@ -125,15 +154,18 @@ export default async function ArticlePage({ params }: Props) {
         </div>
 
         {/* Featured image */}
-        {heroImageUrl && (
+        {heroImage && (
           <div className="max-w-5xl mx-auto px-4 md:px-8 mb-8">
-            <div className="w-full rounded-sm bg-gray-100">
+            <figure className="w-full rounded-sm bg-gray-100">
               <img
-                src={heroImageUrl}
+                src={heroImage.url}
                 alt={article.title}
                 className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
               />
-            </div>
+              <figcaption className="mt-2 text-center text-sm italic text-gray-500">
+                {imageCaption(heroImage, 0, article.title)}
+              </figcaption>
+            </figure>
           </div>
         )}
 

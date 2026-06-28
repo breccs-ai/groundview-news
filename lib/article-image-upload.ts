@@ -7,6 +7,7 @@ import { generateSlug } from '@/lib/slug';
 
 export type ArticleImageUploadResult = {
   urls: string[];
+  slotUrls: Array<string | null>;
   hadFailure: boolean;
 };
 
@@ -77,6 +78,7 @@ export async function uploadArticleImages(options: {
 
   return {
     urls: resolved.filter((url): url is string => typeof url === 'string' && url.length > 0),
+    slotUrls: resolved.slice(0, 3),
     hadFailure,
   };
 }
