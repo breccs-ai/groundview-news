@@ -21,6 +21,10 @@ type Props = {
 const GEORGIA = { fontFamily: "Georgia, 'Times New Roman', serif" };
 const PLAYFAIR = { fontFamily: "'Playfair Display', Georgia, serif" };
 
+function replaceEmDashes(content: string): string {
+  return content.replace(/—/g, ' - ');
+}
+
 function buildMarkdownComponents(
   getParagraphIndex: () => number,
   injectMidAd?: boolean,
@@ -332,7 +336,13 @@ function countMarkdownParagraphs(markdown: string): number {
 }
 
 function buildImagePlacements(markdown: string, inlineImages: ArticleImage[]) {
-  const images = inlineImages.filter((image) => image.url).slice(0, 2);
+  const images = inlineImages
+    .filter((image) => image.url)
+    .map((image) => ({
+      ...image,
+      caption: replaceEmDashes(image.caption),
+    }))
+    .slice(0, 2);
   if (images.length === 0) return [];
 
   const paragraphCount = Math.max(1, countMarkdownParagraphs(markdown));
@@ -352,11 +362,12 @@ export function MarkdownBodyContent({
   injectMidAd,
   inlineImages = [],
 }: MarkdownInnerProps) {
+  const displayMarkdown = replaceEmDashes(markdown);
   const paragraphIndexRef = useRef(0);
   paragraphIndexRef.current = 0;
   const imagePlacements = useMemo(
-    () => buildImagePlacements(markdown, inlineImages),
-    [markdown, inlineImages]
+    () => buildImagePlacements(displayMarkdown, inlineImages),
+    [displayMarkdown, inlineImages]
   );
 
   const components = useMemo(
@@ -372,7 +383,7 @@ export function MarkdownBodyContent({
   return (
     <div className={`article-markdown-body w-full max-w-full ${wrapperClassName || ''}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>
-        {markdown}
+        {displayMarkdown}
       </ReactMarkdown>
     </div>
   );
