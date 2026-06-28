@@ -28,6 +28,10 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = await getArticleBySlug(params.slug);
   if (!article) return { title: 'Article not found | Ground View News' };
+  const featuredImageUrl =
+    typeof article.featured_image_url === 'string' && article.featured_image_url.trim() !== ''
+      ? article.featured_image_url
+      : '';
 
   return {
     title: `${article.title} | Ground View News`,
@@ -38,13 +42,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'article',
       publishedTime: article.published_at,
       authors: article.author_name ? [article.author_name] : undefined,
-      images: article.featured_image_url ? [{ url: article.featured_image_url }] : undefined,
+      images: featuredImageUrl ? [{ url: featuredImageUrl }] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt || article.subtitle || '',
-      images: article.featured_image_url ? [article.featured_image_url] : undefined,
+      images: featuredImageUrl ? [featuredImageUrl] : undefined,
     },
   };
 }
@@ -53,12 +57,16 @@ export default async function ArticlePage({ params }: Props) {
   const article = await getArticleBySlug(params.slug);
   if (!article) notFound();
 
+  const legacyFeaturedImageUrl =
+    typeof article.featured_image_url === 'string' && article.featured_image_url.trim() !== ''
+      ? article.featured_image_url
+      : '';
   const articleImages = Array.isArray(article.article_images)
     ? article.article_images
         .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
         .slice(0, 3)
     : [];
-  const heroImageUrl = articleImages[0] || article.featured_image_url || '';
+  const heroImageUrl = articleImages[0] || legacyFeaturedImageUrl;
   const inlineImages = articleImages.slice(1);
 
   const cookieStore = cookies();

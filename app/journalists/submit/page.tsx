@@ -329,7 +329,7 @@ function JournalistSubmitInner() {
       editorial_category: form.editorial_category,
       label: form.label,
       excerpt: form.excerpt.trim(),
-      featured_image_url: featuredImageUrl || null,
+      featured_image_url: featuredImageUrl.trim() ? featuredImageUrl : '',
       article_images: articleImages,
       body: markdownBodyPayload(form.bodyText),
       author_id: userId!,
@@ -780,13 +780,16 @@ function JournalistSubmitInner() {
                   }}
                 />
                 {imageNotice && (
-                  <p
-                    className={`mt-2 text-xs font-medium ${
-                      imageNotice.ok ? 'text-green-700' : 'text-red-600'
+                  <div
+                    role={imageNotice.ok ? 'status' : 'alert'}
+                    className={`mt-3 rounded-sm border px-3 py-2 text-xs font-medium ${
+                      imageNotice.ok
+                        ? 'border-green-200 bg-green-50 text-green-800'
+                        : 'border-red-200 bg-red-50 text-red-700'
                     }`}
                   >
                     {imageNotice.text}
-                  </p>
+                  </div>
                 )}
                 {imageUploadLoading && (
                   <p className="mt-2 text-xs font-medium text-gray-600">Uploading images…</p>
