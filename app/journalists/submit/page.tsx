@@ -29,6 +29,12 @@ const GOLD = '#D4AF37';
 const NAVY = '#0f1f3d';
 
 const NEED_JOURNALIST_ROLE_MSG = 'Add journalist role to your account to save and submit articles.';
+const DEFAULT_AUTHOR_NAME = 'Chrispen Nkosi, The Editor, Continental View | Ground View News';
+
+type AuthorOption = {
+  id: string;
+  name: string;
+};
 
 type FormState = {
   title: string;
@@ -45,7 +51,7 @@ type FormState = {
 const EMPTY_FORM: FormState = {
   title: '',
   subtitle: '',
-  pen_name: '',
+  pen_name: DEFAULT_AUTHOR_NAME,
   category: '',
   editorial_category: 'general',
   label: '',
@@ -86,6 +92,10 @@ function JournalistSubmitInner() {
   const [canSubmitAsJournalist, setCanSubmitAsJournalist] = useState(true);
   const [accountEmailHint, setAccountEmailHint] = useState('');
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
+  const [authorOptions, setAuthorOptions] = useState<AuthorOption[]>([
+    { id: 'default-editor', name: DEFAULT_AUTHOR_NAME },
+  ]);
+  const [selectedAuthorName, setSelectedAuthorName] = useState(DEFAULT_AUTHOR_NAME);
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bodyUiMode, setBodyUiMode] = useState<'write' | 'preview'>('write');
@@ -116,6 +126,57 @@ function JournalistSubmitInner() {
     await supabase.auth.signOut();
     router.push('/journalists/login');
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAuthors = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, pen_name, role, roles')
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error('[author-options] Could not load authors:', error.message);
+        return;
+      }
+
+      const fetched = (data || [])
+        .filter((profile) => {
+          const role = typeof profile.role === 'string' ? profile.role.toLowerCase() : '';
+          const roles = Array.isArray(profile.roles)
+            ? profile.roles.map((r) => String(r).toLowerCase())
+            : [];
+          return role === 'journalist' || role === 'admin' || roles.includes('journalist') || roles.includes('admin');
+        })
+        .map((profile) => {
+          const fullName = typeof profile.full_name === 'string' ? profile.full_name.trim() : '';
+          const penName = typeof profile.pen_name === 'string' ? profile.pen_name.trim() : '';
+          return {
+            id: String(profile.id),
+            name: fullName || penName,
+          };
+        })
+        .filter((author): author is AuthorOption => Boolean(author.id && author.name));
+
+      const seen = new Set<string>([DEFAULT_AUTHOR_NAME]);
+      const deduped = fetched.filter((author) => {
+        if (seen.has(author.name)) return false;
+        seen.add(author.name);
+        return true;
+      });
+
+      if (!cancelled) {
+        setAuthorOptions([{ id: 'default-editor', name: DEFAULT_AUTHOR_NAME }, ...deduped]);
+      }
+    };
+
+    loadAuthors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const resolveImagesForSave = async () => {
     if (!accessToken) {
@@ -278,7 +339,7 @@ function JournalistSubmitInner() {
         setForm({
           title: article.title || '',
           subtitle: article.subtitle || '',
-          pen_name: article.author_name || pn || '',
+          pen_name: article.author_name || DEFAULT_AUTHOR_NAME,
           category: article.category || '',
           editorial_category:
             typeof (article as { editorial_category?: string }).editorial_category === 'string'
@@ -320,11 +381,20 @@ function JournalistSubmitInner() {
     setSubmissionSuccess(null);
   };
 
+  const handleAuthorSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const authorName = e.target.value;
+    setSelectedAuthorName(authorName);
+    setForm((prev) => ({ ...prev, pen_name: authorName }));
+    setDraftSavedAt(null);
+    setPublishOutcome({ kind: 'idle' });
+    setSubmissionSuccess(null);
+  };
+
   const buildPayload = useCallback((articleImages: string[], featuredImageUrl: string) => {
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
-      author_name: form.pen_name.trim(),
+      author_name: form.pen_name.trim() || DEFAULT_AUTHOR_NAME,
       category: form.category,
       editorial_category: form.editorial_category,
       label: form.label,
@@ -798,7 +868,21 @@ function JournalistSubmitInner() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">
-                  Pen Name * <span className="font-normal text-gray-400">(as shown on articles)</span>
+                  Select author
+                </label>
+                <select
+                  value={selectedAuthorName}
+                  onChange={handleAuthorSelect}
+                  className="w-full border border-gray-300 rounded-sm px-3 py-2.5 text-sm bg-white"
+                >
+                  {authorOptions.map((author) => (
+                    <option key={author.id} value={author.name}>
+                      {author.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mt-3 mb-1">
+                  Author name (editable)
                 </label>
                 <input
                   type="text"

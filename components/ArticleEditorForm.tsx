@@ -24,7 +24,15 @@ import {
   uploadArticleImages,
   validateArticleImage,
 } from '@/lib/article-image-upload';
+import { supabase } from '@/lib/supabase';
 import { Save, Globe, ArrowLeft, Eye, X, Trash2 } from 'lucide-react';
+
+const DEFAULT_AUTHOR_NAME = 'Chrispen Nkosi, The Editor, Continental View | Ground View News';
+
+type AuthorOption = {
+  id: string;
+  name: string;
+};
 
 type ArticleForm = {
   title: string;
@@ -45,7 +53,7 @@ type Props = {
 const EMPTY_FORM: ArticleForm = {
   title: '',
   subtitle: '',
-  author_name: 'Ground View Editor',
+  author_name: DEFAULT_AUTHOR_NAME,
   category: 'opinion-commentary',
   label: 'Commentary',
   excerpt: '',
@@ -96,6 +104,10 @@ export default function ArticleEditorForm({ articleId }: Props) {
     null,
   ]);
   const [articleImagesTouched, setArticleImagesTouched] = useState(false);
+  const [authorOptions, setAuthorOptions] = useState<AuthorOption[]>([
+    { id: 'default-editor', name: DEFAULT_AUTHOR_NAME },
+  ]);
+  const [selectedAuthorName, setSelectedAuthorName] = useState(DEFAULT_AUTHOR_NAME);
 
   const loadArticle = useCallback(async () => {
     if (!articleId) return;
@@ -136,7 +148,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setForm({
       title: String(data.title || ''),
       subtitle: String(data.subtitle || ''),
-      author_name: String(data.author_name || 'Ground View Editor'),
+      author_name: String(data.author_name || DEFAULT_AUTHOR_NAME),
       category: normalizeArticleCategory(
         typeof data.category === 'string' ? data.category : undefined
       ),
@@ -155,6 +167,57 @@ export default function ArticleEditorForm({ articleId }: Props) {
     if (!isEdit) return;
     loadArticle();
   }, [isEdit, loadArticle]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAuthors = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, pen_name, role, roles')
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error('[author-options] Could not load authors:', error.message);
+        return;
+      }
+
+      const fetched = (data || [])
+        .filter((profile) => {
+          const role = typeof profile.role === 'string' ? profile.role.toLowerCase() : '';
+          const roles = Array.isArray(profile.roles)
+            ? profile.roles.map((r) => String(r).toLowerCase())
+            : [];
+          return role === 'journalist' || role === 'admin' || roles.includes('journalist') || roles.includes('admin');
+        })
+        .map((profile) => {
+          const fullName = typeof profile.full_name === 'string' ? profile.full_name.trim() : '';
+          const penName = typeof profile.pen_name === 'string' ? profile.pen_name.trim() : '';
+          return {
+            id: String(profile.id),
+            name: fullName || penName,
+          };
+        })
+        .filter((author): author is AuthorOption => Boolean(author.id && author.name));
+
+      const seen = new Set<string>([DEFAULT_AUTHOR_NAME]);
+      const deduped = fetched.filter((author) => {
+        if (seen.has(author.name)) return false;
+        seen.add(author.name);
+        return true;
+      });
+
+      if (!cancelled) {
+        setAuthorOptions([{ id: 'default-editor', name: DEFAULT_AUTHOR_NAME }, ...deduped]);
+      }
+    };
+
+    loadAuthors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = previewOpen ? 'hidden' : '';
@@ -201,6 +264,13 @@ export default function ArticleEditorForm({ articleId }: Props) {
     }
   };
 
+  const handleAuthorSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const authorName = e.target.value;
+    setSelectedAuthorName(authorName);
+    setForm((prev) => ({ ...prev, author_name: authorName }));
+    setSaveStatus('idle');
+  };
+
   const buildContentPayload = (articleImages: string[], featuredImageUrl: string) => {
     const body = markdownBodyPayload(form.bodyText);
     const category = normalizeArticleCategory(form.category);
@@ -208,7 +278,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     return {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
-      author_name: form.author_name.trim() || 'Ground View Editor',
+      author_name: form.author_name.trim() || DEFAULT_AUTHOR_NAME,
       category,
       label,
       excerpt: form.excerpt.trim(),
@@ -382,7 +452,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     const payload = {
       title: form.title.trim(),
       subtitle: form.subtitle.trim(),
-      author_name: form.author_name.trim() || 'Ground View Editor',
+      author_name: form.author_name.trim() || DEFAULT_AUTHOR_NAME,
       category,
       label,
       excerpt: form.excerpt.trim(),
@@ -839,7 +909,21 @@ export default function ArticleEditorForm({ articleId }: Props) {
 
           <div className="bg-white border border-gray-200 rounded-sm p-5">
             <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">
-              Author Name
+              Select author
+            </label>
+            <select
+              value={selectedAuthorName}
+              onChange={handleAuthorSelect}
+              className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 bg-white transition-colors"
+            >
+              {authorOptions.map((author) => (
+                <option key={author.id} value={author.name}>
+                  {author.name}
+                </option>
+              ))}
+            </select>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mt-4 mb-2">
+              Author name (editable)
             </label>
             <input
               type="text"
@@ -847,7 +931,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
               value={form.author_name}
               onChange={handleField}
               className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
-              placeholder="Ground View Editor"
+              placeholder={DEFAULT_AUTHOR_NAME}
             />
           </div>
 
