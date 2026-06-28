@@ -50,7 +50,7 @@ function normalizeArticleImages(value: unknown): ArticleImage[] {
 }
 
 function imageCaption(image: ArticleImage, index: number, title: string): string {
-  return image.caption.trim() || `Image ${index + 1}: ${title}`;
+  return image.caption.trim() || title;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
