@@ -81,6 +81,37 @@ function previewCaption(image: ArticleImage, index: number, title: string): stri
   return image.caption.trim() || `Image ${index + 1} — ${title || 'Untitled'}`;
 }
 
+function validateArticleImageCaptionsForSlots(
+  urls: Array<string | null>,
+  files: Array<File | null>,
+  captions: string[]
+): string[] {
+  const errors = ['', '', ''];
+  const imageSlots = [0, 1, 2].filter((index) => Boolean(urls[index] || files[index]));
+  if (imageSlots.length <= 1) return errors;
+
+  const seen = new Map<string, number>();
+  imageSlots.forEach((index) => {
+    const caption = captions[index]?.trim() || '';
+    if (!caption) {
+      errors[index] = `Caption is required for image ${index + 1}`;
+      return;
+    }
+
+    const key = caption.toLowerCase();
+    const firstMatch = seen.get(key);
+    if (firstMatch !== undefined) {
+      const message = `Each image must have a unique caption (image ${firstMatch + 1} and image ${index + 1} match)`;
+      errors[firstMatch] = message;
+      errors[index] = message;
+      return;
+    }
+    seen.set(key, index);
+  });
+
+  return errors;
+}
+
 type FormState = {
   title: string;
   subtitle: string;
@@ -131,6 +162,7 @@ function JournalistSubmitInner() {
     null,
   ]);
   const [articleImageCaptions, setArticleImageCaptions] = useState(['', '', '']);
+  const [articleImageCaptionErrors, setArticleImageCaptionErrors] = useState(['', '', '']);
   const [articleImagesTouched, setArticleImagesTouched] = useState(false);
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -478,6 +510,14 @@ function JournalistSubmitInner() {
       setBootError(NEED_JOURNALIST_ROLE_MSG);
       return;
     }
+    const captionErrors = validateArticleImageCaptionsForSlots(
+      articleImageUrls,
+      articleImageFiles,
+      articleImageCaptions
+    );
+    setArticleImageCaptionErrors(captionErrors);
+    if (captionErrors.some(Boolean)) return;
+
     setLoadingDraftSave(true);
     try {
       const images = await resolveImagesForSave();
@@ -544,6 +584,14 @@ function JournalistSubmitInner() {
 
     setFieldErrors(errs);
     if (errs.length) return;
+
+    const captionErrors = validateArticleImageCaptionsForSlots(
+      articleImageUrls,
+      articleImageFiles,
+      articleImageCaptions
+    );
+    setArticleImageCaptionErrors(captionErrors);
+    if (captionErrors.some(Boolean)) return;
 
     setLoadingPublish(true);
     setPublishOutcome({ kind: 'idle' });
@@ -891,6 +939,9 @@ function JournalistSubmitInner() {
                     setArticleImageFiles((prev) =>
                       prev.map((current, slot) => (slot === index ? file : current))
                     );
+                    setArticleImageCaptionErrors((prev) =>
+                      prev.map((error, slot) => (slot === index ? '' : error))
+                    );
                     setArticleImagesTouched(true);
                     setImageNotice(null);
                   }}
@@ -903,6 +954,9 @@ function JournalistSubmitInner() {
                     );
                     setArticleImageCaptions((prev) =>
                       prev.map((caption, slot) => (slot === index ? '' : caption))
+                    );
+                    setArticleImageCaptionErrors((prev) =>
+                      prev.map((error, slot) => (slot === index ? '' : error))
                     );
                     setArticleImagesTouched(true);
                     setImageNotice(null);
@@ -924,11 +978,19 @@ function JournalistSubmitInner() {
                             setArticleImageCaptions((prev) =>
                               prev.map((caption, slot) => (slot === index ? value : caption))
                             );
+                            setArticleImageCaptionErrors((prev) =>
+                              prev.map((error, slot) => (slot === index ? '' : error))
+                            );
                             setArticleImagesTouched(true);
                           }}
                           className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
                           placeholder={`Caption for image ${index + 1}`}
                         />
+                        {articleImageCaptionErrors[index] && (
+                          <p className="mt-1 text-xs font-medium text-red-600">
+                            {articleImageCaptionErrors[index]}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div key={index} aria-hidden />

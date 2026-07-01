@@ -45,7 +45,7 @@ function articleCardHtml(a: ArticleRow): string {
   const title = escapeHtml(a.title || 'Untitled');
   const category = a.category ? escapeHtml(a.category) : '';
   const excerpt = a.excerpt ? escapeHtml(a.excerpt) : '';
-  const href = `${SITE}/article/${encodeURIComponent(a.slug)}`;
+  const href = `${SITE}/articles/${encodeURIComponent(a.slug)}`;
   return `
 <tr><td style="padding:18px 0;border-bottom:1px solid #eee;">
   ${category ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#b8860b;margin-bottom:6px;">${category}</div>` : ''}

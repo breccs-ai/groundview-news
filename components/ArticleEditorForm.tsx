@@ -78,6 +78,37 @@ function previewCaption(image: ArticleImage, index: number, title: string): stri
   return image.caption.trim() || `Image ${index + 1} — ${title || 'Untitled'}`;
 }
 
+function validateArticleImageCaptionsForSlots(
+  urls: Array<string | null>,
+  files: Array<File | null>,
+  captions: string[]
+): string[] {
+  const errors = ['', '', ''];
+  const imageSlots = [0, 1, 2].filter((index) => Boolean(urls[index] || files[index]));
+  if (imageSlots.length <= 1) return errors;
+
+  const seen = new Map<string, number>();
+  imageSlots.forEach((index) => {
+    const caption = captions[index]?.trim() || '';
+    if (!caption) {
+      errors[index] = `Caption is required for image ${index + 1}`;
+      return;
+    }
+
+    const key = caption.toLowerCase();
+    const firstMatch = seen.get(key);
+    if (firstMatch !== undefined) {
+      const message = `Each image must have a unique caption (image ${firstMatch + 1} and image ${index + 1} match)`;
+      errors[firstMatch] = message;
+      errors[index] = message;
+      return;
+    }
+    seen.set(key, index);
+  });
+
+  return errors;
+}
+
 type ArticleForm = {
   title: string;
   subtitle: string;
@@ -148,6 +179,7 @@ export default function ArticleEditorForm({ articleId }: Props) {
     null,
   ]);
   const [articleImageCaptions, setArticleImageCaptions] = useState(['', '', '']);
+  const [articleImageCaptionErrors, setArticleImageCaptionErrors] = useState(['', '', '']);
   const [articleImagesTouched, setArticleImagesTouched] = useState(false);
   const [authorOptions, setAuthorOptions] = useState<AuthorOption[]>([
     { id: 'default-editor', name: DEFAULT_AUTHOR_NAME },
@@ -355,6 +387,19 @@ export default function ArticleEditorForm({ articleId }: Props) {
     setSaving(true);
     setSaveStatus('idle');
 
+    const captionErrors = validateArticleImageCaptionsForSlots(
+      articleImageUrls,
+      articleImageFiles,
+      articleImageCaptions
+    );
+    setArticleImageCaptionErrors(captionErrors);
+    if (captionErrors.some(Boolean)) {
+      setSaving(false);
+      setSaveMsg('Please fix image caption errors before saving.');
+      setSaveStatus('error');
+      return;
+    }
+
     const images = await resolveImagesForSave();
     const content = buildContentPayload(images.articleImages, images.featuredImageUrl);
     const res = await fetch('/api/articles', {
@@ -383,6 +428,18 @@ export default function ArticleEditorForm({ articleId }: Props) {
     if (!articleId) return;
     if (!form.title.trim()) {
       setSaveMsg('Title is required.');
+      setSaveStatus('error');
+      return;
+    }
+
+    const captionErrors = validateArticleImageCaptionsForSlots(
+      articleImageUrls,
+      articleImageFiles,
+      articleImageCaptions
+    );
+    setArticleImageCaptionErrors(captionErrors);
+    if (captionErrors.some(Boolean)) {
+      setSaveMsg('Please fix image caption errors before publishing.');
       setSaveStatus('error');
       return;
     }
@@ -490,6 +547,18 @@ export default function ArticleEditorForm({ articleId }: Props) {
   const saveNewArticle = async (publishNow?: boolean) => {
     if (!form.title.trim()) {
       setSaveMsg('Title is required.');
+      setSaveStatus('error');
+      return;
+    }
+
+    const captionErrors = validateArticleImageCaptionsForSlots(
+      articleImageUrls,
+      articleImageFiles,
+      articleImageCaptions
+    );
+    setArticleImageCaptionErrors(captionErrors);
+    if (captionErrors.some(Boolean)) {
+      setSaveMsg('Please fix image caption errors before saving.');
       setSaveStatus('error');
       return;
     }
@@ -1016,6 +1085,9 @@ export default function ArticleEditorForm({ articleId }: Props) {
                 setArticleImageFiles((prev) =>
                   prev.map((current, slot) => (slot === index ? file : current))
                 );
+                setArticleImageCaptionErrors((prev) =>
+                  prev.map((error, slot) => (slot === index ? '' : error))
+                );
                 setArticleImagesTouched(true);
                 setImageNotice(null);
               }}
@@ -1028,6 +1100,9 @@ export default function ArticleEditorForm({ articleId }: Props) {
                 );
                 setArticleImageCaptions((prev) =>
                   prev.map((caption, slot) => (slot === index ? '' : caption))
+                );
+                setArticleImageCaptionErrors((prev) =>
+                  prev.map((error, slot) => (slot === index ? '' : error))
                 );
                 setArticleImagesTouched(true);
                 setImageNotice(null);
@@ -1049,11 +1124,19 @@ export default function ArticleEditorForm({ articleId }: Props) {
                         setArticleImageCaptions((prev) =>
                           prev.map((caption, slot) => (slot === index ? value : caption))
                         );
+                        setArticleImageCaptionErrors((prev) =>
+                          prev.map((error, slot) => (slot === index ? '' : error))
+                        );
                         setArticleImagesTouched(true);
                       }}
                       className="w-full border border-gray-200 rounded-sm px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-blue-800 transition-colors"
                       placeholder={`Caption for image ${index + 1}`}
                     />
+                    {articleImageCaptionErrors[index] && (
+                      <p className="mt-1 text-xs font-medium text-red-600">
+                        {articleImageCaptionErrors[index]}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div key={index} aria-hidden />

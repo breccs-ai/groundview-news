@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
   revalidatePath('/category/commentary');
 
   if (slug) {
-    revalidatePath(`/article/${slug}`);
     revalidatePath(`/articles/${slug}`);
   }
 

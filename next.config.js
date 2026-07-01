@@ -41,6 +41,11 @@ const nextConfig = {
         destination: '/advertiser/dashboard',
         permanent: true,
       },
+      {
+        source: '/article/:slug*',
+        destination: '/articles/:slug*',
+        permanent: true,
+      },
     ];
   },
 };

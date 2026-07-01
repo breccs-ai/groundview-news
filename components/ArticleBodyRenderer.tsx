@@ -133,9 +133,11 @@ function buildMarkdownComponents(
                   className="mx-auto block h-auto max-h-[640px] w-auto max-w-full rounded-sm"
                   loading="lazy"
                 />
-                <figcaption className="mt-2 min-h-[1.25rem] text-center text-sm italic text-gray-500">
-                  {placement.image.caption}
-                </figcaption>
+                {placement.image.caption && (
+                  <figcaption className="mt-2 text-center text-sm italic text-gray-500">
+                    {placement.image.caption}
+                  </figcaption>
+                )}
               </figure>
             ))}
           </>

@@ -49,8 +49,10 @@ function normalizeArticleImages(value: unknown): ArticleImage[] {
     .slice(0, 3);
 }
 
-function imageCaption(image: ArticleImage, index: number, title: string): string {
-  return image.caption.trim() || title;
+function imageCaption(image: ArticleImage, imageCount: number, title: string): string {
+  const caption = image.caption.trim();
+  if (caption) return caption;
+  return imageCount === 1 ? title : '';
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -91,11 +93,12 @@ export default async function ArticlePage({ params }: Props) {
       : '';
   const articleImages = normalizeArticleImages(article.article_images);
   const heroImage = articleImages[0] || (legacyFeaturedImageUrl ? { url: legacyFeaturedImageUrl, caption: '' } : null);
+  const imageCount = articleImages.length || (heroImage ? 1 : 0);
   const inlineImages = articleImages
     .slice(1)
-    .map((image, index) => ({
+    .map((image) => ({
       ...image,
-      caption: imageCaption(image, index + 1, article.title),
+      caption: imageCaption(image, imageCount, article.title),
     }));
 
   const cookieStore = cookies();
@@ -162,9 +165,11 @@ export default async function ArticlePage({ params }: Props) {
                 alt={article.title}
                 className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
               />
-              <figcaption className="mt-2 text-center text-sm italic text-gray-500">
-                {imageCaption(heroImage, 0, article.title)}
-              </figcaption>
+              {imageCaption(heroImage, imageCount, article.title) && (
+                <figcaption className="mt-2 text-center text-sm italic text-gray-500">
+                  {imageCaption(heroImage, imageCount, article.title)}
+                </figcaption>
+              )}
             </figure>
           </div>
         )}

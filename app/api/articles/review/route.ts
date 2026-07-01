@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/email';
 import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/lib/article-markdown';
 import { CATEGORIES } from '@/lib/supabase';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
+import { articleCanonicalUrl, articlePublicPath } from '@/lib/article-public-url';
 
 type ReviewOutcome = 'published' | 'pending' | 'pending_editorial' | 'rejected';
 
@@ -289,10 +290,12 @@ async function sendOutcomeEmail(args: {
   if (!args.to) return;
 
   if (args.outcome === 'published') {
+    const canonicalUrl = articleCanonicalUrl(args.slug);
+    const canonicalPath = articlePublicPath(args.slug);
     await sendEmail(
       args.to,
       `Your article has been published: ${args.title}`,
-      `<p>Your article '<strong>${escapeHtml(args.title)}</strong>' has been published at <a href="https://groundviewnews.com/article/${escapeHtml(args.slug)}">groundviewnews.com/article/${escapeHtml(args.slug)}</a>.</p>`
+      `<p>Your article '<strong>${escapeHtml(args.title)}</strong>' has been published at <a href="${escapeHtml(canonicalUrl)}">${escapeHtml(canonicalPath.replace(/^\//, 'groundviewnews.com/'))}</a>.</p>`
     );
     return;
   }

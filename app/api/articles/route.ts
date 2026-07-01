@@ -85,6 +85,34 @@ function applyEarlyAccessPublishAt(payload: Record<string, unknown>): void {
   payload.publish_at = new Date(publishedAt.getTime() + EARLY_ACCESS_WINDOW_MS).toISOString();
 }
 
+function validateArticleImageCaptions(payload: Record<string, unknown>): string | null {
+  if (!Object.prototype.hasOwnProperty.call(payload, 'article_images')) return null;
+  const value = payload.article_images;
+  if (!Array.isArray(value) || value.length <= 1) return null;
+
+  const seen = new Map<string, number>();
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    const caption =
+      entry && typeof entry === 'object' && typeof (entry as { caption?: unknown }).caption === 'string'
+        ? (entry as { caption: string }).caption.trim()
+        : '';
+
+    if (!caption) {
+      return `Caption is required for image ${index + 1}.`;
+    }
+
+    const key = caption.toLowerCase();
+    const firstMatch = seen.get(key);
+    if (firstMatch !== undefined) {
+      return `Each image must have a unique caption (image ${firstMatch + 1} and image ${index + 1} match).`;
+    }
+    seen.set(key, index);
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const actor = await resolveArticlesActor(req);
@@ -137,6 +165,10 @@ export async function POST(req: NextRequest) {
     }
 
     let payload = { ...(incoming as Record<string, unknown>) };
+    const imageCaptionError = validateArticleImageCaptions(payload);
+    if (imageCaptionError) {
+      return NextResponse.json({ error: imageCaptionError }, { status: 400 });
+    }
 
     if (actor.kind === 'journalist') {
       const aid = payload.author_id;
@@ -266,6 +298,10 @@ export async function PATCH(req: NextRequest) {
 
     const { id, ...payload } = body as { id?: string } & Record<string, unknown>;
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    const imageCaptionError = validateArticleImageCaptions(payload);
+    if (imageCaptionError) {
+      return NextResponse.json({ error: imageCaptionError }, { status: 400 });
+    }
 
     const p = payload as Record<string, unknown>;
     if (Object.prototype.hasOwnProperty.call(p, 'label')) {
