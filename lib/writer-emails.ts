@@ -92,7 +92,10 @@ export function applicationApprovedEmail(args: {
       <li style="margin-bottom:6px;">Our editors review it. If approved, you will receive an email from us.</li>
       <li style="margin-bottom:6px;">You then <strong>click Publish</strong> from your dashboard to take it live.</li>
     </ol>
-    <p>We are looking forward to reading your work.</p>
+    <p><strong>How writer earnings work:</strong> Ground View News maintains a writer share pool funded from net advertising revenue. Your share is based on meaningful reader engagement with your published articles, so earnings vary with advertising income and article performance and are not guaranteed.</p>
+    <p>Your dashboard shows your monthly earnings, available balance, payment requests, and payout instructions. You can choose bank transfer, Wise, PayPal, mobile money, another remittance service, or describe another suitable method. We never require you to have a Stripe account.</p>
+    <p>Our first priority is thoughtful, credible journalism. If you are proud of an article, you are welcome to share it with your community. You may also introduce appropriate advertising partners, but neither activity is required and neither affects editorial decisions.</p>
+    <p>We are looking forward to reading your work and building Ground View News together.</p>
   `);
   return { subject, html };
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { validateWriterApplicationContent } from '@/lib/writer-application-validation';
+import { enforceWriterApplicationRateLimit } from '@/lib/writer-application-rate-limit';
 
 function getServiceSupabase() {
   return createClient(
@@ -12,14 +14,20 @@ function getServiceSupabase() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, email, full_name, pen_name, bio, expertise } = body as {
+    const { id, email, full_name, pen_name, bio, expertise, website } = body as {
       id?: string;
       email?: string;
       full_name?: string;
       pen_name?: string;
       bio?: string;
       expertise?: string[];
+      website?: string;
     };
+
+    // Honeypot: silently accept and discard bot submissions before any database work.
+    if (String(website || '').trim()) {
+      return NextResponse.json({ success: true, existing: false });
+    }
 
     if (!id || !email) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
@@ -33,7 +41,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please select at least one area of expertise.' }, { status: 400 });
     }
 
+    const fullName = String(full_name).trim();
+    const penName = String(pen_name).trim();
+    const bioText = String(bio).trim();
+    const contentValidation = validateWriterApplicationContent({
+      fullName,
+      penName,
+      bio: bioText,
+    });
+    if (!contentValidation.valid) {
+      return NextResponse.json({ error: contentValidation.error }, { status: 400 });
+    }
+
     const supabase = getServiceSupabase();
+    const rateLimitResponse = await enforceWriterApplicationRateLimit(req, supabase);
+    if (rateLimitResponse) return rateLimitResponse;
     const emailNorm = String(email).trim().toLowerCase();
 
     const { data: existing } = await supabase
@@ -64,9 +86,9 @@ export async function POST(req: NextRequest) {
       const sub = (existingRow.subscription_status || '').toLowerCase();
       const update: Record<string, unknown> = {
         roles: currentRoles,
-        full_name,
-        pen_name,
-        bio,
+        full_name: fullName,
+        pen_name: penName,
+        bio: bioText,
         expertise,
       };
       if (sub !== 'active') {
@@ -79,7 +101,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: upErr.message }, { status: 400 });
       }
 
-      await sendJournalistDigestEmail(emailNorm, full_name, pen_name, expertise);
+      await sendJournalistDigestEmail(emailNorm, fullName, penName, expertise);
 
       return NextResponse.json({
         existing: true,
@@ -90,9 +112,9 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from('profiles').insert({
       id,
       email: emailNorm,
-      full_name,
-      pen_name,
-      bio,
+      full_name: fullName,
+      pen_name: penName,
+      bio: bioText,
       role: 'journalist',
       roles: ['journalist'],
       subscription_status: 'pending_approval',
@@ -104,7 +126,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    await sendJournalistDigestEmail(emailNorm, full_name, pen_name, expertise);
+    await sendJournalistDigestEmail(emailNorm, fullName, penName, expertise);
 
     return NextResponse.json({ success: true, existing: false });
   } catch (err) {

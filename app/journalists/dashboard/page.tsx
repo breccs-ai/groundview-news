@@ -9,6 +9,7 @@ import CategoryBadge from '@/components/CategoryBadge';
 import { supabase, getCategoryMeta } from '@/lib/supabase';
 import { hasJournalistRole } from '@/lib/profile-roles';
 import { Plus, Eye, Pencil, ChevronDown, MessageSquare, Send } from 'lucide-react';
+import RemunerationPanel from '@/components/writer/RemunerationPanel';
 
 const GOLD = '#D4AF37';
 const NAVY = '#0f1f3d';
@@ -311,7 +312,7 @@ export default function JournalistDashboardPage() {
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-10">
           {/* Quick actions */}
-          <section className="flex flex-wrap gap-3 items-center">
+          {isApproved && <section className="flex flex-wrap gap-3 items-center">
             <Link
               href="/journalists/submit"
               className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-sm text-[#1a1a1a] shadow-sm transition-colors hover:opacity-95"
@@ -339,7 +340,7 @@ export default function JournalistDashboardPage() {
               <MessageSquare size={16} />
               Share feedback
             </Link>
-          </section>
+          </section>}
 
           {/* Account status */}
           {profile && (
@@ -420,6 +421,8 @@ export default function JournalistDashboardPage() {
               </div>
             </div>
           </section>
+
+          {isApproved && <RemunerationPanel />}
 
           {/* Articles */}
           <section>

@@ -39,6 +39,7 @@ function JournalistRegisterInner() {
     confirm: '',
     bio: '',
     expertise: [] as ExpertiseOption[],
+    website: '',
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -120,6 +121,7 @@ function JournalistRegisterInner() {
         pen_name: form.pen_name,
         bio: form.bio,
         expertise: form.expertise,
+        website: form.website,
       }),
     });
 
@@ -187,6 +189,21 @@ function JournalistRegisterInner() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
+            <div
+              className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+              aria-hidden="true"
+            >
+              <label htmlFor="journalist-website">Website</label>
+              <input
+                id="journalist-website"
+                type="text"
+                name="website"
+                value={form.website}
+                onChange={handleChange}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">Full Name *</label>

@@ -47,14 +47,14 @@ export default function TermsOfUsePage() {
           <div>
             <p className="text-sm text-gray-700 leading-relaxed mb-10">
               Please read these Terms of Use carefully before using the Ground View News website
-              located at <strong>groundviewnews.com</strong> (the "Website"). By accessing or using
+              located at <strong>groundviewnews.com</strong> (the &quot;Website&quot;). By accessing or using
               the Website, you agree to be bound by these Terms. If you do not agree, please do not
               use the Website.
             </p>
 
             <Section title="1. About Ground View News">
               <p>
-                Ground View News ("we", "us", "our") is an independent digital publication providing
+                Ground View News (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is an independent digital publication providing
                 commentary, analysis, and reporting on global affairs, Africa, the African diaspora,
                 human rights, world politics, and the global economy. We operate the Website as a
                 journalistic and editorial platform.
@@ -183,7 +183,7 @@ export default function TermsOfUsePage() {
                   connected systems.
                 </li>
                 <li>
-                  Interfere with the operation of the Website or disrupt other users' experience.
+                  Interfere with the operation of the Website or disrupt other users&apos; experience.
                 </li>
                 <li>
                   Transmit unsolicited communications, spam, or malicious software.
@@ -199,7 +199,7 @@ export default function TermsOfUsePage() {
                 The Website may contain links to third-party websites for reference or context. These
                 links are provided for your convenience only. We have no control over the content or
                 availability of those sites and accept no responsibility or liability for them.
-                Linking to a third-party site does not constitute endorsement of that site's views or
+                Linking to a third-party site does not constitute endorsement of that site&apos;s views or
                 content.
               </p>
             </Section>
@@ -224,7 +224,7 @@ export default function TermsOfUsePage() {
 
             <Section title="11. Disclaimer of Warranties">
               <p>
-                The Website and all content are provided on an "as is" and "as available" basis
+                The Website and all content are provided on an &quot;as is&quot; and &quot;as available&quot; basis
                 without warranties of any kind, express or implied. We do not warrant that the Website
                 will be uninterrupted, error-free, or free of viruses or other harmful components.
               </p>

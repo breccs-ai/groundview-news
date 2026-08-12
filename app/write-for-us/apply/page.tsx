@@ -51,6 +51,7 @@ type FormState = {
   bio: string;
   categories: CategoryOption[];
   how_heard_about: string;
+  website: string;
 };
 
 const DEFAULT_DIAL = '44'; // United Kingdom default; updates when user picks country
@@ -67,6 +68,7 @@ export default function WriterApplyPage() {
     bio: '',
     categories: [],
     how_heard_about: '',
+    website: '',
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -143,6 +145,7 @@ export default function WriterApplyPage() {
         bio: form.bio.trim(),
         categories: form.categories,
         how_heard_about: form.how_heard_about || null,
+        website: form.website,
       }),
     });
     const body = await res.json().catch(() => ({}));
@@ -229,6 +232,21 @@ export default function WriterApplyPage() {
 
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div
+              className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+              aria-hidden="true"
+            >
+              <label htmlFor="writer-website">Website</label>
+              <input
+                id="writer-website"
+                type="text"
+                name="website"
+                value={form.website}
+                onChange={(e) => setField('website', e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <Field label="Full Name *">
                 <input

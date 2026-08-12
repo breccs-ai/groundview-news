@@ -6,6 +6,8 @@ import {
   applicationReceivedEmail,
   escapeHtml,
 } from '@/lib/writer-emails';
+import { validateWriterApplicationContent } from '@/lib/writer-application-validation';
+import { enforceWriterApplicationRateLimit } from '@/lib/writer-application-rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +29,7 @@ type ApplyBody = {
   bio?: string;
   categories?: string[];
   how_heard_about?: string | null;
+  website?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -35,6 +38,12 @@ export async function POST(req: NextRequest) {
     body = (await req.json()) as ApplyBody;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+  }
+
+  // Honeypot: legitimate users never see or populate this field. Return the same
+  // success shape as a real submission so automated clients are not alerted.
+  if (String(body.website || '').trim()) {
+    return NextResponse.json({ ok: true });
   }
 
   const full_name = String(body.full_name || '').trim();
@@ -65,10 +74,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bio must be 300 characters or less.' }, { status: 400 });
   }
 
+  const contentValidation = validateWriterApplicationContent({ fullName: full_name, penName: pen_name, bio });
+  if (!contentValidation.valid) {
+    return NextResponse.json({ error: contentValidation.error }, { status: 400 });
+  }
+
   const supabase = getServiceSupabase();
   if (!supabase) {
     return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 });
   }
+
+  const rateLimitResponse = await enforceWriterApplicationRateLimit(req, supabase);
+  if (rateLimitResponse) return rateLimitResponse;
 
   // Check whether this email already has an auth user.
   const { data: existingProfile } = await supabase
