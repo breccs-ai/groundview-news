@@ -64,6 +64,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: updateErr.message }, { status: 400 });
   }
 
+  await supabase
+    .from('journalist_approval_assignments')
+    .update({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+      decision: action,
+    })
+    .eq('application_journalist_id', journalist_id)
+    .eq('status', 'assigned');
+
   const profileRow = profile as {
     id: string;
     email: string;

@@ -10,6 +10,7 @@ import { supabase, getCategoryMeta } from '@/lib/supabase';
 import { hasJournalistRole } from '@/lib/profile-roles';
 import { Plus, Eye, Pencil, ChevronDown, MessageSquare, Send } from 'lucide-react';
 import RemunerationPanel from '@/components/writer/RemunerationPanel';
+import ApplicationReviewQueue from '@/components/writer/ApplicationReviewQueue';
 
 const GOLD = '#D4AF37';
 const NAVY = '#0f1f3d';
@@ -423,6 +424,8 @@ export default function JournalistDashboardPage() {
           </section>
 
           {isApproved && <RemunerationPanel />}
+
+          {isApproved && <ApplicationReviewQueue />}
 
           {/* Articles */}
           <section>

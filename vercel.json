@@ -4,6 +4,7 @@
     { "path": "/api/cron/calculate-revenue", "schedule": "0 2 1 * *" },
     { "path": "/api/cron/ad-reminders", "schedule": "0 9 * * *" },
     { "path": "/api/cron/expire-ads", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/weekly-newsletter", "schedule": "0 8 * * 1" }
+    { "path": "/api/cron/weekly-newsletter", "schedule": "0 8 * * 1" },
+    { "path": "/api/cron/journalist-approval-escalations", "schedule": "0 * * * *" }
   ]
 }
