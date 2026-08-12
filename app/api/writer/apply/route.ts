@@ -4,10 +4,10 @@ import { sendEmail } from '@/lib/email';
 import {
   WRITER_EMAIL_FROM,
   applicationReceivedEmail,
-  escapeHtml,
 } from '@/lib/writer-emails';
 import { validateWriterApplicationContent } from '@/lib/writer-application-validation';
 import { enforceWriterApplicationRateLimit } from '@/lib/writer-application-rate-limit';
+import { assignAndNotifyJournalistApplication, notifyOwnerOfApplication } from '@/lib/journalist-approval-workflow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   let userId: string | undefined = (existingProfile as { id?: string } | null)?.id;
+  let awaitingApproval = true;
 
   if (!userId) {
     const created = await supabase.auth.admin.createUser({
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
     const currentRoles = [...(existingRow.roles || []).map(String)];
     if (!currentRoles.includes('journalist')) currentRoles.push('journalist');
     const sub = (existingRow.subscription_status || '').toLowerCase();
+    awaitingApproval = sub !== 'active';
 
     const update: Record<string, unknown> = { ...baseProfile, roles: currentRoles };
     if (sub !== 'active') {
@@ -171,24 +173,11 @@ export async function POST(req: NextRequest) {
   const confirmation = applicationReceivedEmail({ fullName: full_name });
   await sendEmail(email, confirmation.subject, confirmation.html, WRITER_EMAIL_FROM);
 
-  // Notify the editorial inbox so admins can act quickly.
-  await sendEmail(
-    'info@groundviewnews.com',
-    'New writer application received',
-    `
-      <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height:1.5;">
-        <h2 style="margin:0 0 12px;">New writer application</h2>
-        <p style="margin:0 0 6px;"><strong>Name:</strong> ${escapeHtml(full_name)}</p>
-        <p style="margin:0 0 6px;"><strong>Pen name:</strong> ${escapeHtml(pen_name)}</p>
-        <p style="margin:0 0 6px;"><strong>Email:</strong> ${escapeHtml(email)}</p>
-        <p style="margin:0 0 6px;"><strong>Phone:</strong> ${escapeHtml(phone)}</p>
-        <p style="margin:0 0 6px;"><strong>Country:</strong> ${escapeHtml(country)}</p>
-        <p style="margin:0 0 6px;"><strong>Categories:</strong> ${escapeHtml(categories.join(', '))}</p>
-        ${how_heard_about ? `<p style="margin:0 0 6px;"><strong>Source:</strong> ${escapeHtml(how_heard_about)}</p>` : ''}
-        <p style="margin:12px 0 0;white-space:pre-wrap;">${escapeHtml(bio)}</p>
-      </div>
-    `.trim()
-  );
+  if (awaitingApproval) {
+    const applicant = { id: userId, email, full_name, pen_name };
+    await notifyOwnerOfApplication(applicant, 'A new application was submitted and is awaiting approval.');
+    await assignAndNotifyJournalistApplication(supabase, applicant);
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/email';
 import { validateWriterApplicationContent } from '@/lib/writer-application-validation';
 import { enforceWriterApplicationRateLimit } from '@/lib/writer-application-rate-limit';
+import { assignAndNotifyJournalistApplication, notifyOwnerOfApplication } from '@/lib/journalist-approval-workflow';
 
 function getServiceSupabase() {
   return createClient(
@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: upErr.message }, { status: 400 });
       }
 
-      await sendJournalistDigestEmail(emailNorm, fullName, penName, expertise);
+      if (sub !== 'active') {
+        await notifyAndAssign(supabase, id, emailNorm, fullName, penName);
+      }
 
       return NextResponse.json({
         existing: true,
@@ -126,7 +128,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    await sendJournalistDigestEmail(emailNorm, fullName, penName, expertise);
+    await notifyAndAssign(supabase, id, emailNorm, fullName, penName);
 
     return NextResponse.json({ success: true, existing: false });
   } catch (err) {
@@ -134,32 +136,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function sendJournalistDigestEmail(
+async function notifyAndAssign(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  id: string,
   emailNorm: string,
   full_name: string,
   pen_name: string,
-  expertise: string[],
 ) {
-  await sendEmail(
-    'info@groundviewnews.com',
-    'New journalist application received',
-    `
-        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
-          <h2 style="margin:0 0 12px;">New journalist application</h2>
-          <p style="margin:0 0 6px;"><strong>Name:</strong> ${escapeHtml(full_name)}</p>
-          <p style="margin:0 0 6px;"><strong>Pen name:</strong> ${escapeHtml(pen_name)}</p>
-          <p style="margin:0 0 6px;"><strong>Email:</strong> ${escapeHtml(emailNorm)}</p>
-          <p style="margin:0 0 6px;"><strong>Areas:</strong> ${escapeHtml(expertise.join(', '))}</p>
-        </div>
-      `.trim(),
-  );
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+  const applicant = { id, email: emailNorm, full_name, pen_name };
+  await notifyOwnerOfApplication(applicant, 'A new application was submitted and is awaiting approval.');
+  await assignAndNotifyJournalistApplication(supabase, applicant);
 }
