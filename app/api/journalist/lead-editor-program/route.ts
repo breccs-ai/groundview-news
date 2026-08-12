@@ -66,7 +66,23 @@ export async function POST(req: NextRequest) {
     writer.email,
     body.response === 'accept' ? 'Your Founding Lead Editor access is active' : 'Your Founding Lead Editor response',
     body.response === 'accept'
-      ? `<p>Thank you ${escapeHtml(writer.penName)}. You have accepted the Founding Lead Editor invitation.</p><p>Your private application-review queue is now active in your writer dashboard. Assignments are optional to accept as a programme participant but, while assigned, should be reviewed within 24 hours. Keep applicant information confidential and apply editorial standards independently.</p><p>Your existing writer access remains unchanged. The separate earnings-weighting stage is not active yet.</p>`
+      ? `<p>Congratulations ${escapeHtml(writer.penName)},</p>
+<p>You have completed the Founding Lead Editor acceptance process. Your restricted Lead Editor access is now active.</p>
+<p><a href="${escapeHtml(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com'}/journalists/dashboard#application-reviews`)}">Open your Lead Editor review queue</a></p>
+<h3>Your responsibilities</h3>
+<ul>
+  <li>Review only the writer applications assigned to your private queue.</li>
+  <li>Aim to decide each assignment within <strong>24 hours</strong>. If you cannot respond, it will move automatically to another Lead Editor.</li>
+  <li>Keep applicant names, contact details, biographies and other application information confidential.</li>
+  <li>Apply Ground View News editorial standards independently and consistently.</li>
+  <li>Do not approve yourself, someone with whom you have a conflict of interest, or anyone because of recruitment, advertising or financial considerations.</li>
+</ul>
+<h3>How to make a strong decision</h3>
+<p>Look for a credible identity, a coherent biography, relevant subject knowledge, a clear and responsible writing purpose, and evidence that the applicant can contribute thoughtful journalism. Reject or leave unapproved anything suspicious, misleading or outside your confidence. Quality and integrity matter more than speed or volume.</p>
+<h3>How Ground View News will support you</h3>
+<p>Your dashboard shows only work assigned to you. If an application is unfamiliar, sensitive or outside your expertise, do not guess; allow reassignment and contact <a href="mailto:info@breccs.com">info@breccs.com</a> for guidance. Your submitted confidence and support feedback will help us improve training and tools.</p>
+<p>Your existing writer access remains unchanged. Lead Editor status does not provide unrestricted administration, access to other writers' payment information, or authority to change editorial or financial policy. The separate 1.02 earnings-weighting stage is not active yet, and earnings are never guaranteed.</p>
+<p>Thank you for helping Ground View News build a credible, active and supportive contributor community.</p>`
       : `<p>Thank you ${escapeHtml(writer.penName)}. We have recorded that you declined the Founding Lead Editor invitation.</p><p>Your writer account, publishing access and existing earnings are unchanged.</p>`,
     WRITER_EMAIL_FROM,
   );
