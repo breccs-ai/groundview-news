@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { evaluateFoundingLeadEditorEligibility } from '@/lib/founding-lead-editor-program';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import { generateSlug, generateUniqueSlug } from '@/lib/slug';
@@ -252,6 +253,10 @@ export async function POST(req: NextRequest) {
 <p><strong>Author:</strong> ${bodyPayload.author_name || 'N/A'}</p>
 <p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${row.slug}">https://groundviewnews.com/articles/${row.slug}</a></p>`
           );
+          await evaluateFoundingLeadEditorEligibility(
+            supabase,
+            typeof payload.author_id === 'string' ? payload.author_id : null,
+          );
         }
 
         // STEP 7 — Response after successful Supabase insert.
@@ -320,6 +325,7 @@ export async function PATCH(req: NextRequest) {
     const supabase = getServiceSupabase();
     if (!supabase) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
 
+    let publishedAuthorId: string | null = null;
     if (actor.kind === 'journalist') {
       const { data: existing, error: fetchErr } = await supabase
         .from('articles')
@@ -331,6 +337,7 @@ export async function PATCH(req: NextRequest) {
       if (!existing?.author_id || existing.author_id !== actor.user.id) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
+      publishedAuthorId = existing.author_id;
       payload.author_id = actor.user.id;
       if (actor.user.email) payload.author_email = actor.user.email;
       if (payload.editorial_category === undefined || payload.editorial_category === null) {
@@ -345,6 +352,14 @@ export async function PATCH(req: NextRequest) {
     } else {
       const ec = normalizeEditorialCategory((payload as Record<string, unknown>).editorial_category);
       (payload as Record<string, unknown>).editorial_category = ec;
+      if (p.status === 'published') {
+        const { data: articleAuthor } = await supabase
+          .from('articles')
+          .select('author_id')
+          .eq('id', id)
+          .maybeSingle();
+        publishedAuthorId = articleAuthor?.author_id || null;
+      }
     }
 
     // Early-access window: server-applies publish_at when this PATCH flips
@@ -368,6 +383,7 @@ export async function PATCH(req: NextRequest) {
 <p><strong>Author:</strong> ${p.author_name || 'N/A'}</p>
 <p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${slug}">https://groundviewnews.com/articles/${slug}</a></p>`
       );
+      await evaluateFoundingLeadEditorEligibility(supabase, publishedAuthorId);
     }
 
     const statusOut = typeof payload.status === 'string' ? payload.status : undefined;
