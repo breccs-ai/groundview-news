@@ -87,5 +87,7 @@ export async function GET(req: NextRequest) {
 
   await sendEmail('info@groundviewnews.com', subject, html);
 
+  console.log(`[spam-monitor] checked=${rows.length} flagged=${flagged.length}`);
+
   return NextResponse.json({ ok: true, checked: rows.length, flagged: flagged.length });
 }
