@@ -6,7 +6,7 @@ import Footer from '@/components/Footer';
 import { CircleCheck as CheckCircle, Mail } from 'lucide-react';
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '', website: '' });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -32,7 +32,7 @@ export default function ContactPage() {
       setStatus('error');
     } else {
       setStatus('success');
-      setForm({ name: '', email: '', subject: '', message: '' });
+      setForm({ name: '', email: '', subject: '', message: '', website: '' });
     }
   };
 
@@ -143,6 +143,21 @@ export default function ContactPage() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  <div
+                    className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+                    aria-hidden="true"
+                  >
+                    <label htmlFor="contact-website">Website</label>
+                    <input
+                      id="contact-website"
+                      type="text"
+                      name="website"
+                      value={form.website}
+                      onChange={handleChange}
+                      tabIndex={-1}
+                      autoComplete="off"
+                    />
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">

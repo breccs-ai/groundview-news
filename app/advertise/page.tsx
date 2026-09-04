@@ -38,6 +38,7 @@ export default function AdvertisePage() {
     email: '',
     package_interest: '',
     message: '',
+    website: '',
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -64,7 +65,7 @@ export default function AdvertisePage() {
       setStatus('error');
     } else {
       setStatus('success');
-      setForm({ name: '', contact_name: '', email: '', package_interest: '', message: '' });
+      setForm({ name: '', contact_name: '', email: '', package_interest: '', message: '', website: '' });
     }
   };
 
@@ -188,6 +189,21 @@ export default function AdvertisePage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
+              <div
+                className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+                aria-hidden="true"
+              >
+                <label htmlFor="advertise-website">Website</label>
+                <input
+                  id="advertise-website"
+                  type="text"
+                  name="website"
+                  value={form.website}
+                  onChange={handleChange}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1.5">
