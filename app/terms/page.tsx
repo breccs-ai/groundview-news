@@ -47,14 +47,15 @@ export default function TermsPage() {
             Please read these Terms &amp; Conditions carefully before using the Ground View News
             website at <strong>groundviewnews.com</strong> (the &ldquo;Site&rdquo;). By accessing or
             using the Site in any way, you agree to be bound by these Terms. If you do not agree,
-            please do not use the Site. These Terms are governed by the laws of the Republic of
-            Ireland.
+            please do not use the Site. These Terms are governed by the laws of England and Wales.
           </p>
 
           <Section title="1. About Ground View News">
             <p>
               Ground View News (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is an
-              independent digital news commentary publication operated from the Republic of Ireland.
+              independent digital news commentary publication operated by{' '}
+              <strong>Breccs Private Limited</strong> (company number 15139888), registered in
+              England and Wales, with its registered office at 128 City Road, London, EC1V 2NX.
               The Site publishes commentary, opinion, and analysis on global affairs, including
               human rights, world politics, and the global economy, without geographic or political bias.
             </p>
@@ -143,8 +144,8 @@ export default function TermsPage() {
               All content published on the Site, including articles, editorials, commentary,
               analysis, headlines, photographs, graphics, illustrations, logos, and the site&rsquo;s
               overall design and layout, is the property of Ground View News or its contributing
-              authors and is protected by copyright law, including the Copyright and Related Rights
-              Act 2000 (Ireland) and applicable international copyright conventions.
+              authors and is protected by copyright law, including the Copyright, Designs and
+              Patents Act 1988 (UK) and applicable international copyright conventions.
             </p>
             <p>You may, for personal non-commercial use:</p>
             <ul className="list-disc pl-5 space-y-1">
@@ -205,8 +206,7 @@ export default function TermsPage() {
                 rights of any third party.
               </li>
               <li>
-                It is not defamatory, obscene, harassing, threatening, or unlawful under the laws of
-                Ireland, the EU, or the UK.
+                It is not defamatory, obscene, harassing, threatening, or unlawful under UK law.
               </li>
               <li>It does not contain malicious code, viruses, spam, or unsolicited advertising.</li>
             </ul>
@@ -288,8 +288,7 @@ export default function TermsPage() {
             <p>You agree not to use the Site to:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                Violate any applicable local, national, or international law or regulation,
-                including Irish law, EU law, and applicable UK law.
+                Violate any applicable UK law or regulation, or the law of your own jurisdiction.
               </li>
               <li>
                 Engage in conduct that is harmful, threatening, abusive, harassing, discriminatory,
@@ -331,7 +330,7 @@ export default function TermsPage() {
 
           <Section title="11. Limitation of Liability">
             <p>
-              To the fullest extent permitted by Irish and EU law, Ground View News, its editors,
+              To the fullest extent permitted by UK law, Ground View News, its editors,
               contributors, directors, and affiliates shall not be liable for any direct, indirect,
               incidental, special, consequential, or exemplary damages arising from:
             </p>
@@ -351,7 +350,7 @@ export default function TermsPage() {
             <p>
               Nothing in these Terms limits our liability for death or personal injury caused by our
               negligence, for fraud or fraudulent misrepresentation, or for any other liability that
-              cannot be excluded or limited under Irish or EU law.
+              cannot be excluded or limited under UK law.
             </p>
           </Section>
 
@@ -377,10 +376,10 @@ export default function TermsPage() {
           <Section title="14. Governing Law and Jurisdiction">
             <p>
               These Terms &amp; Conditions are governed by and construed in accordance with the laws
-              of the <strong>Republic of Ireland</strong>. Any dispute arising out of or in connection
+              of <strong>England and Wales</strong>. Any dispute arising out of or in connection
               with these Terms shall be subject to the exclusive jurisdiction of the courts of
-              Ireland, without prejudice to your rights as a consumer under the law of your country
-              of residence where applicable.
+              England and Wales, without prejudice to your rights as a consumer under the law of your
+              country of residence where applicable.
             </p>
           </Section>
 

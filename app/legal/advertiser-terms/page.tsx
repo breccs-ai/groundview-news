@@ -37,11 +37,13 @@ export default function AdvertiserTermsPage() {
               Advertiser Terms
             </h1>
             <p className="text-sm text-gray-600">
-              Ground View News is operated by <strong>Breccs Private Limited</strong>, a company registered in the United
-              Kingdom. These terms apply to advertisers using our self-serve advertising tools. They are written in plain
-              English and are intended to align with the UK Consumer Rights Act 2015, the UK ASA CAP Code, UK GDPR and EU
-              GDPR, the Irish Consumer Protection Act 2007, and the EU e-Commerce Directive (2000/31/EC). They do not
-              constitute personal legal advice.
+              Ground View News is operated by <strong>Breccs Private Limited</strong> (company number 15139888),
+              registered in England and Wales, with its registered office at 128 City Road, London, EC1V 2NX. These
+              terms apply to advertisers using our self-serve advertising tools. They are written in plain
+              English and are intended to align with the UK Consumer Rights Act 2015, the UK Consumer Protection from
+              Unfair Trading Regulations 2008, the UK ASA CAP Code, UK GDPR, and, where advertisers or readers are based
+              in the EU, EU GDPR and the EU e-Commerce Directive (2000/31/EC). They do not constitute personal legal
+              advice.
             </p>
           </div>
 

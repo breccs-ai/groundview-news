@@ -6,7 +6,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Privacy Policy | Ground View News',
   description:
-    'How Ground View News collects, uses, and protects your personal data under GDPR, UK GDPR, and Irish data protection law.',
+    'How Ground View News collects, uses, and protects your personal data under the UK GDPR and the Data Protection Act 2018.',
 };
 
 function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
@@ -47,21 +47,25 @@ export default function PrivacyPolicyPage() {
           <p className="text-sm text-gray-700 leading-relaxed mb-10">
             Ground View News (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is committed to
             protecting your personal data. This Privacy Policy explains what personal data we collect,
-            why we collect it, how we use it, and your rights under the EU General Data Protection
-            Regulation (EU GDPR), the UK General Data Protection Regulation (UK GDPR), and the Irish
-            Data Protection Acts 2018. Please read it carefully.
+            why we collect it, how we use it, and your rights under the UK General Data Protection
+            Regulation (UK GDPR) and the Data Protection Act 2018. Where we process personal data of
+            individuals located in the EU, the EU GDPR may also apply. Please read it carefully.
           </p>
 
           <Section title="1. Who We Are">
             <p>
-              Ground View News is an independent digital news commentary publication operated from
-              Ireland. Our website is located at{' '}
-              <strong>groundviewnews.com</strong>.
+              Ground View News is an independent digital news commentary publication operated by{' '}
+              <strong>Breccs Private Limited</strong>, a company registered in England and Wales. Our
+              website is located at <strong>groundviewnews.com</strong>.
             </p>
             <p>
-              <strong>Data Controller:</strong> Ground View News
+              <strong>Data Controller:</strong> Breccs Private Limited, trading as Ground View News
               <br />
-              <strong>Registered jurisdiction:</strong> Republic of Ireland
+              <strong>Company number:</strong> 15139888
+              <br />
+              <strong>Registered jurisdiction:</strong> United Kingdom (England and Wales)
+              <br />
+              <strong>Registered office:</strong> 128 City Road, London, EC1V 2NX
               <br />
               <strong>Contact:</strong>{' '}
               <a
@@ -72,11 +76,10 @@ export default function PrivacyPolicyPage() {
               </a>
             </p>
             <p>
-              As a data controller established in the Republic of Ireland, our lead supervisory
-              authority for EU GDPR purposes is the{' '}
-              <strong>Data Protection Commission (DPC) of Ireland</strong>. UK-based visitors also
-              have the right to raise concerns with the{' '}
-              <strong>UK Information Commissioner&rsquo;s Office (ICO)</strong> in relation to UK GDPR.
+              As a data controller established in the United Kingdom, our lead supervisory authority
+              is the <strong>UK Information Commissioner&rsquo;s Office (ICO)</strong>. Individuals
+              located in the EU may also raise concerns with their own national data protection
+              authority.
             </p>
             <p className="bg-amber-50 border border-amber-200 rounded-sm p-4 text-xs text-amber-900">
               <strong>ICO Registration Note:</strong> Operators processing personal data of UK
@@ -471,24 +474,7 @@ export default function PrivacyPolicyPage() {
               data protection law.
             </p>
             <p>
-              <strong>For EU visitors:</strong>
-              <br />
-              Data Protection Commission (DPC), Ireland
-              <br />
-              Website:{' '}
-              <a
-                href="https://www.dataprotection.ie"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-amber-700 hover:text-amber-900 underline"
-              >
-                www.dataprotection.ie
-              </a>
-              <br />
-              Tel: +353 57 868 4800
-            </p>
-            <p>
-              <strong>For UK visitors:</strong>
+              <strong>For UK residents:</strong>
               <br />
               Information Commissioner&rsquo;s Office (ICO)
               <br />
@@ -549,26 +535,27 @@ export default function PrivacyPolicyPage() {
             <p>
               No system connected to the internet can be guaranteed to be completely secure. In the
               event of a personal data breach that is likely to result in a risk to your rights and
-              freedoms, we will notify the DPC within 72 hours and affected individuals without
-              undue delay, as required by GDPR Article 33&ndash;34.
+              freedoms, we will notify the ICO within 72 hours and affected individuals without
+              undue delay, as required by UK GDPR Article 33&ndash;34.
             </p>
           </Section>
 
           <Section title="13. International Data Transfers">
             <p>
-              Ground View News is based in Ireland and primarily processes data within the
-              EU/EEA. Where personal data is transferred to a country outside the EU/EEA or the UK
-              (such as the United States, where Resend operates), we ensure that appropriate
+              Ground View News is based in the United Kingdom. Where personal data is transferred to
+              a country outside the UK (such as the United States, where Resend operates, or the
+              EU/EEA, where some hosting infrastructure is located), we ensure that appropriate
               safeguards are in place:
             </p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <strong>EU transfers:</strong> Standard Contractual Clauses (SCCs) approved by the
-                European Commission under GDPR Article 46(2)(c).
+                <strong>Transfers outside the UK:</strong> the UK International Data Transfer
+                Agreement (IDTA) or the UK Addendum to the EU Standard Contractual Clauses.
               </li>
               <li>
-                <strong>UK transfers:</strong> UK International Data Transfer Agreement (IDTA) or
-                UK Addendum to SCCs.
+                <strong>Transfers to the EU/EEA:</strong> permitted on the basis of the UK
+                Government&rsquo;s EU adequacy regulations, which recognise the EU/EEA as providing
+                an adequate level of data protection.
               </li>
             </ul>
           </Section>
