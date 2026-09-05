@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'Terms & Conditions | Ground View News',
   description:
     'Terms and conditions governing your use of the Ground View News website and publication.',
+  alternates: { canonical: '/terms' },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: 'About | Ground View News',
   description:
     'Ground View News publishes independent commentary on global affairs: human rights, world politics, and the global economy. No geographic bias. Fair, evidence-based analysis.',
+  alternates: { canonical: '/about' },
 };
 
 const values = [

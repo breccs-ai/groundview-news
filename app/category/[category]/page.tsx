@@ -13,6 +13,7 @@ import { formatDate } from '@/lib/utils';
 import { Eye, Share2 } from 'lucide-react';
 import { formatStatCount } from '@/lib/format-stats';
 import { parseArticleShares } from '@/lib/article-shares';
+import { getPublicSiteOrigin } from '@/lib/article-public-url';
 
 type Props = {
   params: { category: string };
@@ -27,6 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${meta.label} | Ground View News`,
     description: `Read the latest ${meta.label} articles from Ground View News, independent global commentary.`,
+    alternates: {
+      canonical: `${getPublicSiteOrigin()}/category/${params.category}`,
+    },
   };
 }
 

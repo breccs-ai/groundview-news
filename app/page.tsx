@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   title: 'Ground View News: Independent Global Commentary',
   description:
     'Independent commentary on global affairs: Africa, the African diaspora, human rights, world politics, and the global economy.',
+  alternates: {
+    canonical: '/',
+  },
 };
 
 export default async function HomePage() {

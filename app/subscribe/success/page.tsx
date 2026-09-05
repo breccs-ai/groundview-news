@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Welcome to Ground View News',
   description: 'Your subscription is active. Thank you for supporting independent journalism.',
+  robots: { index: false, follow: false },
 };
 
 const NAVY = '#0f1f3d';

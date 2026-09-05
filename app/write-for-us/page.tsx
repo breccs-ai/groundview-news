@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'Write for Ground View News',
   description:
     'Join a growing community of writers covering global affairs, politics, business, sports, and more. Apply to write for Ground View News.',
+  alternates: { canonical: '/write-for-us' },
   openGraph: {
     title: 'Write for Ground View News',
     description:

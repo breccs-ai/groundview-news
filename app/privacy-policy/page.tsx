@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'Privacy Policy | Ground View News',
   description:
     'How Ground View News collects, uses, and protects your personal data under the UK GDPR and the Data Protection Act 2018.',
+  alternates: { canonical: '/privacy-policy' },
 };
 
 function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {

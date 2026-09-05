@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Terms of Use | Ground View News',
   description: 'Terms and conditions governing use of the Ground View News website.',
+  alternates: { canonical: '/terms-of-use' },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

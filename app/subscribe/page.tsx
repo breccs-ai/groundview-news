@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'Subscribe | Ground View News',
   description:
     'Support independent global commentary. Subscribe to Ground View News from £4.99/month — remove ads, get early access, and fund the writers behind every story.',
+  alternates: { canonical: '/subscribe' },
 };
 
 const benefits: string[] = [

@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: 'Editorial Disclaimer | Ground View News',
   description:
     'Ground View News is a commentary and opinion publication. Read our editorial disclaimer, corrections policy, and source standards.',
+  alternates: { canonical: '/disclaimer' },
 };
 
 export default function DisclaimerPage() {

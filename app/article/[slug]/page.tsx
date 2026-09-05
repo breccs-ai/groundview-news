@@ -18,6 +18,7 @@ import SubscriptionPromptBanner from '@/components/SubscriptionPromptBanner';
 import EarlyAccessBanner from '@/components/EarlyAccessBanner';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import type { ArticleImage } from '@/lib/supabase';
+import { articleCanonicalUrl } from '@/lib/article-public-url';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
 import { ADMIN_COOKIE, ADMIN_COOKIE_VALUE } from '@/lib/admin-auth';
@@ -66,6 +67,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${article.title} | Ground View News`,
     description: article.excerpt || article.subtitle || '',
+    alternates: {
+      canonical: articleCanonicalUrl(params.slug),
+    },
     openGraph: {
       title: article.title,
       description: article.excerpt || article.subtitle || '',

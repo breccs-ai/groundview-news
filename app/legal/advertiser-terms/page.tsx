@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Advertiser Terms | Ground View News',
   description: 'Terms for advertisers placing paid placements with Ground View News.',
+  alternates: { canonical: '/legal/advertiser-terms' },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

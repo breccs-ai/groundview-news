@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: 'Editorial Policy | Ground View News',
   description:
     'Our standards for accuracy, sourcing, corrections, independence, and content moderation at Ground View News.',
+  alternates: { canonical: '/editorial-policy' },
 };
 
 const sections = [
