@@ -68,18 +68,24 @@ async function main() {
   }
 
   let sent = 0;
+  const failed: string[] = [];
   for (const r of recipients) {
     const tmpl = writerActivityReminderEmail({ id: r.id, fullName: r.full_name || '' });
-    try {
-      await sendEmail(r.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM, tmpl.headers);
+    const ok = await sendEmail(r.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM, tmpl.headers);
+    if (ok) {
       sent += 1;
       console.log(`Sent to ${r.email}`);
-    } catch (e) {
-      console.error(`Failed to send to ${r.email}:`, e instanceof Error ? e.message : e);
+    } else {
+      failed.push(r.email);
+      console.error(`FAILED to send to ${r.email} (see [email] Resend error above)`);
     }
     await sleep(250);
   }
   console.log(`\nDone. Sent ${sent}/${recipients.length}.`);
+  if (failed.length) {
+    console.error(`${failed.length} failed: ${failed.join(', ')}`);
+    process.exitCode = 1;
+  }
 }
 
 main();
