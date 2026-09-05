@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/email';
 import { evaluateFoundingLeadEditorEligibility } from '@/lib/founding-lead-editor-program';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
@@ -249,8 +248,7 @@ export async function POST(req: NextRequest) {
 
         if (payload.status === 'published') {
           await triggerRevalidate(req, row.slug);
-          await sendEmail(
-            'info@groundviewnews.com',
+          await notifyOps(
             `New Article Published: ${String(bodyPayload.title || '')}`,
             `<p><strong>Title:</strong> ${escapeHtml(String(bodyPayload.title || ''))}</p>
 <p><strong>Category:</strong> ${escapeHtml(String(bodyPayload.category || 'N/A'))}</p>
@@ -387,8 +385,7 @@ export async function PATCH(req: NextRequest) {
 
     if (p.status === 'published') {
       await triggerRevalidate(req, slug);
-      await sendEmail(
-        'info@groundviewnews.com',
+      await notifyOps(
         `New Article Published: ${String(p.title || '')}`,
         `<p><strong>Title:</strong> ${escapeHtml(String(p.title || ''))}</p>
 <p><strong>Category:</strong> ${escapeHtml(String(p.category || 'N/A'))}</p>

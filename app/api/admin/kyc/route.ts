@@ -2,20 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { isAdminServerSession } from '@/lib/admin-server';
 import { sendEmail } from '@/lib/email';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 
 const KYC_BUCKET = 'kyc-documents';
 const SIGNED_URL_TTL_SEC = 60 * 60;
-
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 export async function GET(req: NextRequest) {
   if (!isAdminServerSession()) {
@@ -133,8 +125,8 @@ export async function POST(req: NextRequest) {
     await sendEmail(
       row.email,
       'Your Ground View News advertiser account is verified',
-      `<p>Your identity has been verified. You can now log in and place advertisements on Ground View News.</p>
-       <p>Visit your dashboard: <a href="https://groundviewnews.com/advertiser/dashboard">https://groundviewnews.com/advertiser/dashboard</a></p>`
+      emailShell(`<p>Your identity has been verified. You can now log in and place advertisements on Ground View News.</p>
+       <p>Visit your dashboard: <a href="https://groundviewnews.com/advertiser/dashboard">https://groundviewnews.com/advertiser/dashboard</a></p>`)
     );
 
     return NextResponse.json({ ok: true, kyc_status: 'verified' });
@@ -158,9 +150,9 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     row.email,
     'Identity verification unsuccessful — Ground View News',
-    `<p>Unfortunately we were unable to verify your identity with the document provided.</p>
+    emailShell(`<p>Unfortunately we were unable to verify your identity with the document provided.</p>
      <p><strong>Reason:</strong> ${escapeHtml(rejectionReason)}</p>
-     <p>Please log in and resubmit a valid identity document.</p>`
+     <p>Please log in and resubmit a valid identity document.</p>`)
   );
 
   return NextResponse.json({ ok: true, kyc_status: 'failed' });

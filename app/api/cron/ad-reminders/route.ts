@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 function getSupabase() {
   return createClient(
@@ -46,9 +47,9 @@ export async function GET(req: NextRequest) {
       await sendEmail(
         profile.email,
         'Your Ground View News ad draft has been discarded',
-        `<p>Hi ${profile.full_name || 'there'},</p>
+        emailShell(`<p>Hi ${escapeHtml(profile.full_name || 'there')},</p>
 <p>Your saved ad draft has been discarded after 7 days of inactivity. You can create a new ad at any time.</p>
-<p><a href="https://groundviewnews.com/advertiser/create-ad">Create a new ad</a></p>`
+<p><a href="https://groundviewnews.com/advertiser/create-ad">Create a new ad</a></p>`)
       );
       discarded++;
     } else if (needsFirstReminder) {
@@ -59,10 +60,10 @@ export async function GET(req: NextRequest) {
       await sendEmail(
         profile.email,
         'You have an unfinished ad on Ground View News',
-        `<p>Hi ${profile.full_name || 'there'},</p>
+        emailShell(`<p>Hi ${escapeHtml(profile.full_name || 'there')},</p>
 <p>You started creating an ad on Ground View News but haven't completed it yet.</p>
-<p><a href="https://groundviewnews.com/advertiser/create-ad?draft=${adRecord.id}">Complete your ad here</a></p>
-<p>If you no longer wish to continue, you can ignore this email.</p>`
+<p><a href="https://groundviewnews.com/advertiser/create-ad?draft=${encodeURIComponent(String(adRecord.id))}">Complete your ad here</a></p>
+<p>If you no longer wish to continue, you can ignore this email.</p>`)
       );
       reminded++;
     }

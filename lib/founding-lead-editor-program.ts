@@ -97,7 +97,7 @@ export async function claimAndSendProgrammeNotification(
   await sendEmail(
     JOURNALIST_APPROVAL_OWNER_EMAIL,
     `Founding Lead Editor invitation sent: ${writer.pen_name || writer.full_name}`,
-    `<p>${escapeHtml(writer.full_name)} (${escapeHtml(writer.email)}) qualified after five published articles and received a 14-day Founding Lead Editor invitation.</p>`,
+    emailShell(`<p>${escapeHtml(writer.full_name)} (${escapeHtml(writer.email)}) qualified after five published articles and received a 14-day Founding Lead Editor invitation.</p>`),
     WRITER_EMAIL_FROM,
   );
   return true;

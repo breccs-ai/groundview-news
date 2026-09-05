@@ -200,8 +200,7 @@ export function adminFeedbackEmail(args: {
   rating: number;
 }): { subject: string; html: string } {
   const subject = `Writer feedback: ${args.subject}`;
-  const html = `
-    <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height:1.5;">
+  const html = shell(`
       <h2 style="margin:0 0 12px;">Writer feedback received</h2>
       <p style="margin:0 0 6px;"><strong>Writer:</strong> ${escapeHtml(args.fullName)} (${escapeHtml(args.penName || '—')})</p>
       <p style="margin:0 0 6px;"><strong>Email:</strong> ${escapeHtml(args.email)}</p>
@@ -209,7 +208,6 @@ export function adminFeedbackEmail(args: {
       <p style="margin:0 0 6px;"><strong>Subject:</strong> ${escapeHtml(args.subject)}</p>
       <hr style="margin:14px 0;border:none;border-top:1px solid #e5e5e5;" />
       <p style="white-space:pre-wrap;margin:0;">${escapeHtml(args.message)}</p>
-    </div>
-  `.trim();
+  `);
   return { subject, html };
 }

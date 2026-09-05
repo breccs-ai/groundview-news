@@ -71,12 +71,12 @@ export async function notifyOwnerOfApplication(applicant: Applicant, note: strin
   await sendEmail(
     JOURNALIST_APPROVAL_OWNER_EMAIL,
     `Writer application requires attention: ${applicant.pen_name || applicant.full_name}`,
-    `<h2>Writer application awaiting approval</h2>
+    emailShell(`<h2>Writer application awaiting approval</h2>
 <p><strong>Name:</strong> ${escapeHtml(applicant.full_name)}<br/>
 <strong>Pen name:</strong> ${escapeHtml(applicant.pen_name || 'Not provided')}<br/>
 <strong>Email:</strong> ${escapeHtml(applicant.email)}</p>
 <p><strong>Workflow note:</strong> ${escapeHtml(note)}</p>
-<p><a href="${escapeHtml(`${siteUrl()}/admin`)}">Open the admin review queue</a></p>`,
+<p><a href="${escapeHtml(`${siteUrl()}/admin`)}">Open the admin review queue</a></p>`),
     WRITER_EMAIL_FROM,
   );
 }

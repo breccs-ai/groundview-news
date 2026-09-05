@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { sendEmail } from '@/lib/email';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 
@@ -124,23 +125,14 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     'info@groundviewnews.com',
     'KYC Document Submitted — Action Required',
-    `<p>Advertiser ${escapeHtml(company)} (${escapeHtml(email)}) has submitted their identity document for review. Please log in to the admin dashboard to review and approve.</p>`
+    emailShell(`<p>Advertiser ${escapeHtml(company)} (${escapeHtml(email)}) has submitted their identity document for review. Please log in to the admin dashboard to review and approve.</p>`)
   );
 
   await sendEmail(
     email,
     'Your identity document has been received — Ground View News',
-    `<p>Thank you for submitting your identity document. Our team will review it within 1-2 business days and notify you by email once your account is verified. You will then be able to place advertisements on Ground View News.</p>`
+    emailShell(`<p>Thank you for submitting your identity document. Our team will review it within 1-2 business days and notify you by email once your account is verified. You will then be able to place advertisements on Ground View News.</p>`)
   );
 
   return NextResponse.json({ success: true, status: 'pending_review' });
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }

@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     JOURNALIST_APPROVAL_OWNER_EMAIL,
     `Founding Lead Editor invitation ${outcome}: ${writer.penName}`,
-    `<p><strong>${escapeHtml(writer.fullName)}</strong> (${escapeHtml(writer.email)}) ${outcome} the Founding Lead Editor invitation.</p>
-<p>Their optional confidence and support feedback is recorded securely in the platform.</p>`,
+    emailShell(`<p><strong>${escapeHtml(writer.fullName)}</strong> (${escapeHtml(writer.email)}) ${outcome} the Founding Lead Editor invitation.</p>
+<p>Their optional confidence and support feedback is recorded securely in the platform.</p>`),
     WRITER_EMAIL_FROM,
   );
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { getApprovedWriter } from '@/lib/writer-server-auth';
 import { sendEmail } from '@/lib/email';
-import { WRITER_EMAIL_FROM, escapeHtml } from '@/lib/writer-emails';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export async function POST(req: NextRequest) {
   const writer = await getApprovedWriter(req);
@@ -37,13 +38,13 @@ export async function POST(req: NextRequest) {
     sendEmail(
       writer.email,
       'Payment request received — Ground View News',
-      `<p>Hi ${escapeHtml(writer.penName || writer.fullName)},</p><p>We received your payment request for <strong>£${amount.toFixed(2)}</strong>. You can follow its status in your writer dashboard.</p>`,
+      emailShell(`<p>Hi ${escapeHtml(writer.penName || writer.fullName)},</p><p>We received your payment request for <strong>£${amount.toFixed(2)}</strong>. You can follow its status in your writer dashboard.</p>`),
       WRITER_EMAIL_FROM
     ),
     sendEmail(
       'info@groundviewnews.com',
       'Writer payment request received',
-      `<p><strong>${escapeHtml(writer.penName || writer.fullName)}</strong> requested <strong>£${amount.toFixed(2)}</strong>.</p><p>Open the admin Revenue page for their verified remittance instructions.</p>`,
+      emailShell(`<p><strong>${escapeHtml(writer.penName || writer.fullName)}</strong> requested <strong>£${amount.toFixed(2)}</strong>.</p><p>Open the admin Revenue page for their verified remittance instructions.</p>`),
       WRITER_EMAIL_FROM
     ),
   ]);

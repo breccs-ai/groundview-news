@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isPlausibleFreeText, isValidEmailFormat } from '@/lib/contact-spam-validation';
 import { enforceContactRateLimit } from '@/lib/contact-rate-limit';
-import { escapeHtml } from '@/lib/email-branding';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     'advertising@groundviewnews.com',
     `New Advertising Enquiry: ${name}`,
-    `<p><strong>Company:</strong> ${escapeHtml(name)}</p>
+    emailShell(`<p><strong>Company:</strong> ${escapeHtml(name)}</p>
 <p><strong>Contact:</strong> ${escapeHtml(contact_name)}</p>
 <p><strong>Email:</strong> ${escapeHtml(email)}</p>
 <p><strong>Package interest:</strong> ${escapeHtml(package_interest || 'Not specified')}</p>
 <p><strong>Message:</strong></p>
-<p>${escapeHtml(message || '').replace(/\n/g, '<br />')}</p>`
+<p>${escapeHtml(message || '').replace(/\n/g, '<br />')}</p>`)
   );
 
   return NextResponse.json({ ok: true });

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isPlausibleFreeText } from '@/lib/contact-spam-validation';
-import { escapeHtml } from '@/lib/email-branding';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 <p>Review these directly in the contact_messages table in Supabase.</p>`
       : `<p>Checked ${rows.length} contact-form submission${rows.length === 1 ? '' : 's'} from the last 24 hours. None matched the known spam pattern.</p>`;
 
-  await sendEmail('info@groundviewnews.com', subject, html);
+  await sendEmail('info@groundviewnews.com', subject, emailShell(html));
 
   console.log(`[spam-monitor] checked=${rows.length} flagged=${flagged.length}`);
 

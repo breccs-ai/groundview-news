@@ -68,11 +68,11 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     'info@groundviewnews.com',
     `New Contact Message: ${subject}`,
-    `<p><strong>Name:</strong> ${escapeHtml(name)}</p>
+    emailShell(`<p><strong>Name:</strong> ${escapeHtml(name)}</p>
 <p><strong>Email:</strong> ${escapeHtml(email)}</p>
 <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
 <p><strong>Message:</strong></p>
-<p>${escapeHtml(message).replace(/\n/g, '<br />')}</p>`
+<p>${escapeHtml(message).replace(/\n/g, '<br />')}</p>`)
   );
 
   const confirmationHtml = emailShell(
