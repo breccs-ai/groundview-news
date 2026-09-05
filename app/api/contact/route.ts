@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { validateContactSubmission } from '@/lib/contact-spam-validation';
 import { enforceContactRateLimit } from '@/lib/contact-rate-limit';
+import { escapeHtml } from '@/lib/html-escape';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,11 +68,11 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     'info@groundviewnews.com',
     `New Contact Message: ${subject}`,
-    `<p><strong>Name:</strong> ${name}</p>
-<p><strong>Email:</strong> ${email}</p>
-<p><strong>Subject:</strong> ${subject}</p>
+    `<p><strong>Name:</strong> ${escapeHtml(name)}</p>
+<p><strong>Email:</strong> ${escapeHtml(email)}</p>
+<p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
 <p><strong>Message:</strong></p>
-<p>${message.replace(/\n/g, '<br />')}</p>`
+<p>${escapeHtml(message).replace(/\n/g, '<br />')}</p>`
   );
 
   const confirmationHtml = `<p>Thank you for reaching out to Ground View News. We have received your message and will be in touch as soon as possible.</p>

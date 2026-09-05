@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
-import { looksLikeRandomToken } from '@/lib/contact-spam-validation';
+import { isPlausibleName, isPlausibleFreeText } from '@/lib/contact-spam-validation';
+import { escapeHtml } from '@/lib/html-escape';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
  * Daily watchdog for the contact/advertising-enquiry pipeline hardened in
- * lib/contact-spam-validation.ts. Server-side validation should already reject
- * the known spam pattern before it reaches contact_messages, so any row here
- * that still matches it means the filter needs tightening — this alerts on
- * that, and reports "0 flagged" on healthy days so silence never gets read as
- * "nobody's watching".
+ * lib/contact-spam-validation.ts. Re-runs the exact same isPlausibleName /
+ * isPlausibleFreeText checks enforced at submit time against rows already in
+ * contact_messages, so a flag here means the current filter genuinely would
+ * reject that row today — not just that it loosely resembles spam. Rows from
+ * before the hardening deploy (or from the anon-key window before RLS was
+ * tightened) can still show up here for a day; check created_at against the
+ * deploy time before assuming the filter itself regressed.
  *
  * Schedule: daily (declared in vercel.json). Auth matches the other cron routes.
  */
@@ -31,10 +34,6 @@ type ContactMessageRow = {
   message: string;
   created_at: string;
 };
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -60,9 +59,7 @@ export async function GET(req: NextRequest) {
   const rows = (data || []) as ContactMessageRow[];
   const flagged = rows.filter(
     (row) =>
-      looksLikeRandomToken(row.name) ||
-      looksLikeRandomToken(row.subject) ||
-      looksLikeRandomToken(row.message)
+      !isPlausibleName(row.name) || !isPlausibleFreeText(row.subject) || !isPlausibleFreeText(row.message)
   );
 
   const subject =
@@ -80,7 +77,7 @@ export async function GET(req: NextRequest) {
 
   const html =
     flagged.length > 0
-      ? `<p>${flagged.length} of ${rows.length} contact-form submissions in the last 24 hours matched the known spam pattern despite server-side validation rejecting it at submit time. That means the filter in lib/contact-spam-validation.ts may need tightening.</p>
+      ? `<p>${flagged.length} of ${rows.length} contact-form submissions in the last 24 hours would be rejected by today's validation in lib/contact-spam-validation.ts. If they arrived after the last hardening deploy, that's a live bypass and the filter needs tightening. If they're older than the deploy, they're leftover rows from before the check existed and this alert is just surfacing them for cleanup, not reporting a live gap.</p>
 <ul>${sampleHtml}</ul>
 <p>Review these directly in the contact_messages table in Supabase.</p>`
       : `<p>Checked ${rows.length} contact-form submission${rows.length === 1 ? '' : 's'} from the last 24 hours. None matched the known spam pattern.</p>`;
