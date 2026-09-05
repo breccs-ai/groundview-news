@@ -4,7 +4,8 @@ export async function sendEmail(
   to: string,
   subject: string,
   html: string,
-  from: string = DEFAULT_FROM
+  from: string = DEFAULT_FROM,
+  headers?: Record<string, string>
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -23,6 +24,7 @@ export async function sendEmail(
       to,
       subject,
       html,
+      ...(headers ? { headers } : {}),
     }),
   });
 

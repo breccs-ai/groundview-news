@@ -1,7 +1,8 @@
 /**
- * One-off announcement: reminds every approved, active journalist to log in
- * and publish, and outlines how reader engagement/sharing grows their
- * earnings. Not wired into any route — run manually, once.
+ * One-off announcement: reminds every approved, active journalist (who
+ * hasn't opted out via the email's unsubscribe link) to log in and publish,
+ * and outlines how reader engagement/sharing grows their earnings. Not wired
+ * into any route — run manually, once.
  *
  * Dry run (default, sends nothing):
  *   npx tsx scripts/notify-active-writers.ts
@@ -10,9 +11,16 @@
  *   npx tsx scripts/notify-active-writers.ts --send
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and
- * RESEND_API_KEY in the environment (pull them from Vercel's project env,
- * or set them inline for this one command).
+ * RESEND_API_KEY. Loads .env.local the same way `next dev` does (plain
+ * `tsx` does not do this on its own), so anything already in .env.local
+ * (e.g. RESEND_API_KEY) is picked up without re-entering it. Vars not in
+ * .env.local — typically the Supabase ones, which usually only live in
+ * Vercel's dashboard — still need to be pulled in, e.g. via
+ * `vercel env pull .env.local`, or set inline for this one command.
  */
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
+
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { WRITER_EMAIL_FROM, writerActivityReminderEmail } from '@/lib/writer-emails';
@@ -42,6 +50,7 @@ async function main() {
     .from('profiles')
     .select('id, email, full_name')
     .eq('subscription_status', 'active')
+    .eq('writer_reminder_opt_out', false)
     .or('role.eq.journalist,roles.cs.{journalist}');
 
   if (error) {
@@ -60,9 +69,9 @@ async function main() {
 
   let sent = 0;
   for (const r of recipients) {
-    const tmpl = writerActivityReminderEmail({ fullName: r.full_name || '' });
+    const tmpl = writerActivityReminderEmail({ id: r.id, fullName: r.full_name || '' });
     try {
-      await sendEmail(r.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM);
+      await sendEmail(r.email, tmpl.subject, tmpl.html, WRITER_EMAIL_FROM, tmpl.headers);
       sent += 1;
       console.log(`Sent to ${r.email}`);
     } catch (e) {

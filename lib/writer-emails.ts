@@ -2,6 +2,7 @@
  * Branded HTML email templates for the writer onboarding system.
  * All writer-facing emails are signed "The Editor, Continental View | Ground View News".
  */
+import { signUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const EDITOR_SIGNATURE = `The Editor<br/>Continental View | Ground View News`;
 
@@ -26,7 +27,13 @@ function firstName(fullName: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
-function shell(bodyHtml: string): string {
+/**
+ * `footerExtra`, when given, renders above the standard footer line — used for
+ * the data-protection disclaimer + unsubscribe link on emails that are an
+ * optional category (activity reminders) rather than an essential account
+ * notification (approvals, decisions, payment statements), which don't carry it.
+ */
+function shell(bodyHtml: string, footerExtra?: string): string {
   return `<!doctype html>
 <html lang="en">
   <body style="margin:0;padding:24px;background-color:#f6f6f4;font-family:Georgia,'Playfair Display',serif;color:#1a1a1a;">
@@ -43,7 +50,8 @@ function shell(bodyHtml: string): string {
           ${EDITOR_SIGNATURE}
         </p>
       </div>
-      <div style="padding:14px 28px 22px 28px;border-top:1px solid #efeee9;font-size:11px;color:#888;font-family:Arial,Helvetica,sans-serif;">
+      <div style="padding:14px 28px 22px 28px;border-top:1px solid #efeee9;font-size:11px;color:#888;font-family:Arial,Helvetica,sans-serif;line-height:1.6;">
+        ${footerExtra ? `<div style="margin-bottom:10px;">${footerExtra}</div>` : ''}
         Continental View | Ground View News &middot; ${escapeHtml(siteUrl().replace(/^https?:\/\//, ''))}
       </div>
     </div>
@@ -135,12 +143,14 @@ export function articleApprovedForPublishEmail(args: {
   return { subject, html };
 }
 
-export function writerActivityReminderEmail(args: { fullName: string }): {
+export function writerActivityReminderEmail(args: { id: string; fullName: string }): {
   subject: string;
   html: string;
+  headers: Record<string, string>;
 } {
   const subject = 'Log in and publish — plus how your earnings grow';
   const dashboardUrl = `${siteUrl()}/journalists/dashboard`;
+  const unsubscribeUrl = `${siteUrl()}/api/journalists/unsubscribe-reminders?id=${encodeURIComponent(args.id)}&token=${signUnsubscribeToken(args.id)}`;
   const html = shell(`
     <p>Hi ${escapeHtml(firstName(args.fullName))},</p>
     <p>A quick reminder to log in and publish as news breaks — timely coverage is what keeps readers coming back, and your dashboard is ready whenever a story is.</p>
@@ -155,8 +165,18 @@ export function writerActivityReminderEmail(args: { fullName: string }): {
     <p>Writers who publish five qualifying articles also become eligible for the Founding Lead Editor programme — an optional role for our first ten members that adds a small earnings weighting on top of the standard share.</p>
     <p>Your dashboard shows your running monthly statement and payout options (bank transfer, Wise, PayPal, mobile money, or another method that works for you). As always, earnings vary with advertising income and article performance and are not guaranteed.</p>
     <p>We'd love to see fresh coverage from you this week.</p>
+  `, `
+    You're receiving this because you hold an active writer account with Ground View News (${escapeHtml(siteUrl().replace(/^https?:\/\//, ''))}) and this is an occasional activity and earnings reminder for approved writers — not a required account notification.
+    <br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#888;">Unsubscribe from these reminders</a> — you will still receive essential account emails (application decisions, article approvals, and payment statements), which aren't optional.
   `);
-  return { subject, html };
+  return {
+    subject,
+    html,
+    headers: {
+      'List-Unsubscribe': `<mailto:info@groundviewnews.com?subject=unsubscribe>, <${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
