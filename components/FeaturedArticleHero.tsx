@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import CategoryBadge from '@/components/CategoryBadge';
 import type { Article } from '@/lib/supabase';
@@ -63,11 +64,15 @@ export default function FeaturedArticleHero({ articles }: Props) {
           role={canRotate ? 'group' : undefined}
         >
           {featured.featured_image_url && (
-            <div className="w-full rounded-sm bg-gray-100 mb-7">
-              <img
+            <div className="relative w-full aspect-video rounded-sm bg-gray-100 mb-7 overflow-hidden">
+              <Image
                 src={featured.featured_image_url}
                 alt={featured.title}
-                className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
+                fill
+                priority
+                sizes="(min-width: 1024px) 896px, 100vw"
+                style={{ objectFit: 'contain' }}
+                className="rounded-sm"
               />
             </div>
           )}

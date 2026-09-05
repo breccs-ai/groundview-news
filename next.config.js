@@ -4,7 +4,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'vnpwmgfxxfmjdebqrdhi.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
   },
   /**
    * NEXT_PUBLIC_* is exposed to the browser. Server-only secrets (STRIPE_SECRET_KEY,

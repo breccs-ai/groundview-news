@@ -1,12 +1,29 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Pencil } from 'lucide-react';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 type Props = {
   articleId: string;
 };
 
-/** Floating edit control for admins on public article pages (visibility gated by server cookie). */
+/**
+ * Floating edit control for admins on public article pages. Checks the
+ * (non-httpOnly) admin cookie client-side so the article page itself doesn't
+ * need cookies() — which would force full dynamic rendering on every
+ * request for all visitors just to show a button only admins ever see.
+ */
 export default function AdminArticleEditFab({ articleId }: Props) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(isAdminAuthenticated());
+  }, []);
+
+  if (!isAdmin) return null;
+
   return (
     <Link
       href={`/admin/articles/edit/${articleId}`}

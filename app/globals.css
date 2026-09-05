@@ -128,7 +128,7 @@ video {
     overflow-x: auto;
   }
 
-  .article-markdown-body p.markdown-first-p::first-letter {
+  .article-markdown-body > p:first-of-type::first-letter {
     font-size: 4rem;
     font-family: 'Playfair Display', serif;
     float: left;

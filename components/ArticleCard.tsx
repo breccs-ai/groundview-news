@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, Share2 } from 'lucide-react';
 import { Article } from '@/lib/supabase';
@@ -21,11 +22,13 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
       <div className="group relative flex gap-4 py-4 border-b border-gray-100 last:border-0">
         <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
         {article.featured_image_url && (
-          <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100">
-            <img
+          <div className="relative flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100">
+            <Image
               src={article.featured_image_url}
               alt={article.title}
-              className="w-full h-full object-cover"
+              fill
+              sizes="80px"
+              style={{ objectFit: 'cover' }}
             />
           </div>
         )}
@@ -59,10 +62,13 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
         <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
         {article.featured_image_url ? (
           <div className="relative w-full aspect-[16/9] overflow-hidden bg-gray-200 rounded-sm">
-            <img
+            <Image
               src={article.featured_image_url}
               alt={article.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              sizes="(min-width: 1024px) 800px, 100vw"
+              style={{ objectFit: 'cover' }}
+              className="transition-transform duration-500 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -132,10 +138,13 @@ export default function ArticleCard({ article, variant = 'default' }: Props) {
       <Link href={href} className="absolute inset-0 z-10" aria-label={article.title} />
       {article.featured_image_url && (
         <div className="relative w-full aspect-[16/9] overflow-hidden bg-gray-200 rounded-sm mb-4">
-          <img
+          <Image
             src={article.featured_image_url}
             alt={article.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            fill
+            sizes="(min-width: 1024px) 400px, 100vw"
+            style={{ objectFit: 'cover' }}
+            className="transition-transform duration-500 group-hover:scale-105"
           />
         </div>
       )}

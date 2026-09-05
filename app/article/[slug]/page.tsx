@@ -1,8 +1,10 @@
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// No cookies()/auth dependency on this page (the admin edit button checks its
+// own cookie client-side — see AdminArticleEditFab) — safe to cache and
+// revalidate periodically instead of fully re-rendering on every request.
+export const revalidate = 60;
 
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import AdminArticleEditFab from '@/components/AdminArticleEditFab';
@@ -19,9 +21,9 @@ import EarlyAccessBanner from '@/components/EarlyAccessBanner';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import type { ArticleImage } from '@/lib/supabase';
 import { articleCanonicalUrl } from '@/lib/article-public-url';
+import { newsArticleJsonLd, jsonLdScript } from '@/lib/structured-data';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
-import { ADMIN_COOKIE, ADMIN_COOKIE_VALUE } from '@/lib/admin-auth';
 
 type Props = {
   params: { slug: string };
@@ -105,17 +107,20 @@ export default async function ArticlePage({ params }: Props) {
       caption: imageCaption(image, imageCount, article.title),
     }));
 
-  const cookieStore = cookies();
-  const showAdminEditFab =
-    cookieStore.get(ADMIN_COOKIE)?.value === ADMIN_COOKIE_VALUE;
-
   const sharesParsed = parseArticleShares(article.shares);
 
   const related = await getPublishedArticles({ category: article.category, limit: 4 });
   const relatedArticles = related.filter((a) => a.id !== article.id).slice(0, 3);
 
+  const schemaImages = [heroImage, ...inlineImages].map((i) => i?.url).filter((u): u is string => Boolean(u));
+  const jsonLd = newsArticleJsonLd(article, schemaImages);
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
+      />
       <Navbar />
 
       <main className="bg-white">
@@ -164,11 +169,17 @@ export default async function ArticlePage({ params }: Props) {
         {heroImage && (
           <div className="max-w-5xl mx-auto px-4 md:px-8 mb-8">
             <figure className="w-full rounded-sm bg-gray-100">
-              <img
-                src={heroImage.url}
-                alt={article.title}
-                className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[640px] mx-auto rounded-sm"
-              />
+              <div className="relative w-full aspect-video overflow-hidden rounded-sm">
+                <Image
+                  src={heroImage.url}
+                  alt={article.title}
+                  fill
+                  priority
+                  sizes="(min-width: 1024px) 1024px, 100vw"
+                  style={{ objectFit: 'contain' }}
+                  className="rounded-sm"
+                />
+              </div>
               {imageCaption(heroImage, imageCount, article.title) && (
                 <figcaption className="mt-2 text-center text-sm italic text-gray-500">
                   {imageCaption(heroImage, imageCount, article.title)}
@@ -271,7 +282,7 @@ export default async function ArticlePage({ params }: Props) {
 
       <Footer />
 
-      {showAdminEditFab && <AdminArticleEditFab articleId={article.id} />}
+      <AdminArticleEditFab articleId={article.id} />
     </>
   );
 }

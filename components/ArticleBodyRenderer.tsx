@@ -1,10 +1,13 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
 import type { Components } from 'react-markdown';
 import type { ArticleBody, ArticleImage } from '@/lib/supabase';
 import { storedBodyToEditorMarkdown } from '@/lib/article-markdown';
@@ -26,7 +29,7 @@ function replaceEmDashes(content: string): string {
 }
 
 function buildMarkdownComponents(
-  getParagraphIndex: () => number,
+  paragraphStartLines: number[],
   injectMidAd?: boolean,
   imagePlacements: Array<{ afterParagraph: number; image: ArticleImage }> = []
 ): Components {
@@ -93,13 +96,16 @@ function buildMarkdownComponents(
         {children}
       </h4>
     ),
-    p: ({ children, ...props }) => {
-      const idx = getParagraphIndex();
-      const isFirst = idx === 0;
+    p: ({ node, children, ...props }) => {
+      // Pure lookup — no state mutated during render, so server and client
+      // (and React Strict Mode's double-render) always agree. -1 means this
+      // <p> is nested inside a blockquote/list, not a top-level paragraph;
+      // it gets no drop-cap and never anchors an inline image.
+      const line = node?.position?.start?.line;
+      const idx = line != null ? paragraphStartLines.indexOf(line) : -1;
       const paragraph = (
         <p
           {...props}
-          className={isFirst ? 'markdown-first-p' : undefined}
           style={{
             ...GEORGIA,
             fontSize: '18px',
@@ -127,12 +133,16 @@ function buildMarkdownComponents(
             )}
             {imagesAfterParagraph.map((placement) => (
               <figure key={placement.image.url} className="my-10">
-                <img
-                  src={placement.image.url}
-                  alt=""
-                  className="mx-auto block h-auto max-h-[640px] w-auto max-w-full rounded-sm"
-                  loading="lazy"
-                />
+                <div className="relative mx-auto aspect-video max-h-[640px] w-full max-w-full">
+                  <Image
+                    src={placement.image.url}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 700px, 100vw"
+                    style={{ objectFit: 'contain' }}
+                    className="rounded-sm"
+                  />
+                </div>
                 {placement.image.caption && (
                   <figcaption className="mt-2 text-center text-sm italic text-gray-500">
                     {placement.image.caption}
@@ -230,9 +240,27 @@ function buildMarkdownComponents(
     ),
     img: (props) => {
       const { alt, src } = props as { alt?: string; src?: string };
+      if (!src) return null;
+      // Inline markdown images can reference any URL a writer pastes in, not
+      // just our own storage bucket — next/image throws at runtime for a
+      // domain outside next.config.js's remotePatterns, so only optimize the
+      // ones we know are safe and fall back to a plain <img> for the rest.
+      if (src.startsWith('https://vnpwmgfxxfmjdebqrdhi.supabase.co/storage/')) {
+        return (
+          <span className="relative my-8 block aspect-video w-full max-w-full">
+            <Image
+              src={src}
+              alt={alt ?? ''}
+              fill
+              sizes="(min-width: 1024px) 700px, 100vw"
+              style={{ objectFit: 'contain', borderRadius: 8 }}
+            />
+          </span>
+        );
+      }
       return (
         <img
-          src={src ?? ''}
+          src={src}
           alt={alt ?? ''}
           style={{ maxWidth: '100%', borderRadius: 8, margin: '2rem 0', height: 'auto' }}
           loading="lazy"
@@ -322,6 +350,27 @@ type MarkdownInnerProps = {
   inlineImages?: ArticleImage[];
 };
 
+/**
+ * Source line (1-indexed) of each top-level paragraph, in document order.
+ * Parsed with the same remark pipeline react-markdown uses internally, so
+ * a <p> node's `position.start.line` is guaranteed to match one of these —
+ * a pure, single computation per markdown string rather than a counter
+ * mutated during render (which is what caused the hydration mismatch this
+ * replaced: React explicitly disallows reading/writing refs during render).
+ */
+function getTopLevelParagraphLines(markdown: string): number[] {
+  const tree = unified().use(remarkParse).use(remarkGfm).parse(markdown) as {
+    children?: Array<{ type?: string; position?: { start?: { line?: number } } }>;
+  };
+  const lines: number[] = [];
+  for (const child of tree.children || []) {
+    if (child.type === 'paragraph' && typeof child.position?.start?.line === 'number') {
+      lines.push(child.position.start.line);
+    }
+  }
+  return lines;
+}
+
 function countMarkdownParagraphs(markdown: string): number {
   let inFence = false;
   return markdown
@@ -365,21 +414,18 @@ export function MarkdownBodyContent({
   inlineImages = [],
 }: MarkdownInnerProps) {
   const displayMarkdown = replaceEmDashes(markdown);
-  const paragraphIndexRef = useRef(0);
-  paragraphIndexRef.current = 0;
+  const paragraphStartLines = useMemo(
+    () => getTopLevelParagraphLines(displayMarkdown),
+    [displayMarkdown]
+  );
   const imagePlacements = useMemo(
     () => buildImagePlacements(displayMarkdown, inlineImages),
     [displayMarkdown, inlineImages]
   );
 
   const components = useMemo(
-    () =>
-      buildMarkdownComponents(() => {
-        const idx = paragraphIndexRef.current;
-        paragraphIndexRef.current += 1;
-        return idx;
-      }, injectMidAd, imagePlacements),
-    [injectMidAd, imagePlacements],
+    () => buildMarkdownComponents(paragraphStartLines, injectMidAd, imagePlacements),
+    [paragraphStartLines, injectMidAd, imagePlacements],
   );
 
   return (

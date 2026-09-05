@@ -1,5 +1,6 @@
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// No cookies()/auth dependency on this page — safe to cache and revalidate
+// periodically instead of fully re-rendering on every request.
+export const revalidate = 60;
 
 import type { Metadata } from 'next';
 import Link from 'next/link';

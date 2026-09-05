@@ -1,7 +1,9 @@
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// No cookies()/auth dependency on this page — safe to cache and revalidate
+// periodically instead of fully re-rendering on every request.
+export const revalidate = 60;
 
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -80,11 +82,14 @@ export default async function CategoryPage({ params }: Props) {
               {/* Featured article */}
               <article className="mb-12 pb-12 border-b border-gray-200">
                 {featured.featured_image_url && (
-                  <div className="w-full rounded-sm bg-gray-100 mb-7">
-                    <img
+                  <div className="relative w-full aspect-video rounded-sm bg-gray-100 mb-7 overflow-hidden">
+                    <Image
                       src={featured.featured_image_url}
                       alt={featured.title}
-                      className="block w-auto max-w-full h-auto max-h-[60vh] sm:max-h-[560px] mx-auto rounded-sm"
+                      fill
+                      sizes="(min-width: 1024px) 896px, 100vw"
+                      style={{ objectFit: 'contain' }}
+                      className="rounded-sm"
                     />
                   </div>
                 )}
