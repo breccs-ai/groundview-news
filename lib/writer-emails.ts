@@ -135,6 +135,30 @@ export function articleApprovedForPublishEmail(args: {
   return { subject, html };
 }
 
+export function writerActivityReminderEmail(args: { fullName: string }): {
+  subject: string;
+  html: string;
+} {
+  const subject = 'Log in and publish — plus how your earnings grow';
+  const dashboardUrl = `${siteUrl()}/journalists/dashboard`;
+  const html = shell(`
+    <p>Hi ${escapeHtml(firstName(args.fullName))},</p>
+    <p>A quick reminder to log in and publish as news breaks — timely coverage is what keeps readers coming back, and your dashboard is ready whenever a story is.</p>
+    <p style="margin-top:20px;">
+      <a
+        href="${escapeHtml(dashboardUrl)}"
+        style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"
+      >Open your writer dashboard</a>
+    </p>
+    <p style="margin-top:24px;"><strong>How that connects to your earnings:</strong> Ground View News shares a percentage of net advertising revenue with writers each month. Your share of that pool is based on real reader engagement with your published articles — not just raw views, but how long readers stay and how far they read. The more readers your work reaches and holds, the larger your share of that month's pool.</p>
+    <p>If you're proud of a piece, sharing it with your own network directly grows that engagement — every reader who clicks through and stays counts toward your earnings on that article. This is entirely optional and never affects editorial decisions.</p>
+    <p>Writers who publish five qualifying articles also become eligible for the Founding Lead Editor programme — an optional role for our first ten members that adds a small earnings weighting on top of the standard share.</p>
+    <p>Your dashboard shows your running monthly statement and payout options (bank transfer, Wise, PayPal, mobile money, or another method that works for you). As always, earnings vary with advertising income and article performance and are not guaranteed.</p>
+    <p>We'd love to see fresh coverage from you this week.</p>
+  `);
+  return { subject, html };
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin-facing templates
 // ──────────────────────────────────────────────────────────────────────────
