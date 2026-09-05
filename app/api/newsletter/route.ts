@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isValidEmailFormat } from '@/lib/contact-spam-validation';
 import { enforceNewsletterRateLimit } from '@/lib/newsletter-rate-limit';
-import { escapeHtml } from '@/lib/html-escape';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,10 +75,14 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     email,
     'Welcome to Ground View News',
-    `<p>Thank you for subscribing to Ground View News, ${escapeHtml(first_name)}.</p>
-<p>You will receive our latest commentary and analysis directly to your inbox.</p>
-<p>Ground View News — Independent global commentary.</p>
-<p style="font-size:12px;color:#888;">You subscribed at groundviewnews.com. To unsubscribe, reply to this email with "unsubscribe" in the subject line.</p>`
+    emailShell(
+      `<p>Thank you for subscribing to Ground View News, ${escapeHtml(first_name)}.</p>
+<p>You will receive our latest commentary and analysis directly to your inbox.</p>`,
+      {
+        footerExtra:
+          'You\'re receiving this because you subscribed to the Ground View News newsletter at groundviewnews.com. To unsubscribe, reply to this email with "unsubscribe" in the subject line.',
+      }
+    )
   );
 
   return NextResponse.json({ ok: true });

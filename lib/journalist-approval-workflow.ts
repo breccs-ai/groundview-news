@@ -1,6 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
-import { WRITER_EMAIL_FROM, escapeHtml, siteUrl } from '@/lib/writer-emails';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell, escapeHtml, siteUrl } from '@/lib/email-branding';
+import { notifyOps } from '@/lib/ops-notifications';
 
 export const JOURNALIST_APPROVAL_OWNER_EMAIL = 'info@breccs.com';
 
@@ -46,14 +48,21 @@ export async function assignAndNotifyJournalistApplication(
   await sendEmail(
     lead.email,
     `Writer application awaiting your review: ${applicant.pen_name || applicant.full_name}`,
-    `<p>Hi ${escapeHtml(lead.pen_name || lead.full_name || 'Lead Editor')},</p>
+    emailShell(`<p>Hi ${escapeHtml(lead.pen_name || lead.full_name || 'Lead Editor')},</p>
 <p>A writer application has been assigned only to you for review.</p>
 <p><strong>Applicant:</strong> ${escapeHtml(applicant.full_name)}<br/>
 <strong>Pen name:</strong> ${escapeHtml(applicant.pen_name || 'Not provided')}</p>
 <p>Please review it within <strong>24 hours</strong>. If you cannot respond, it will automatically move to another lead editor.</p>
 <p><a href="${escapeHtml(`${siteUrl()}/journalists/dashboard#application-reviews`)}">Open your Lead Editor queue</a></p>
-<p>Make the decision independently using Ground View News editorial standards. Do not contact the applicant privately or share their application details.</p>`,
+<p>Make the decision independently using Ground View News editorial standards. Do not contact the applicant privately or share their application details.</p>`),
     WRITER_EMAIL_FROM,
+  );
+
+  await notifyOps(
+    `Writer application assigned for review: ${applicant.pen_name || applicant.full_name}`,
+    `<p><strong>Applicant:</strong> ${escapeHtml(applicant.full_name)} (${escapeHtml(applicant.email)})</p>
+<p><strong>Assigned to:</strong> ${escapeHtml(lead.pen_name || lead.full_name || lead.email)}</p>
+<p><strong>Due:</strong> ${escapeHtml(assignment.due_at)} (auto-reassigns to another lead editor if not decided by then)</p>`
   );
 
   return assignment;

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { notifyOps } from '@/lib/ops-notifications';
+import { escapeHtml } from '@/lib/email-branding';
 
 function getServiceSupabase() {
   return createClient(
@@ -84,6 +86,13 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await notifyOps(
+      `New advertiser account: ${fullNameTrimmed || emailNorm}`,
+      `<p>A new advertiser account was created.</p>
+<p><strong>Name:</strong> ${escapeHtml(fullNameTrimmed || 'Not provided')}<br/>
+<strong>Email:</strong> ${escapeHtml(emailNorm)}</p>`
+    );
 
     return NextResponse.json({ success: true, existing: false });
   } catch (err) {

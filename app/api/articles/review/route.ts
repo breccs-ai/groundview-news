@@ -5,6 +5,8 @@ import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/li
 import { CATEGORIES } from '@/lib/supabase';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import { articleCanonicalUrl, articlePublicPath } from '@/lib/article-public-url';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 type ReviewOutcome = 'published' | 'pending' | 'pending_editorial' | 'rejected';
 
@@ -295,7 +297,8 @@ async function sendOutcomeEmail(args: {
     await sendEmail(
       args.to,
       `Your article has been published: ${args.title}`,
-      `<p>Your article '<strong>${escapeHtml(args.title)}</strong>' has been published at <a href="${escapeHtml(canonicalUrl)}">${escapeHtml(canonicalPath.replace(/^\//, 'groundviewnews.com/'))}</a>.</p>`
+      emailShell(`<p>Your article '<strong>${escapeHtml(args.title)}</strong>' has been published at <a href="${escapeHtml(canonicalUrl)}">${escapeHtml(canonicalPath.replace(/^\//, 'groundviewnews.com/'))}</a>.</p>`),
+      WRITER_EMAIL_FROM
     );
     return;
   }
@@ -304,7 +307,8 @@ async function sendOutcomeEmail(args: {
     await sendEmail(
       args.to,
       `Your article is under review: ${args.title}`,
-      `<p>Your article '<strong>${escapeHtml(args.title)}</strong>' is under editorial review. You will hear back within 24 hours.</p>`
+      emailShell(`<p>Your article '<strong>${escapeHtml(args.title)}</strong>' is under editorial review. You will hear back within 24 hours.</p>`),
+      WRITER_EMAIL_FROM
     );
     return;
   }
@@ -312,10 +316,11 @@ async function sendOutcomeEmail(args: {
   await sendEmail(
     args.to,
     `Your article was not accepted: ${args.title}`,
-    `<p>Your article '<strong>${escapeHtml(args.title)}</strong>' was not accepted.</p>
+    emailShell(`<p>Your article '<strong>${escapeHtml(args.title)}</strong>' was not accepted.</p>
 <p><strong>Reason:</strong> ${escapeHtml(args.reason || 'Not specified')}</p>
 ${args.notes ? `<p><strong>Editorial notes:</strong> ${escapeHtml(args.notes)}</p>` : ''}
-<p>You may revise and resubmit.</p>`
+<p>You may revise and resubmit.</p>`),
+    WRITER_EMAIL_FROM
   );
 }
 
@@ -473,11 +478,3 @@ function safeJsonParse(text: string): Record<string, unknown> | null {
   }
 }
 
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}

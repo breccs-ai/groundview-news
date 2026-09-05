@@ -8,6 +8,8 @@ import {
 import { validateWriterApplicationContent } from '@/lib/writer-application-validation';
 import { enforceWriterApplicationRateLimit } from '@/lib/writer-application-rate-limit';
 import { assignAndNotifyJournalistApplication, notifyOwnerOfApplication } from '@/lib/journalist-approval-workflow';
+import { notifyOps } from '@/lib/ops-notifications';
+import { escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -176,6 +178,13 @@ export async function POST(req: NextRequest) {
   if (awaitingApproval) {
     const applicant = { id: userId, email, full_name, pen_name };
     await notifyOwnerOfApplication(applicant, 'A new application was submitted and is awaiting approval.');
+    await notifyOps(
+      `New writer application: ${full_name}`,
+      `<p><strong>${escapeHtml(full_name)}</strong> (${escapeHtml(email)}) applied to write for Ground View News.</p>
+<p><strong>Pen name:</strong> ${escapeHtml(pen_name)}<br/>
+<strong>Country:</strong> ${escapeHtml(country)}<br/>
+<strong>Categories:</strong> ${escapeHtml(categories.join(', '))}</p>`
+    );
     await assignAndNotifyJournalistApplication(supabase, applicant);
   }
 

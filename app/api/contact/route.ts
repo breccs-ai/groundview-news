@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { validateContactSubmission } from '@/lib/contact-spam-validation';
 import { enforceContactRateLimit } from '@/lib/contact-rate-limit';
-import { escapeHtml } from '@/lib/html-escape';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,9 +75,10 @@ export async function POST(req: NextRequest) {
 <p>${escapeHtml(message).replace(/\n/g, '<br />')}</p>`
   );
 
-  const confirmationHtml = `<p>Thank you for reaching out to Ground View News. We have received your message and will be in touch as soon as possible.</p>
-<p>This is an automated confirmation. Please do not reply to this email.</p>
-<p>Ground View News<br />groundviewnews.com</p>`;
+  const confirmationHtml = emailShell(
+    `<p>Thank you for reaching out to Ground View News. We have received your message and will be in touch as soon as possible.</p>
+<p>This is an automated confirmation. Please do not reply to this email.</p>`
+  );
 
   await sendEmail(
     email,

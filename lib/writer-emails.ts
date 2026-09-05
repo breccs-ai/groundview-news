@@ -1,25 +1,15 @@
 /**
  * Branded HTML email templates for the writer onboarding system.
  * All writer-facing emails are signed "The Editor, Continental View | Ground View News".
+ * The shell/signature/footer live in lib/email-branding.ts and are shared with
+ * every other outgoing email — do not redefine them here.
  */
 import { signUnsubscribeToken } from '@/lib/unsubscribe-token';
+import { emailShell, escapeHtml, siteUrl } from '@/lib/email-branding';
 
-const EDITOR_SIGNATURE = `The Editor<br/>Continental View | Ground View News`;
+export { siteUrl, escapeHtml };
 
 export const WRITER_EMAIL_FROM = 'Ground View News <info@groundviewnews.com>';
-
-export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com').replace(/\/$/, '');
-}
-
-export function escapeHtml(input: string): string {
-  return String(input ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 function firstName(fullName: string): string {
   const trimmed = String(fullName || '').trim();
@@ -27,36 +17,8 @@ function firstName(fullName: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
-/**
- * `footerExtra`, when given, renders above the standard footer line — used for
- * the data-protection disclaimer + unsubscribe link on emails that are an
- * optional category (activity reminders) rather than an essential account
- * notification (approvals, decisions, payment statements), which don't carry it.
- */
 function shell(bodyHtml: string, footerExtra?: string): string {
-  return `<!doctype html>
-<html lang="en">
-  <body style="margin:0;padding:24px;background-color:#f6f6f4;font-family:Georgia,'Playfair Display',serif;color:#1a1a1a;">
-    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e7e3;border-radius:4px;overflow:hidden;">
-      <div style="background:#0f1f3d;padding:18px 24px;">
-        <p style="margin:0;font-size:20px;font-weight:bold;color:#ffffff;font-family:Georgia,'Playfair Display',serif;">
-          Ground View <span style="color:#d4a017;">News</span>
-        </p>
-      </div>
-      <div style="padding:28px 28px 8px 28px;font-size:15px;line-height:1.6;color:#1f1f1f;">
-        ${bodyHtml}
-        <p style="margin-top:28px;color:#555;">
-          Warm regards,<br/>
-          ${EDITOR_SIGNATURE}
-        </p>
-      </div>
-      <div style="padding:14px 28px 22px 28px;border-top:1px solid #efeee9;font-size:11px;color:#888;font-family:Arial,Helvetica,sans-serif;line-height:1.6;">
-        ${footerExtra ? `<div style="margin-bottom:10px;">${footerExtra}</div>` : ''}
-        Continental View | Ground View News &middot; ${escapeHtml(siteUrl().replace(/^https?:\/\//, ''))}
-      </div>
-    </div>
-  </body>
-</html>`;
+  return emailShell(bodyHtml, { footerExtra });
 }
 
 // ──────────────────────────────────────────────────────────────────────────

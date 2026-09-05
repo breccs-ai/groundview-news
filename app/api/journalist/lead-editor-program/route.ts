@@ -4,7 +4,8 @@ import { getServiceSupabase } from '@/lib/supabase-service';
 import { sendEmail } from '@/lib/email';
 import { JOURNALIST_APPROVAL_OWNER_EMAIL } from '@/lib/journalist-approval-workflow';
 import { claimAndSendProgrammeNotification } from '@/lib/founding-lead-editor-program';
-import { WRITER_EMAIL_FROM, escapeHtml } from '@/lib/writer-emails';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,8 +66,9 @@ export async function POST(req: NextRequest) {
   await sendEmail(
     writer.email,
     body.response === 'accept' ? 'Your Founding Lead Editor access is active' : 'Your Founding Lead Editor response',
-    body.response === 'accept'
-      ? `<p>Congratulations ${escapeHtml(writer.penName)},</p>
+    emailShell(
+      body.response === 'accept'
+        ? `<p>Congratulations ${escapeHtml(writer.penName)},</p>
 <p>You have completed the Founding Lead Editor acceptance process. Your restricted Lead Editor access is now active.</p>
 <p><a href="${escapeHtml(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://groundviewnews.com'}/journalists/dashboard#application-reviews`)}">Open your Lead Editor review queue</a></p>
 <h3>Your responsibilities</h3>
@@ -80,10 +82,11 @@ export async function POST(req: NextRequest) {
 <h3>How to make a strong decision</h3>
 <p>Look for a credible identity, a coherent biography, relevant subject knowledge, a clear and responsible writing purpose, and evidence that the applicant can contribute thoughtful journalism. Reject or leave unapproved anything suspicious, misleading or outside your confidence. Quality and integrity matter more than speed or volume.</p>
 <h3>How Ground View News will support you</h3>
-<p>Your dashboard shows only work assigned to you. If an application is unfamiliar, sensitive or outside your expertise, do not guess; allow reassignment and contact <a href="mailto:info@breccs.com">info@breccs.com</a> for guidance. Your submitted confidence and support feedback will help us improve training and tools.</p>
+<p>Your dashboard shows only work assigned to you. If an application is unfamiliar, sensitive or outside your expertise, do not guess; allow reassignment and contact <a href="mailto:info@groundviewnews.com">info@groundviewnews.com</a> for guidance. Your submitted confidence and support feedback will help us improve training and tools.</p>
 <p>Your existing writer access remains unchanged. Lead Editor status does not provide unrestricted administration, access to other writers' payment information, or authority to change editorial or financial policy. The separate 1.02 earnings-weighting stage is not active yet, and earnings are never guaranteed.</p>
 <p>Thank you for helping Ground View News build a credible, active and supportive contributor community.</p>`
-      : `<p>Thank you ${escapeHtml(writer.penName)}. We have recorded that you declined the Founding Lead Editor invitation.</p><p>Your writer account, publishing access and existing earnings are unchanged.</p>`,
+        : `<p>Thank you ${escapeHtml(writer.penName)}. We have recorded that you declined the Founding Lead Editor invitation.</p><p>Your writer account, publishing access and existing earnings are unchanged.</p>`
+    ),
     WRITER_EMAIL_FROM,
   );
   await sendEmail(

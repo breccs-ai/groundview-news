@@ -9,6 +9,8 @@ import {
 } from '@/lib/emails/advertiser-emails';
 import { computeExpiry, getProfileByEmail } from '@/lib/subscription';
 import { READER_SUBSCRIPTION_METADATA_VALUE } from '@/lib/stripe';
+import { notifyOps } from '@/lib/ops-notifications';
+import { escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 
@@ -422,6 +424,12 @@ async function handleReaderCheckoutCompleted(
       ...(subId ? { stripe_subscription_id: subId } : {}),
     })
     .eq('id', userId);
+
+  await notifyOps(
+    `New reader subscription: ${plan}`,
+    `<p>${escapeHtml(email || userId)} started a <strong>${escapeHtml(plan)}</strong> reader subscription.</p>
+<p><strong>Expires:</strong> ${escapeHtml(expiresAt.toISOString())}</p>`
+  );
 }
 
 async function handleReaderInvoicePaid(

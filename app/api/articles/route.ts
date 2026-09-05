@@ -5,6 +5,10 @@ import { evaluateFoundingLeadEditorEligibility } from '@/lib/founding-lead-edito
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import { generateSlug, generateUniqueSlug } from '@/lib/slug';
+import { notifyOps } from '@/lib/ops-notifications';
+import { escapeHtml } from '@/lib/email-branding';
+
+const REVIEW_STATUSES = ['pending', 'pending_editorial'];
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -248,14 +252,22 @@ export async function POST(req: NextRequest) {
           await sendEmail(
             'info@groundviewnews.com',
             `New Article Published: ${String(bodyPayload.title || '')}`,
-            `<p><strong>Title:</strong> ${bodyPayload.title}</p>
-<p><strong>Category:</strong> ${bodyPayload.category || 'N/A'}</p>
-<p><strong>Author:</strong> ${bodyPayload.author_name || 'N/A'}</p>
-<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${row.slug}">https://groundviewnews.com/articles/${row.slug}</a></p>`
+            `<p><strong>Title:</strong> ${escapeHtml(String(bodyPayload.title || ''))}</p>
+<p><strong>Category:</strong> ${escapeHtml(String(bodyPayload.category || 'N/A'))}</p>
+<p><strong>Author:</strong> ${escapeHtml(String(bodyPayload.author_name || 'N/A'))}</p>
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${escapeHtml(row.slug)}">https://groundviewnews.com/articles/${escapeHtml(row.slug)}</a></p>`
           );
           await evaluateFoundingLeadEditorEligibility(
             supabase,
             typeof payload.author_id === 'string' ? payload.author_id : null,
+          );
+        } else if (REVIEW_STATUSES.includes(String(payload.status))) {
+          await notifyOps(
+            `Article submitted for review: ${String(bodyPayload.title || '')}`,
+            `<p><strong>Title:</strong> ${escapeHtml(String(bodyPayload.title || ''))}</p>
+<p><strong>Category:</strong> ${escapeHtml(String(bodyPayload.category || 'N/A'))}</p>
+<p><strong>Author:</strong> ${escapeHtml(String(bodyPayload.author_name || 'N/A'))}</p>
+<p><strong>Status:</strong> ${escapeHtml(String(payload.status))}</p>`
           );
         }
 
@@ -378,12 +390,20 @@ export async function PATCH(req: NextRequest) {
       await sendEmail(
         'info@groundviewnews.com',
         `New Article Published: ${String(p.title || '')}`,
-        `<p><strong>Title:</strong> ${p.title}</p>
-<p><strong>Category:</strong> ${p.category || 'N/A'}</p>
-<p><strong>Author:</strong> ${p.author_name || 'N/A'}</p>
-<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${slug}">https://groundviewnews.com/articles/${slug}</a></p>`
+        `<p><strong>Title:</strong> ${escapeHtml(String(p.title || ''))}</p>
+<p><strong>Category:</strong> ${escapeHtml(String(p.category || 'N/A'))}</p>
+<p><strong>Author:</strong> ${escapeHtml(String(p.author_name || 'N/A'))}</p>
+<p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${escapeHtml(String(slug || ''))}">https://groundviewnews.com/articles/${escapeHtml(String(slug || ''))}</a></p>`
       );
       await evaluateFoundingLeadEditorEligibility(supabase, publishedAuthorId);
+    } else if (REVIEW_STATUSES.includes(String(p.status))) {
+      await notifyOps(
+        `Article submitted for review: ${String(p.title || '')}`,
+        `<p><strong>Title:</strong> ${escapeHtml(String(p.title || ''))}</p>
+<p><strong>Category:</strong> ${escapeHtml(String(p.category || 'N/A'))}</p>
+<p><strong>Author:</strong> ${escapeHtml(String(p.author_name || 'N/A'))}</p>
+<p><strong>Status:</strong> ${escapeHtml(String(p.status))}</p>`
+      );
     }
 
     const statusOut = typeof payload.status === 'string' ? payload.status : undefined;

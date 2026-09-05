@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell } from '@/lib/email-branding';
 
 function getSupabase() {
   return createClient(
@@ -129,10 +131,11 @@ export async function GET(req: NextRequest) {
     await sendEmail(
       email,
       `Your Ground View News earnings for ${monthLabel}`,
-      `<p>Here is your monthly statement for <strong>${monthLabel}</strong>.</p>
+      emailShell(`<p>Here is your monthly statement for <strong>${monthLabel}</strong>.</p>
 <p><strong>Weighted views:</strong> ${Number(row.weighted_views || 0).toFixed(2)}</p>
 <p><strong>View share:</strong> ${pct}</p>
-<p><strong>Amount earned:</strong> ${amount}</p>`
+<p><strong>Amount earned:</strong> ${amount}</p>`),
+      WRITER_EMAIL_FROM
     );
   }
 

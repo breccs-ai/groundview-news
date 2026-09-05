@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isPlausibleFreeText, isValidEmailFormat } from '@/lib/contact-spam-validation';
 import { enforceContactRateLimit } from '@/lib/contact-rate-limit';
-import { escapeHtml } from '@/lib/html-escape';
+import { escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

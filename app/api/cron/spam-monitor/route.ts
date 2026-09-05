@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isPlausibleFreeText } from '@/lib/contact-spam-validation';
-import { escapeHtml } from '@/lib/html-escape';
+import { escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { isAdminServerSession } from '@/lib/admin-server';
 import { sendEmail } from '@/lib/email';
-import { WRITER_EMAIL_FROM, escapeHtml } from '@/lib/writer-emails';
+import { WRITER_EMAIL_FROM } from '@/lib/writer-emails';
+import { emailShell, escapeHtml } from '@/lib/email-branding';
 
 const TRANSITIONS: Record<string, string[]> = {
   requested: ['processing', 'rejected'],
@@ -99,7 +100,7 @@ export async function PATCH(req: NextRequest) {
     await sendEmail(
       profile.email,
       `Payment request ${nextStatus} — Ground View News`,
-      `<p>Hi ${escapeHtml(profile.pen_name || profile.full_name || 'there')},</p><p>Your payment request for <strong>${escapeHtml(amount)}</strong> is now <strong>${escapeHtml(nextStatus)}</strong>.</p>${reference ? `<p>Transaction reference: <strong>${escapeHtml(reference)}</strong></p>` : ''}${adminNote ? `<p>${escapeHtml(adminNote)}</p>` : ''}`,
+      emailShell(`<p>Hi ${escapeHtml(profile.pen_name || profile.full_name || 'there')},</p><p>Your payment request for <strong>${escapeHtml(amount)}</strong> is now <strong>${escapeHtml(nextStatus)}</strong>.</p>${reference ? `<p>Transaction reference: <strong>${escapeHtml(reference)}</strong></p>` : ''}${adminNote ? `<p>${escapeHtml(adminNote)}</p>` : ''}`),
       WRITER_EMAIL_FROM
     );
   }
