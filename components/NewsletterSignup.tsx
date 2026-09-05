@@ -9,14 +9,17 @@ type Props = {
 };
 
 export default function NewsletterSignup({ variant = 'section' }: Props) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
   const [consented, setConsented] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !consented) return;
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !consented) return;
 
     setStatus('loading');
     setErrorMsg('');
@@ -24,7 +27,12 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
     const res = await fetch('/api/newsletter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      body: JSON.stringify({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        website,
+      }),
     });
 
     if (!res.ok) {
@@ -37,10 +45,27 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
       setStatus('error');
     } else {
       setStatus('success');
+      setFirstName('');
+      setLastName('');
       setEmail('');
       setConsented(false);
     }
   };
+
+  // Legitimate users never see or populate this field; bots that fill every
+  // input on the page will, which is how the honeypot catches them.
+  const honeypotField = (
+    <input
+      type="text"
+      name="website"
+      value={website}
+      onChange={(e) => setWebsite(e.target.value)}
+      tabIndex={-1}
+      autoComplete="off"
+      aria-hidden="true"
+      style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+    />
+  );
 
   if (variant === 'inline') {
     return (
@@ -64,6 +89,25 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
           <p className="text-sm text-green-700 font-medium">Thank you. You are now subscribed.</p>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            {honeypotField}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                required
+                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                required
+                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
             <input
               type="email"
               value={email}
@@ -132,6 +176,25 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="max-w-md mx-auto flex flex-col gap-4">
+            {honeypotField}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                required
+                className="flex-1 bg-white/10 border border-white/20 rounded-sm px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-400 transition-colors"
+              />
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                required
+                className="flex-1 bg-white/10 border border-white/20 rounded-sm px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-400 transition-colors"
+              />
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="email"
