@@ -24,8 +24,7 @@ loadEnvConfig(process.cwd());
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { WRITER_EMAIL_FROM, writerActivityReminderEmail } from '@/lib/writer-emails';
-
-type Recipient = { id: string; email: string; full_name: string | null };
+import { fetchActiveWriters } from '@/lib/active-writers';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,19 +45,14 @@ async function main() {
   }
 
   const supabase = createClient(url, key);
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, email, full_name')
-    .eq('subscription_status', 'active')
-    .eq('writer_reminder_opt_out', false)
-    .or('role.eq.journalist,roles.cs.{journalist}');
-
-  if (error) {
-    console.error('Query failed:', error.message);
+  let recipients;
+  try {
+    recipients = await fetchActiveWriters(supabase);
+  } catch (e) {
+    console.error('Query failed:', e instanceof Error ? e.message : e);
     process.exit(1);
   }
 
-  const recipients = ((data || []) as Recipient[]).filter((r) => r.email);
   console.log(`Found ${recipients.length} active journalist(s).`);
   recipients.forEach((r) => console.log(`  - ${r.full_name || '(no name)'} <${r.email}>`));
 

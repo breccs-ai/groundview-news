@@ -141,6 +141,52 @@ export function writerActivityReminderEmail(args: { id: string; fullName: string
   };
 }
 
+export type DigestArticle = { title: string; url: string; authorName: string };
+
+/**
+ * Shared by the one-off "latest story" send and the recurring weekly digest —
+ * `periodLabel` and `articles` are the only difference between the two. Each
+ * recipient's own articles are filtered out by the caller before this runs,
+ * so nobody is told to go share their own piece.
+ */
+export function articleDigestEmail(args: {
+  id: string;
+  fullName: string;
+  periodLabel: string;
+  articles: DigestArticle[];
+}): { subject: string; html: string; headers: Record<string, string> } {
+  const subject =
+    args.articles.length === 1
+      ? `New on Ground View News: ${args.articles[0].title}`
+      : `${args.periodLabel}: ${args.articles.length} new stories from Ground View News`;
+  const unsubscribeUrl = `${siteUrl()}/api/journalists/unsubscribe-reminders?id=${encodeURIComponent(args.id)}&token=${signUnsubscribeToken(args.id)}`;
+
+  const list = args.articles
+    .map(
+      (a) =>
+        `<li style="margin-bottom:10px;"><a href="${escapeHtml(a.url)}" style="color:#0f1f3d;"><strong>${escapeHtml(a.title)}</strong></a><br/><span style="color:#666;font-size:13px;">by ${escapeHtml(a.authorName)}</span></li>`
+    )
+    .join('');
+
+  const html = shell(
+    `<p>Hi ${escapeHtml(firstName(args.fullName))},</p>
+<p>${escapeHtml(args.periodLabel)} on Ground View News:</p>
+<ul style="padding-left:20px;margin:16px 0;">${list}</ul>
+<p>If any of these resonate, sharing them with your own network helps grow readership for everyone — and every reader who clicks through and stays counts toward that writer's earnings on the piece.</p>`,
+    `You're receiving this because you hold an active writer account with Ground View News and this is an occasional roundup of colleagues' published work — not a required account notification.
+<br /><a href="${escapeHtml(unsubscribeUrl)}" style="color:#888;">Unsubscribe from these emails</a> — you will still receive essential account emails (application decisions, article approvals, and payment statements), which aren't optional.`
+  );
+
+  return {
+    subject,
+    html,
+    headers: {
+      'List-Unsubscribe': `<mailto:info@groundviewnews.com?subject=unsubscribe>, <${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  };
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin-facing templates
 // ──────────────────────────────────────────────────────────────────────────
