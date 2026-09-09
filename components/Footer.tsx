@@ -222,6 +222,9 @@ export default function Footer() {
             <Link href="/editorial-policy" className="hover:text-white transition-colors">
               Editorial Policy
             </Link>
+            <Link href="/disclosure" className="hover:text-white transition-colors">
+              Affiliate Disclosure
+            </Link>
             <Link href="/contact" className="hover:text-white transition-colors">
               Contact
             </Link>
