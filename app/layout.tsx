@@ -1,6 +1,5 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import Script from 'next/script';
 import { Inter, Playfair_Display } from 'next/font/google';
 import CookieConsent from '@/components/CookieConsent';
 import { SubscriptionProvider } from '@/components/SubscriptionProvider';
@@ -44,10 +43,6 @@ export default function RootLayout({
           {children}
           <CookieConsent />
         </SubscriptionProvider>
-        <Script
-          src="https://s.skimresources.com/js/309034X1797362.skimlinks.js"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );
