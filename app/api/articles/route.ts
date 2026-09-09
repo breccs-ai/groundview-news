@@ -231,6 +231,13 @@ export async function POST(req: NextRequest) {
 
     delete payload.id;
 
+    // Going live on insert: stamp published_at so homepage/category ordering
+    // (sorted by published_at desc) reflects true recency instead of leaving
+    // the column null, which Postgres would sort first in a desc order.
+    if (payload.status === 'published' && !Object.prototype.hasOwnProperty.call(payload, 'published_at')) {
+      payload.published_at = new Date().toISOString();
+    }
+
     // Early-access window: set publish_at = published_at + 24h when publishing.
     applyEarlyAccessPublishAt(payload);
 
@@ -336,10 +343,11 @@ export async function PATCH(req: NextRequest) {
     if (!supabase) return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
 
     let publishedAuthorId: string | null = null;
+    let existingPublishedAt: string | null = null;
     if (actor.kind === 'journalist') {
       const { data: existing, error: fetchErr } = await supabase
         .from('articles')
-        .select('author_id, editorial_category')
+        .select('author_id, editorial_category, published_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -348,6 +356,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       publishedAuthorId = existing.author_id;
+      existingPublishedAt = (existing as { published_at?: string | null }).published_at || null;
       payload.author_id = actor.user.id;
       if (actor.user.email) payload.author_email = actor.user.email;
       if (payload.editorial_category === undefined || payload.editorial_category === null) {
@@ -365,11 +374,21 @@ export async function PATCH(req: NextRequest) {
       if (p.status === 'published') {
         const { data: articleAuthor } = await supabase
           .from('articles')
-          .select('author_id')
+          .select('author_id, published_at')
           .eq('id', id)
           .maybeSingle();
         publishedAuthorId = articleAuthor?.author_id || null;
+        existingPublishedAt = (articleAuthor as { published_at?: string | null } | null)?.published_at || null;
       }
+    }
+
+    // Going live: stamp published_at with the actual publish moment so homepage/category
+    // ordering (which sorts by published_at desc) reflects true recency. Without this,
+    // published_at stays null and Postgres sorts nulls first in a desc order, so a
+    // writer-published article can outrank genuinely newer articles. Preserve an existing
+    // published_at (e.g. unpublish/republish) rather than overwriting it.
+    if (p.status === 'published' && !Object.prototype.hasOwnProperty.call(payload, 'published_at')) {
+      payload.published_at = existingPublishedAt || new Date().toISOString();
     }
 
     // Early-access window: server-applies publish_at when this PATCH flips
