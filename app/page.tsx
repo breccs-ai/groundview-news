@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
+  other: {
+    'impact-site-verification': '957ffaf6-1153-4be1-95c7-2a4e214acbb9',
+  },
 };
 
 export default async function HomePage() {
