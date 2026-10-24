@@ -1,20 +1,8 @@
+import './fonts.css';
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
 import CookieConsent from '@/components/CookieConsent';
 import { SubscriptionProvider } from '@/components/SubscriptionProvider';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://groundviewnews.com'),
@@ -37,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-      <body className={inter.className}>
+    <html lang="en">
+      <body>
         <SubscriptionProvider>
           {children}
           <CookieConsent />
