@@ -64,7 +64,8 @@ export function getCheckoutPriceGbp(tier: PlacementTier, billingCycle: BillingCy
   return billingCycle === 'monthly' ? getMonthlyPriceGbp(tier) : getAnnualPriceGbp(tier);
 }
 
-const gbp = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+const gbp = (n: number) =>
+  `£${n.toLocaleString('en-GB', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
 
 export function getMonthlyPriceLine(tier: PlacementTier): string {
   return `${gbp(getMonthlyPriceGbp(tier))}/month`;

@@ -3,31 +3,42 @@
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import Link from 'next/link';
 import { CircleCheck as CheckCircle, LayoutTemplate, AlignCenter, PanelTop } from 'lucide-react';
+import {
+  getAnnualPriceLines,
+  getMonthlyPriceGbp,
+  type PlacementTier,
+} from '@/lib/advertiser/pricing';
+import { PLACEMENT_TIER_DESCRIPTIONS, PLACEMENT_TIER_NAMES } from '@/lib/advertiser/placements';
 
-const packages = [
-  { duration: '7 days', price: '£59', description: 'Ideal for short campaigns and time-sensitive announcements.' },
-  { duration: '14 days', price: '£99', description: 'A fortnight of visibility across our article and category pages.', popular: true },
-  { duration: '30 days', price: '£179', description: 'One month. Our most popular package for brand awareness.' },
-  { duration: '60 days', price: '£299', description: 'Two months of sustained exposure to our global readership.' },
-  { duration: '90 days', price: '£399', description: 'Our best value. Three months for maximum impact.' },
-];
+// Prices and placement descriptions come from the same modules the advertiser
+// portal uses, so this page cannot drift from what checkout actually charges.
+const TIERS: PlacementTier[] = ['basic', 'standard', 'premium'];
+
+const packages = TIERS.map((tier) => ({
+  tier,
+  name: PLACEMENT_TIER_NAMES[tier],
+  price: `£${getMonthlyPriceGbp(tier)}`,
+  description: PLACEMENT_TIER_DESCRIPTIONS[tier],
+  annual: getAnnualPriceLines(tier),
+}));
 
 const placements = [
   {
+    icon: PanelTop,
+    title: 'Homepage Featured',
+    body: 'A featured slot at the top of the homepage. Included with the Premium plan.',
+  },
+  {
     icon: AlignCenter,
-    title: 'Article Breaker',
-    body: 'Placed between paragraphs within article bodies. Seen by readers at the point of highest engagement.',
+    title: 'In-Article',
+    body: 'Placed within the article body, seen by readers at the point of highest engagement. Included with Standard and Premium.',
   },
   {
     icon: LayoutTemplate,
-    title: 'Sidebar',
-    body: 'Displayed alongside article content on desktop. Persistent visibility throughout the reading experience.',
-  },
-  {
-    icon: PanelTop,
-    title: 'Header Banner',
-    body: 'Full-width banner at the top of the page. Maximum exposure on all page types.',
+    title: 'Sidebar and Footer',
+    body: 'Displayed alongside article and homepage content, and in the footer banner. Included with every plan.',
   },
 ];
 
@@ -101,37 +112,48 @@ export default function AdvertisePage() {
           >
             Advertising Packages
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {packages.map((pkg) => (
               <div
-                key={pkg.duration}
-                className={`relative p-6 border rounded-sm flex flex-col ${
-                  pkg.popular
-                    ? 'border-amber-400 bg-amber-50'
-                    : 'border-gray-200 bg-white hover:border-gray-400 transition-colors'
-                }`}
+                key={pkg.tier}
+                className="p-6 border border-gray-200 bg-white hover:border-gray-400 transition-colors rounded-sm flex flex-col"
               >
-                {pkg.popular && (
-                  <span className="absolute -top-3 left-4 text-xs font-semibold uppercase tracking-widest bg-amber-500 text-white px-3 py-0.5 rounded-sm">
-                    Most popular
-                  </span>
-                )}
-                <div className="flex items-end gap-2 mb-3">
+                <h3
+                  className="text-base font-bold text-gray-900 mb-2"
+                  style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                >
+                  {pkg.name}
+                </h3>
+                <div className="flex items-end gap-2 mb-1">
                   <span
                     className="text-3xl font-bold text-gray-900"
                     style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                   >
                     {pkg.price}
                   </span>
-                  <span className="text-sm text-gray-400 mb-1">/ {pkg.duration}</span>
+                  <span className="text-sm text-gray-400 mb-1">/ month</span>
                 </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  or {pkg.annual.annualTotal} (save about {pkg.annual.savingsPercent}%)
+                </p>
                 <p className="text-sm text-gray-600 leading-relaxed flex-1">{pkg.description}</p>
               </div>
             ))}
           </div>
-          <p className="mt-6 text-sm text-gray-400">
+          <p className="mt-6 text-sm text-gray-500">
+            Monthly plans renew automatically and can be cancelled at any time from your advertiser
+            dashboard. All advertisers complete a one-time identity verification when they sign up,
+            and every ad is reviewed before it goes live.
+          </p>
+          <p className="mt-2 text-sm text-gray-400">
             All prices exclude VAT where applicable.
           </p>
+          <Link
+            href="/advertiser/register"
+            className="mt-6 inline-block px-6 py-3 bg-gray-900 hover:bg-blue-900 text-white font-semibold text-sm rounded-sm transition-colors duration-150"
+          >
+            Sign up and book online
+          </Link>
         </section>
 
         {/* Placement options */}
@@ -260,8 +282,8 @@ export default function AdvertisePage() {
                 >
                   <option value="">Select a package</option>
                   {packages.map((pkg) => (
-                    <option key={pkg.duration} value={`${pkg.duration} (${pkg.price})`}>
-                      {pkg.duration} ({pkg.price})
+                    <option key={pkg.tier} value={`${pkg.name} (${pkg.price}/month)`}>
+                      {pkg.name} ({pkg.price}/month)
                     </option>
                   ))}
                   <option value="Custom">Custom / not sure yet</option>

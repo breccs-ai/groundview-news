@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
+import { getMonthlyPriceGbp } from '@/lib/advertiser/pricing';
 
 export const metadata: Metadata = {
   title: 'Advertise | Ground View News',
-  description:
-    'Reach readers across Africa, the diaspora, and global affairs coverage. Advertising packages on Ground View News, from 7 to 90 days.',
+  description: `Reach readers across Africa, the diaspora, and global affairs coverage. Advertising plans on Ground View News, from £${getMonthlyPriceGbp('basic')} per month.`,
   alternates: { canonical: '/advertise' },
 };
 
