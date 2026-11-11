@@ -62,7 +62,8 @@ export default function AdvertiserTermsPage() {
               All advertisements submitted to Ground View News are subject to automated content review using AI moderation
               tools. Advertisements containing prohibited content including but not limited to hate speech, harassment,
               violent content, sexual content, or promotions of illegal services will be rejected and the advertiser refunded.
-              Ground View News reserves the right to reject any advertisement at its sole discretion.
+              Advertisements for gambling are also reviewed manually before they are published (see clause 7). Ground View
+              News reserves the right to reject any advertisement at its sole discretion.
             </p>
           </Section>
 
@@ -92,8 +93,10 @@ export default function AdvertiserTermsPage() {
           <Section title="5. Refund Policy">
             <p>
               One-off advertisements rejected by our automated content review system will receive a full refund to the
-              original payment method within 5–10 business days. Subscriptions cancelled mid-period are not eligible for
-              partial refunds. Refunds for exceptional circumstances are at the discretion of Breccs Private Limited.
+              original payment method within 5–10 business days. Advertisements declined following manual review under
+              clause 7 will also receive a full refund to the original payment method, and any related subscription will
+              be cancelled. Subscriptions cancelled mid-period are not eligible for partial refunds. Refunds for
+              exceptional circumstances are at the discretion of Breccs Private Limited.
             </p>
           </Section>
 
@@ -105,8 +108,37 @@ export default function AdvertiserTermsPage() {
             </p>
           </Section>
 
+          <Section title="7. Gambling Advertising Clause">
+            <p>
+              Advertisements for gambling products or services, or that link to gambling websites, are subject to manual
+              review and approval by Ground View News before they are published. This includes, for example, casinos,
+              betting and sportsbooks, bingo, poker, lotteries, and websites that promote or refer visitors to them,
+              including affiliate and lead-generation sites.
+            </p>
+            <p>
+              If we identify your advertisement as gambling advertising, payment is taken as normal but the advertisement
+              will not be published until we have approved it. We will email you when the review is complete. If we
+              approve it, it will go live and run for the period you purchased, starting from the date it goes live. If
+              we decline it, we will refund you in full under clause 5.
+            </p>
+            <p>
+              If your advertisement promotes gambling, you must not disguise this, and you must be properly authorised to
+              offer the gambling you promote to the audience you are targeting. For readers in the United Kingdom, that
+              means holding the relevant licence from the UK Gambling Commission, and your advertisement must comply with
+              the Gambling Commission&rsquo;s licence conditions and the ASA CAP Code, including the rules on protecting
+              under-18s and on responsible gambling. We may ask you for your licence details and any other information we
+              reasonably need before we decide, and we may decline the advertisement if you do not provide it.
+            </p>
+            <p>
+              Approval of an advertisement is not an endorsement of the advertiser or its services. We may decline any
+              gambling advertisement at our sole discretion. We may also remove an approved advertisement at any time if it
+              breaches these terms, if your licence is withdrawn or suspended, or if we are required to by law or by a
+              regulator, and we will tell you by email if we do. Our Refund Policy in clause 5 applies.
+            </p>
+          </Section>
+
           <p className="text-xs text-gray-500 mt-12">
-            Last updated: May 2026. For questions contact{' '}
+            Last updated: November 2026. For questions contact{' '}
             <a href="mailto:info@groundviewnews.com" className="text-amber-800 underline">
               info@groundviewnews.com
             </a>

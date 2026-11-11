@@ -145,6 +145,14 @@ export default function AdvertisePage() {
             dashboard. All advertisers complete a one-time identity verification when they sign up,
             and every ad is reviewed before it goes live.
           </p>
+          <p className="mt-2 text-sm text-gray-500">
+            Gambling advertising is accepted only after manual review and approval. If we decline an
+            ad, you are refunded in full. See our{' '}
+            <Link href="/legal/advertiser-terms" className="underline hover:text-gray-900">
+              Advertiser Terms
+            </Link>
+            .
+          </p>
           <p className="mt-2 text-sm text-gray-400">
             All prices are in pounds sterling. Ground View News is not VAT registered and does not charge VAT.
           </p>

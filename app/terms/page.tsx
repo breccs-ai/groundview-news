@@ -40,7 +40,7 @@ export default function TermsPage() {
               Terms &amp; Conditions
             </h1>
             <p className="text-sm text-gray-500">
-              Last updated: May 2026. Effective date: May 2026.
+              Last updated: November 2026. Effective date: May 2026.
             </p>
           </div>
 
@@ -249,6 +249,17 @@ export default function TermsPage() {
               <li>
                 The presence of advertising on the Site does not constitute editorial endorsement of
                 the advertised product, service, or organisation.
+              </li>
+              <li>
+                Advertising for gambling products and services is published only after manual review and
+                approval by Ground View News. See our{' '}
+                <Link
+                  href="/legal/advertiser-terms"
+                  className="text-amber-700 hover:text-amber-900 underline"
+                >
+                  Advertiser Terms
+                </Link>{' '}
+                for details.
               </li>
               <li>
                 Third-party ad providers may use cookies and tracking technologies subject to your

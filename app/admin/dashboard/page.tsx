@@ -95,6 +95,7 @@ export default function AdminDashboard() {
   const [adFilterTier, setAdFilterTier] = useState('');
   const [adDetail, setAdDetail] = useState<AdminAdRow | null>(null);
   const [overrideAd, setOverrideAd] = useState<AdminAdRow | null>(null);
+  const [overrideAction, setOverrideAction] = useState<'approve_override' | 'approve_held' | 'reject_held'>('approve_override');
   const [overrideReason, setOverrideReason] = useState('');
   const [kycRows, setKycRows] = useState<PendingKyc[]>([]);
   const [kycLoading, setKycLoading] = useState(true);
@@ -235,7 +236,11 @@ export default function AdminDashboard() {
     fetchPendingJournalists();
   };
 
-  const postAdAction = async (action: 'approve_override' | 'expire' | 'cancel', adId: string, reason?: string) => {
+  const postAdAction = async (
+    action: 'approve_override' | 'approve_held' | 'reject_held' | 'expire' | 'cancel',
+    adId: string,
+    reason?: string
+  ) => {
     const res = await fetch('/api/admin/advertisements', {
       method: 'POST',
       credentials: 'include',
@@ -641,20 +646,37 @@ export default function AdminDashboard() {
         {overrideAd && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
             <div className="bg-white rounded-sm shadow-xl p-6 max-w-md w-full">
-              <p className="font-semibold text-gray-900 text-sm mb-2">Override AI rejection</p>
+              <p className="font-semibold text-gray-900 text-sm mb-2">
+                {overrideAction === 'approve_held'
+                  ? 'Approve held gambling ad'
+                  : overrideAction === 'reject_held'
+                    ? 'Reject held gambling ad and refund'
+                    : 'Override AI rejection'}
+              </p>
               <p className="text-xs text-gray-500 mb-3">{overrideAd.title}</p>
+              {overrideAction === 'approve_held' && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-sm p-2 mb-3">
+                  Before approving, check the advertiser holds the licence required for the audience they are
+                  targeting (for UK readers, a Gambling Commission licence) and that the ad meets the CAP Code.
+                </p>
+              )}
+              {overrideAction === 'reject_held' && (
+                <p className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-sm p-2 mb-3">
+                  This refunds the payment in full and emails the advertiser. The reason below is sent to them.
+                </p>
+              )}
               <textarea
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
                 rows={4}
                 className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
-                placeholder="Reason for manual approval (logged)"
+                placeholder={overrideAction === 'reject_held' ? 'Reason for rejection (sent to the advertiser)' : 'Reason for manual approval (logged)'}
               />
               <div className="flex justify-end gap-2 mt-4">
                 <button type="button" className="px-3 py-2 text-sm border rounded-sm" onClick={() => { setOverrideAd(null); setOverrideReason(''); }}>Cancel</button>
                 <button
                   type="button"
-                  className="px-3 py-2 text-sm bg-green-700 text-white rounded-sm"
+                  className={`px-3 py-2 text-sm text-white rounded-sm ${overrideAction === 'reject_held' ? 'bg-red-700' : 'bg-green-700'}`}
                   onClick={async () => {
                     const r = overrideReason.trim();
                     if (r.length < 4) {
@@ -664,10 +686,10 @@ export default function AdminDashboard() {
                     const id = overrideAd.id;
                     setOverrideAd(null);
                     setOverrideReason('');
-                    await postAdAction('approve_override', id, r);
+                    await postAdAction(overrideAction, id, r);
                   }}
                 >
-                  Approve
+                  {overrideAction === 'reject_held' ? 'Reject and refund' : 'Approve'}
                 </button>
               </div>
             </div>
@@ -738,7 +760,13 @@ export default function AdminDashboard() {
                             </a>
                           )}
                           {ad.ai_review_status === 'failed' && ad.status === 'rejected' && (
-                            <button type="button" className="text-xs text-green-800 underline" onClick={() => setOverrideAd(ad)}>Override approve</button>
+                            <button type="button" className="text-xs text-green-800 underline" onClick={() => { setOverrideAction('approve_override'); setOverrideAd(ad); }}>Override approve</button>
+                          )}
+                          {ad.ai_review_status === 'manual_review' && ad.status === 'pending_review' && (
+                            <>
+                              <button type="button" className="text-xs text-green-800 underline font-semibold" onClick={() => { setOverrideAction('approve_held'); setOverrideAd(ad); }}>Approve (held)</button>
+                              <button type="button" className="text-xs text-red-700 underline font-semibold" onClick={() => { setOverrideAction('reject_held'); setOverrideAd(ad); }}>Reject and refund</button>
+                            </>
                           )}
                           <button type="button" className="text-xs text-gray-600 underline" onClick={() => void postAdAction('expire', ad.id)}>Expire</button>
                           <button type="button" className="text-xs text-red-700 underline" onClick={() => void postAdAction('cancel', ad.id)}>Cancel</button>

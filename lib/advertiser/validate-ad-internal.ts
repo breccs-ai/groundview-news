@@ -2,7 +2,10 @@ import Stripe from 'stripe';
 import OpenAI from 'openai';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { isProhibitedDestinationUrl } from '@/lib/advertiser/url-blocklist';
-import { ad_live, ad_rejected } from '@/lib/emails/advertiser-emails';
+import { detectGamblingAd } from '@/lib/advertiser/gambling';
+import { ad_live, ad_rejected, ad_under_review } from '@/lib/emails/advertiser-emails';
+import { notifyOps } from '@/lib/ops-notifications';
+import { escapeHtml, siteUrl } from '@/lib/email-branding';
 import {
   getOneOffDurationDays,
   resolveBillingCycle,
@@ -11,6 +14,8 @@ import {
 } from '@/lib/advertiser/pricing';
 import { formatForPlacementTier } from '@/lib/advertiser/placements';
 import { isPlacementTier, type PlacementTier } from '@/lib/advertiser/pricing';
+
+type Supabase = NonNullable<ReturnType<typeof getServiceSupabase>>;
 
 function getStripe(): Stripe | null {
   const k = process.env.STRIPE_SECRET_KEY;
@@ -28,15 +33,28 @@ function moderationFailureReason(categories: Record<string, boolean>): string {
   return `Automated review flagged: ${keys.slice(0, 6).join(', ') || 'policy violation'}.`;
 }
 
-export type ValidateAdResult = { ok: true } | { ok: false; error: string };
+export type ValidateAdResult = { ok: true; held?: boolean } | { ok: false; error: string };
 
-export async function runAdvertisementValidation(advertisementId: string): Promise<ValidateAdResult> {
-  const supabase = getServiceSupabase();
-  const stripe = getStripe();
-  if (!supabase || !stripe) {
-    return { ok: false, error: 'Server misconfigured' };
-  }
+type AdContext = {
+  supabase: Supabase;
+  advertisementId: string;
+  row: Record<string, unknown>;
+  title: string;
+  bodyText: string;
+  destinationUrl: string;
+  format: AdFormat;
+  placementTier: PlacementTier | null;
+  billingCycle: string;
+  piId: string;
+  subId: string;
+  advertiserName: string;
+  advertiserEmail: string;
+};
 
+async function loadAdContext(
+  supabase: Supabase,
+  advertisementId: string
+): Promise<{ ok: true; ctx: AdContext } | { ok: false; error: string }> {
   const { data: ad, error } = await supabase
     .from('advertisements')
     .select(
@@ -50,21 +68,6 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
   }
 
   const row = ad as Record<string, unknown>;
-  if (row.ai_review_status === 'passed' && row.status === 'active') {
-    return { ok: true };
-  }
-
-  const title = String(row.title || '');
-  const bodyText = String(row.body_text || '');
-  const destinationUrl = String(row.destination_url || '');
-  const format = String(row.format || 'leaderboard_banner') as AdFormat;
-  const placementTier = isPlacementTier(row.tier) ? (row.tier as PlacementTier) : null;
-  const billingCycle = resolveBillingCycle({
-    billing_cycle: row.billing_cycle as string,
-    tier: row.tier as string,
-  });
-  const piId = typeof row.stripe_payment_intent_id === 'string' ? row.stripe_payment_intent_id : '';
-  const subId = typeof row.stripe_subscription_id === 'string' ? row.stripe_subscription_id : '';
   const advertiserId = String(row.advertiser_id || '');
 
   const { data: prof } = await supabase
@@ -74,8 +77,50 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
     .maybeSingle();
 
   const p = prof as { contact_name?: string; email?: string; company_name?: string } | null;
-  const advertiserName = String(p?.contact_name || p?.company_name || 'Advertiser');
-  const advertiserEmail = String(p?.email || '');
+
+  return {
+    ok: true,
+    ctx: {
+      supabase,
+      advertisementId,
+      row,
+      title: String(row.title || ''),
+      bodyText: String(row.body_text || ''),
+      destinationUrl: String(row.destination_url || ''),
+      format: String(row.format || 'leaderboard_banner') as AdFormat,
+      placementTier: isPlacementTier(row.tier) ? (row.tier as PlacementTier) : null,
+      billingCycle: resolveBillingCycle({
+        billing_cycle: row.billing_cycle as string,
+        tier: row.tier as string,
+      }),
+      piId: typeof row.stripe_payment_intent_id === 'string' ? row.stripe_payment_intent_id : '',
+      subId: typeof row.stripe_subscription_id === 'string' ? row.stripe_subscription_id : '',
+      advertiserName: String(p?.contact_name || p?.company_name || 'Advertiser'),
+      advertiserEmail: String(p?.email || ''),
+    },
+  };
+}
+
+export async function runAdvertisementValidation(advertisementId: string): Promise<ValidateAdResult> {
+  const supabase = getServiceSupabase();
+  const stripe = getStripe();
+  if (!supabase || !stripe) {
+    return { ok: false, error: 'Server misconfigured' };
+  }
+
+  const loaded = await loadAdContext(supabase, advertisementId);
+  if (!loaded.ok) return loaded;
+  const ctx = loaded.ctx;
+  const { row, title, bodyText, destinationUrl, piId, subId, advertiserName, advertiserEmail } = ctx;
+
+  if (row.ai_review_status === 'passed' && row.status === 'active') {
+    return { ok: true };
+  }
+  // Already held for manual approval: only an admin decision moves it on, so a
+  // repeated webhook or validation call must not touch it.
+  if (row.ai_review_status === 'manual_review' && row.status === 'pending_review') {
+    return { ok: true, held: true };
+  }
 
   if (isProhibitedDestinationUrl(destinationUrl)) {
     await rejectAd({
@@ -144,16 +189,33 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
     return { ok: false, error: 'moderation' };
   }
 
-  const now = new Date();
-  let expires: Date;
+  // Gambling advertising never goes live automatically. It passed the content
+  // checks above, so it is held (paid, not shown) until an admin approves or
+  // rejects it from the admin dashboard.
+  const gambling = detectGamblingAd({ title, bodyText, destinationUrl });
+  if (gambling.matched) {
+    return holdForGamblingReview(ctx, gambling.signals);
+  }
+
+  return activateAd(ctx);
+}
+
+function computeExpiry(billingCycle: string, format: AdFormat, now: Date): Date {
   if (billingCycle === 'one_off') {
     const days = getOneOffDurationDays(format);
-    expires = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-  } else if (billingCycle === 'monthly') {
-    expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  } else {
-    expires = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   }
+  if (billingCycle === 'monthly') {
+    return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  }
+  return new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+}
+
+async function activateAd(ctx: AdContext, overrideReason?: string): Promise<ValidateAdResult> {
+  const { supabase, advertisementId, row, title, destinationUrl, format, placementTier, billingCycle } = ctx;
+
+  const now = new Date();
+  const expires = computeExpiry(billingCycle, format, now);
   const expiryDate = expires.toISOString().slice(0, 10);
 
   const pricePaid = row.price_gbp != null ? Number(row.price_gbp) : null;
@@ -172,6 +234,9 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
       paid_at: now.toISOString(),
       price_paid: pricePaid,
       updated_at: now.toISOString(),
+      ...(overrideReason
+        ? { admin_override_reason: overrideReason, admin_override_at: now.toISOString() }
+        : {}),
     })
     .eq('id', advertisementId);
 
@@ -185,17 +250,19 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
       advertisement_id: advertisementId,
       status: 'approved',
       is_sponsored: true,
-      ai_assessment: { source: 'advertiser_validate_ad', passed: true },
+      ai_assessment: overrideReason
+        ? { source: 'admin_manual_approval', passed: true }
+        : { source: 'advertiser_validate_ad', passed: true },
     });
     if (mqErr) {
       console.error('[validate-ad] moderation_queue', mqErr.message);
     }
   }
 
-  if (advertiserEmail) {
+  if (ctx.advertiserEmail) {
     await ad_live(
-      advertiserName,
-      advertiserEmail,
+      ctx.advertiserName,
+      ctx.advertiserEmail,
       title,
       format,
       placementTier || billingCycle,
@@ -208,8 +275,95 @@ export async function runAdvertisementValidation(advertisementId: string): Promi
   return { ok: true };
 }
 
+async function holdForGamblingReview(ctx: AdContext, signals: string[]): Promise<ValidateAdResult> {
+  const { supabase, advertisementId, title, destinationUrl, advertiserName, advertiserEmail } = ctx;
+
+  const { error } = await supabase
+    .from('advertisements')
+    .update({
+      status: 'pending_review',
+      ai_review_status: 'manual_review',
+      ai_review_reason: `Gambling advertising: held for manual approval (matched: ${signals.join(', ')}).`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', advertisementId);
+
+  if (error) {
+    console.error('[validate-ad] gambling hold', error.message);
+    return { ok: false, error: error.message };
+  }
+
+  if (advertiserEmail) {
+    await ad_under_review(advertiserName, advertiserEmail, title);
+  }
+
+  await notifyOps(
+    `Gambling ad held for manual approval: ${title}`,
+    `<p>A gambling advertisement has been paid for and is being held. It will not go live until you approve it.</p>
+<p><strong>Advertiser:</strong> ${escapeHtml(advertiserName)}<br/>
+<strong>Title:</strong> ${escapeHtml(title)}<br/>
+<strong>Destination:</strong> ${escapeHtml(destinationUrl)}<br/>
+<strong>Matched on:</strong> ${escapeHtml(signals.join(', '))}</p>
+<p>Review it in the <a href="${siteUrl()}/admin/dashboard">admin dashboard</a> (Advertisements, filter: pending_review). Before approving, check the advertiser holds the licence required for the audience they are targeting.</p>`
+  );
+
+  return { ok: true, held: true };
+}
+
+type HeldResult = { ok: true } | { ok: false; error: string };
+
+async function loadHeldAd(advertisementId: string): Promise<
+  { ok: true; ctx: AdContext } | { ok: false; error: string }
+> {
+  const supabase = getServiceSupabase();
+  if (!supabase) return { ok: false, error: 'Server misconfigured' };
+  const loaded = await loadAdContext(supabase, advertisementId);
+  if (!loaded.ok) return loaded;
+  const { row } = loaded.ctx;
+  if (row.status !== 'pending_review' || row.ai_review_status !== 'manual_review') {
+    return { ok: false, error: 'Ad is not awaiting manual approval.' };
+  }
+  return loaded;
+}
+
+/** Admin approval of a held gambling ad: activates it exactly as automatic approval would. */
+export async function approveHeldAdvertisement(
+  advertisementId: string,
+  reason: string
+): Promise<HeldResult> {
+  const held = await loadHeldAd(advertisementId);
+  if (!held.ok) return held;
+  const result = await activateAd(held.ctx, reason);
+  return result.ok ? { ok: true } : result;
+}
+
+/** Admin rejection of a held gambling ad: rejects it, refunds the payment and emails the advertiser. */
+export async function rejectHeldAdvertisement(
+  advertisementId: string,
+  reason: string
+): Promise<HeldResult> {
+  const stripe = getStripe();
+  if (!stripe) return { ok: false, error: 'Server misconfigured' };
+  const held = await loadHeldAd(advertisementId);
+  if (!held.ok) return held;
+  const { ctx } = held;
+  await rejectAd({
+    supabase: ctx.supabase,
+    stripe,
+    advertisementId,
+    reason,
+    advertiserName: ctx.advertiserName,
+    advertiserEmail: ctx.advertiserEmail,
+    title: ctx.title,
+    piId: ctx.piId,
+    subId: ctx.subId,
+    manual: true,
+  });
+  return { ok: true };
+}
+
 async function rejectAd(opts: {
-  supabase: NonNullable<ReturnType<typeof getServiceSupabase>>;
+  supabase: Supabase;
   stripe: Stripe;
   advertisementId: string;
   reason: string;
@@ -218,8 +372,9 @@ async function rejectAd(opts: {
   title: string;
   piId: string;
   subId: string;
+  manual?: boolean;
 }) {
-  const { supabase, stripe, advertisementId, reason, advertiserName, advertiserEmail, title, piId, subId } = opts;
+  const { supabase, stripe, advertisementId, reason, advertiserName, advertiserEmail, title, piId, subId, manual } = opts;
   const now = new Date().toISOString();
 
   await supabase
@@ -257,6 +412,6 @@ async function rejectAd(opts: {
   }
 
   if (advertiserEmail) {
-    await ad_rejected(advertiserName, advertiserEmail, title, reason);
+    await ad_rejected(advertiserName, advertiserEmail, title, reason, manual);
   }
 }

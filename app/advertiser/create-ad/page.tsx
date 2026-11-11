@@ -342,6 +342,10 @@ function CreateAdInner() {
               Advertiser terms
             </Link>
           </p>
+          <p className="text-xs text-gray-500 -mt-4 mb-6">
+            Advertising for gambling is held for manual approval and is not published until we approve it. If we
+            decline it, you are refunded in full.
+          </p>
 
           {cancelled && step < 3 && (
             <div className="mb-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3">Payment was cancelled.</div>

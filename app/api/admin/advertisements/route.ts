@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-service';
 import { isAdminServerSession } from '@/lib/admin-server';
+import { approveHeldAdvertisement, rejectHeldAdvertisement } from '@/lib/advertiser/validate-ad-internal';
 
 export const runtime = 'nodejs';
 
@@ -141,6 +142,18 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', adId);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'approve_held' || action === 'reject_held') {
+    if (reason.length < 4) {
+      return NextResponse.json({ error: 'A clear reason is required (logged for the record).' }, { status: 400 });
+    }
+    const result =
+      action === 'approve_held'
+        ? await approveHeldAdvertisement(adId, reason)
+        : await rejectHeldAdvertisement(adId, reason);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
     return NextResponse.json({ ok: true });
   }
 

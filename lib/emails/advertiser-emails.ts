@@ -67,14 +67,37 @@ export async function ad_live(
   );
 }
 
-export async function ad_rejected(advertiserName: string, email: string, adTitle: string, reason: string): Promise<void> {
+export async function ad_under_review(advertiserName: string, email: string, adTitle: string): Promise<void> {
   const name = escapeHtml(advertiserName);
+  await sendEmail(
+    email,
+    'Your advertisement is being reviewed',
+    emailShell(
+      `<p>Hello ${name},</p>
+<p>Thank you for your payment. Your advertisement <strong>${escapeHtml(adTitle)}</strong> is being reviewed by our team before it goes live.</p>
+<p>Advertisements for gambling products and services are reviewed manually. Your ad will not be shown until it has been approved. We will email you as soon as the review is complete.</p>
+<p>If we are unable to approve it, your payment will be refunded in full to the original payment method. For more information, see our <a href="${SITE}/legal/advertiser-terms" style="color:#0f1f3d;">Advertiser Terms</a>.</p>
+<p><a href="${SITE}/advertiser/dashboard" style="display:inline-block;background:#0f1f3d;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Go to advertiser dashboard</a></p>`
+    ),
+    WRITER_EMAIL_FROM
+  );
+}
+
+export async function ad_rejected(
+  advertiserName: string,
+  email: string,
+  adTitle: string,
+  reason: string,
+  manualReview = false
+): Promise<void> {
+  const name = escapeHtml(advertiserName);
+  const reviewKind = manualReview ? 'review by our team' : 'automated content review';
   await sendEmail(
     email,
     'Your advertisement could not be approved',
     emailShell(
       `<p>Hello ${name},</p>
-<p>Your advertisement <strong>${escapeHtml(adTitle)}</strong> could not be approved after automated content review.</p>
+<p>Your advertisement <strong>${escapeHtml(adTitle)}</strong> could not be approved after ${reviewKind}.</p>
 <p><strong>Reason:</strong> ${escapeHtml(reason)}</p>
 <p>Your payment has been refunded to the original payment method. Refunds typically appear within 5–10 business days.</p>
 <p>Please revise your creative or destination URL and submit a new advertisement when you are ready.</p>
