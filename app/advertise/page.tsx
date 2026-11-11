@@ -154,7 +154,7 @@ export default function AdvertisePage() {
             .
           </p>
           <p className="mt-2 text-sm text-gray-400">
-            All prices are in pounds sterling. Ground View News is not VAT registered and does not charge VAT.
+            All prices are in pounds sterling.
           </p>
           <Link
             href="/advertiser/register"
