@@ -79,7 +79,7 @@ export function getAnnualPriceLines(tier: PlacementTier): {
   const annual = getAnnualPriceGbp(tier);
   const eff = getAnnualEffectiveMonthlyGbp(tier);
   return {
-    annualTotal: `${gbp(annual)} billed annually`,
+    annualTotal: `${gbp(annual)} for 12 months, paid once`,
     effectiveMonthly: `${gbp(eff)}/month equivalent`,
     savingsPercent: Math.round(ANNUAL_DISCOUNT_RATE * 1000) / 10,
   };
@@ -99,7 +99,7 @@ export function getSelectionSummarySentence(tier: PlacementTier, billingCycle: B
     return `${name} — Monthly — ${getMonthlyPriceLine(tier)}, renews automatically. Cancel anytime from your dashboard.`;
   }
   const lines = getAnnualPriceLines(tier);
-  return `${name} — Annual — ${lines.annualTotal} (${lines.effectiveMonthly}, ~${lines.savingsPercent}% vs monthly). Runs for 12 months from approval.`;
+  return `${name} — Annual — ${lines.annualTotal} (${lines.effectiveMonthly}, ${lines.savingsPercent}% less than paying monthly). Runs for 12 months from approval.`;
 }
 
 export function getBillingInclusionsLine(tier: PlacementTier, billingCycle: BillingCycle): string {

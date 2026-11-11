@@ -34,12 +34,13 @@ type PendingAdDraft = {
 
 const PLACEMENT_TIERS: PlacementTier[] = ['basic', 'standard', 'premium'];
 
-const gbpN = (n: number) => `£${n.toLocaleString('en-GB')}`;
+const gbpN = (n: number) =>
+  `£${n.toLocaleString('en-GB', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
 
 function totalPriceLabel(tier: PlacementTier, billing: BillingCycle): string {
   const p = getCheckoutPriceGbp(tier, billing);
   if (billing === 'monthly') return `Total: ${gbpN(p)}/month GBP`;
-  return `Total: ${gbpN(p)} billed annually GBP`;
+  return `Total: ${gbpN(p)} GBP for 12 months, paid once`;
 }
 
 function isPlacementTier(x: unknown): x is PlacementTier {
@@ -425,7 +426,7 @@ function CreateAdInner() {
                               Annual — <span className="text-amber-900">{annualLines.annualTotal}</span>
                             </div>
                             <p className="text-xs text-gray-600 mt-1">
-                              {annualLines.effectiveMonthly} (~{annualLines.savingsPercent}% vs monthly). Billed annually upfront.
+                              {annualLines.effectiveMonthly} ({annualLines.savingsPercent}% less than paying monthly). One payment upfront, no automatic renewal.
                             </p>
                           </button>
                           {billingCycle && (

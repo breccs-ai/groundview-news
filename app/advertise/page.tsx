@@ -134,7 +134,7 @@ export default function AdvertisePage() {
                   <span className="text-sm text-gray-400 mb-1">/ month</span>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">
-                  or {pkg.annual.annualTotal} (save about {pkg.annual.savingsPercent}%)
+                  or {pkg.annual.annualTotal} (save {pkg.annual.savingsPercent}%)
                 </p>
                 <p className="text-sm text-gray-600 leading-relaxed flex-1">{pkg.description}</p>
               </div>
@@ -146,7 +146,7 @@ export default function AdvertisePage() {
             and every ad is reviewed before it goes live.
           </p>
           <p className="mt-2 text-sm text-gray-400">
-            All prices exclude VAT where applicable.
+            All prices are in pounds sterling. Ground View News is not VAT registered and does not charge VAT.
           </p>
           <Link
             href="/advertiser/register"
