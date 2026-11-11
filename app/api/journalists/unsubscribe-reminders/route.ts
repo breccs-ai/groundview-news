@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
+import { escapeHtml } from '@/lib/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,16 +53,30 @@ async function unsubscribe(id: string, token: string): Promise<NextResponse> {
   );
 }
 
-// Clicked directly from the email footer.
+// Opened from the email footer. This only shows a confirmation page and never
+// changes anything: mail security scanners routinely open every link in an
+// email, and opting out on GET would silently unsubscribe writers who never
+// asked. The button on this page POSTs back to this same URL.
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id') || '';
   const token = req.nextUrl.searchParams.get('token') || '';
-  return unsubscribe(id, token);
+  if (!verifyUnsubscribeToken(id, token)) {
+    return htmlPage('This unsubscribe link is invalid or has expired. Please contact info@groundviewnews.com if you keep receiving emails you did not expect.');
+  }
+
+  const action = `/api/journalists/unsubscribe-reminders?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
+  return htmlPage(
+    `Do you want to stop receiving writer activity and earnings reminder emails from Ground View News?
+    <form method="post" action="${escapeHtml(action)}" style="margin-top:24px;">
+      <button type="submit" style="background:#0f1f3d;color:#ffffff;border:0;padding:12px 24px;border-radius:4px;font-size:15px;font-family:Arial,Helvetica,sans-serif;font-weight:bold;cursor:pointer;">Confirm unsubscribe</button>
+    </form>
+    <p style="font-size:13px;color:#666;margin-top:20px;">If you opened this by mistake, you can simply close this page and nothing will change. You will still receive essential account emails either way.</p>`
+  );
 }
 
-// One-click unsubscribe (RFC 8058): mail clients that see the
-// List-Unsubscribe-Post header call this directly, with no page shown to the
-// user, so it must succeed without requiring the GET confirmation page.
+// Performs the unsubscribe. Called by the confirmation button above, and
+// directly by mail clients using one-click unsubscribe (RFC 8058, triggered by
+// the List-Unsubscribe-Post header), which POST without showing any page.
 export async function POST(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id') || '';
   const token = req.nextUrl.searchParams.get('token') || '';
