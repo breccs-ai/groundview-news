@@ -167,6 +167,13 @@ function JournalistSubmitInner() {
 
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [bootError, setBootError] = useState('');
+  const [editorFeedback, setEditorFeedback] = useState<{
+    round: number;
+    items: string[];
+    note: string | null;
+    sent_at: string;
+    resubmitted_at: string | null;
+  } | null>(null);
   const [canSubmitAsJournalist, setCanSubmitAsJournalist] = useState(true);
   const [accountEmailHint, setAccountEmailHint] = useState('');
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
@@ -413,6 +420,7 @@ function JournalistSubmitInner() {
           return;
         }
         setArticleId(article.id || draftId);
+        setEditorFeedback(json.feedback ?? null);
         const storedImages = normalizeStoredArticleImages(article.article_images);
         setArticleImageUrls([
           storedImages[0]?.url || null,
@@ -772,6 +780,39 @@ function JournalistSubmitInner() {
             </div>
           )}
           {bootError && <p className="text-sm text-red-600 border border-red-200 bg-red-50 px-4 py-3 rounded-sm">{bootError}</p>}
+
+          {editorFeedback && (
+            <div
+              className={`rounded-sm px-5 py-4 space-y-3 border ${
+                editorFeedback.resubmitted_at ? 'border-gray-200 bg-gray-50' : 'border-amber-300 bg-amber-50'
+              }`}
+              role="region"
+              aria-label="Editor feedback"
+            >
+              <p className={`font-semibold ${editorFeedback.resubmitted_at ? 'text-gray-900' : 'text-amber-950'}`}>
+                {editorFeedback.resubmitted_at
+                  ? `Feedback from our editors (round ${editorFeedback.round}). You resubmitted this on ${new Date(editorFeedback.resubmitted_at).toLocaleDateString('en-GB')}.`
+                  : `Our editors have asked for changes before this can be approved (round ${editorFeedback.round})`}
+              </p>
+              <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-900">
+                {editorFeedback.items.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ol>
+              {editorFeedback.note && (
+                <p className="text-sm text-gray-900">
+                  <span className="font-semibold">Note from the editor:</span> {editorFeedback.note}
+                </p>
+              )}
+              <p className="text-xs text-gray-600">
+                Our standards are in the{' '}
+                <Link href="/editorial-policy" className="underline">
+                  editorial policy
+                </Link>
+                . When you have made the changes, submit the article again and we will review the updated version.
+              </p>
+            </div>
+          )}
 
           {publishOutcome.kind === 'rejected' && (
             <div className="border border-red-200 bg-red-50 rounded-sm px-5 py-4 space-y-3">

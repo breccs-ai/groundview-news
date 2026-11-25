@@ -105,6 +105,37 @@ export function articleApprovedForPublishEmail(args: {
   return { subject, html };
 }
 
+export function articleChangesRequestedEmail(args: {
+  fullName: string;
+  articleTitle: string;
+  items: string[];
+  note?: string | null;
+  editUrl: string;
+}): { subject: string; html: string } {
+  const subject = `Changes requested on your article: ${args.articleTitle}`;
+  const list = args.items
+    .map((t) => `<li style="margin-bottom:10px;">${escapeHtml(t)}</li>`)
+    .join('');
+  const note = args.note?.trim()
+    ? `<p style="margin-top:16px;"><strong>A note from the editor:</strong> ${escapeHtml(args.note.trim())}</p>`
+    : '';
+  const html = shell(`
+    <p>Hi ${escapeHtml(firstName(args.fullName))},</p>
+    <p>Thank you for submitting <strong>${escapeHtml(args.articleTitle)}</strong>. Our editors have read it and need a few changes before it can be approved:</p>
+    <ol style="padding-left:22px;margin:16px 0;">${list}</ol>
+    ${note}
+    <p>You can read our standards in the <a href="${siteUrl()}/editorial-policy" style="color:#0f1f3d;">editorial policy</a> (see Accuracy and Verification).</p>
+    <p style="margin-top:20px;">
+      <a
+        href="${escapeHtml(args.editUrl)}"
+        style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"
+      >Edit your article</a>
+    </p>
+    <p>Your draft is saved exactly as you submitted it. When you have made the changes, submit it again and we will review the updated version.</p>
+  `);
+  return { subject, html };
+}
+
 export function writerActivityReminderEmail(args: { id: string; fullName: string }): {
   subject: string;
   html: string;

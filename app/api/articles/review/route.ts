@@ -65,7 +65,13 @@ export async function POST(req: NextRequest) {
     const editorialCategory = normalizeEditorialCategory(
       (article as Record<string, unknown>).editorial_category,
     );
-    if (requiresHumanEditorialReview(editorialCategory)) {
+    // An article an editor has already commented on never goes through
+    // automated review: it always waits for the editor's approval.
+    const { count: feedbackRounds } = await supabase
+      .from('article_feedback')
+      .select('id', { count: 'exact', head: true })
+      .eq('article_id', article_id);
+    if (requiresHumanEditorialReview(editorialCategory) || (feedbackRounds || 0) > 0) {
       const { error: upErr } = await supabase
         .from('articles')
         .update({ status: 'pending_editorial', editorial_category: editorialCategory })

@@ -6,8 +6,34 @@ import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/
 import { generateSlug, generateUniqueSlug } from '@/lib/slug';
 import { notifyOps } from '@/lib/ops-notifications';
 import { escapeHtml } from '@/lib/email-branding';
+import { diffArticle, type ArticleSnapshot } from '@/lib/article-diff';
+import { storedBodyToEditorMarkdown } from '@/lib/article-markdown';
+import { resubmissionNotificationHtml } from '@/lib/article-feedback';
 
 const REVIEW_STATUSES = ['pending', 'pending_editorial'];
+
+type FeedbackRound = {
+  id: string;
+  round: number;
+  items: string[];
+  note: string | null;
+  snapshot: ArticleSnapshot;
+  sent_at: string;
+  resubmitted_at: string | null;
+};
+
+/** Editor feedback rounds for an article, newest first. Service-role only table. */
+async function loadFeedbackRounds(
+  supabase: NonNullable<ReturnType<typeof getServiceSupabase>>,
+  articleId: string
+): Promise<FeedbackRound[]> {
+  const { data } = await supabase
+    .from('article_feedback')
+    .select('id, round, items, note, snapshot, sent_at, resubmitted_at')
+    .eq('article_id', articleId)
+    .order('round', { ascending: false });
+  return (data || []) as FeedbackRound[];
+}
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -149,7 +175,20 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    return NextResponse.json({ article: data });
+    // Latest editor feedback, shown to the writer on their edit page.
+    const rounds = await loadFeedbackRounds(supabase, id);
+    const latest = rounds[0];
+    const feedback = latest
+      ? {
+          round: latest.round,
+          items: latest.items,
+          note: latest.note,
+          sent_at: latest.sent_at,
+          resubmitted_at: latest.resubmitted_at,
+        }
+      : null;
+
+    return NextResponse.json({ article: data, feedback });
   } catch (e) {
     console.error('[articles GET]', e);
     return NextResponse.json({ error: 'Server error.' }, { status: 500 });
@@ -391,6 +430,18 @@ export async function PATCH(req: NextRequest) {
       payload.published_at = existingPublishedAt || new Date().toISOString();
     }
 
+    // An article that has had editor feedback is never published automatically:
+    // any later submission goes to human review, and a resubmission after an
+    // open feedback round also triggers the "what changed" notification below.
+    let openRound: FeedbackRound | null = null;
+    if (actor.kind === 'journalist' && REVIEW_STATUSES.includes(String(p.status))) {
+      const rounds = await loadFeedbackRounds(supabase, id);
+      if (rounds.length > 0) {
+        p.status = 'pending_editorial';
+        openRound = rounds.find((r) => !r.resubmitted_at) || null;
+      }
+    }
+
     // Early-access window: server-applies publish_at when this PATCH flips
     // status to 'published'. Honoured for both admin and journalist paths.
     applyEarlyAccessPublishAt(payload as Record<string, unknown>);
@@ -402,6 +453,45 @@ export async function PATCH(req: NextRequest) {
     const slug =
       typeof p.slug === 'string' && p.slug ? p.slug : undefined;
 
+    if (openRound) {
+      try {
+      const { data: updated } = await supabase
+        .from('articles')
+        .select('title, subtitle, excerpt, body, author_name')
+        .eq('id', id)
+        .maybeSingle();
+      const u = updated as {
+        title?: string;
+        subtitle?: string | null;
+        excerpt?: string | null;
+        body?: unknown;
+        author_name?: string | null;
+      } | null;
+      const diff = diffArticle(openRound.snapshot, {
+        title: u?.title || '',
+        subtitle: u?.subtitle || '',
+        excerpt: u?.excerpt || '',
+        markdown: storedBodyToEditorMarkdown(u?.body),
+      });
+      await supabase
+        .from('article_feedback')
+        .update({ resubmitted_at: new Date().toISOString(), resubmission_summary: diff.stats })
+        .eq('id', openRound.id);
+      const note = resubmissionNotificationHtml({
+        articleId: id,
+        articleTitle: u?.title || String(p.title || ''),
+        writerName: u?.author_name || '',
+        round: openRound.round,
+        items: openRound.items,
+        note: openRound.note,
+        diff,
+      });
+      await notifyOps(note.subject, note.bodyHtml);
+      } catch (e) {
+        console.error('[articles PATCH] resubmission notification failed', e);
+      }
+    }
+
     if (p.status === 'published') {
       await triggerRevalidate(req, slug);
       await notifyOps(
@@ -412,7 +502,7 @@ export async function PATCH(req: NextRequest) {
 <p><strong>Link:</strong> <a href="https://groundviewnews.com/articles/${escapeHtml(String(slug || ''))}">https://groundviewnews.com/articles/${escapeHtml(String(slug || ''))}</a></p>`
       );
       await evaluateFoundingLeadEditorEligibility(supabase, publishedAuthorId);
-    } else if (REVIEW_STATUSES.includes(String(p.status))) {
+    } else if (REVIEW_STATUSES.includes(String(p.status)) && !openRound) {
       await notifyOps(
         `Article submitted for review: ${String(p.title || '')}`,
         `<p><strong>Title:</strong> ${escapeHtml(String(p.title || ''))}</p>

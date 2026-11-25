@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
 import { getCategoryMeta } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
+import { FEEDBACK_PRESETS, FEEDBACK_MAX_ITEMS } from '@/lib/article-feedback-presets';
 import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw, CircleCheck as CheckCircle2, Circle as XCircle, Megaphone, ExternalLink, ShieldCheck } from 'lucide-react';
 
 type DbStatus = { ok: boolean; publishedCount: number; draftCount: number; error?: string } | null;
@@ -100,10 +101,60 @@ export default function AdminDashboard() {
   const [kycLoading, setKycLoading] = useState(true);
   const [rejectingKyc, setRejectingKyc] = useState<PendingKyc | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
+  const [feedbackByArticle, setFeedbackByArticle] = useState<
+    Record<string, { round: number; sent_at: string; resubmitted_at: string | null; email_sent: boolean }>
+  >({});
+  const [changesArticle, setChangesArticle] = useState<Article | null>(null);
+  const [changeItems, setChangeItems] = useState<string[]>(['']);
+  const [changeNote, setChangeNote] = useState('');
+  const [changesBusy, setChangesBusy] = useState(false);
 
   const showToast = (type: ToastMsg['type'], text: string) => {
     setToast({ type, text });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  const fetchFeedback = useCallback(async () => {
+    const res = await fetch('/api/admin/articles/request-changes', { credentials: 'include' });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.feedback) setFeedbackByArticle(body.feedback);
+  }, []);
+
+  const openRequestChanges = (article: Article) => {
+    setChangesArticle(article);
+    setChangeItems(['']);
+    setChangeNote('');
+  };
+
+  const sendChangeRequest = async () => {
+    if (!changesArticle) return;
+    const items = changeItems.map((i) => i.trim()).filter(Boolean);
+    if (items.length === 0) {
+      showToast('error', 'Add at least one comment for the writer.');
+      return;
+    }
+    setChangesBusy(true);
+    const res = await fetch('/api/admin/articles/request-changes', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ article_id: changesArticle.id, items, note: changeNote }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setChangesBusy(false);
+    if (!res.ok) {
+      showToast('error', body.error || 'Could not send the comments.');
+      return;
+    }
+    setChangesArticle(null);
+    showToast(
+      body.email_sent ? 'success' : 'error',
+      body.email_sent
+        ? 'Comments sent. The writer has been emailed.'
+        : 'Comments saved and the article returned to the writer, but the email could not be sent. Please contact them directly.'
+    );
+    fetchArticles();
+    fetchFeedback();
   };
 
   const fetchPendingJournalists = useCallback(async () => {
@@ -210,10 +261,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchArticles();
+    fetchFeedback();
     fetchPendingJournalists();
     fetchAdvertisements();
     fetchPendingKyc();
-  }, [fetchArticles, fetchPendingJournalists, fetchAdvertisements, fetchPendingKyc]);
+  }, [fetchArticles, fetchFeedback, fetchPendingJournalists, fetchAdvertisements, fetchPendingKyc]);
 
   const decideJournalist = async (journalist: PendingJournalist, action: 'approve' | 'reject', reason?: string) => {
     const res = await fetch('/api/admin/journalists/decision', {
@@ -416,6 +468,106 @@ export default function AdminDashboard() {
           }`}
         >
           {toast.text}
+        </div>
+      )}
+
+      {/* Request changes modal: comments are emailed to the writer */}
+      {changesArticle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-white rounded-sm shadow-xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <p className="font-semibold text-gray-900 text-sm mb-1">Request changes</p>
+            <p className="text-xs text-gray-500 mb-4">
+              {changesArticle.title}. Your comments are emailed to {changesArticle.author_name || 'the writer'}, and
+              the article goes back to them as an editable draft. You will be emailed when they resubmit, with a
+              summary of what changed.
+            </p>
+
+            <p className="text-xs font-semibold text-gray-600 mb-2">Quick comments (click to add)</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {FEEDBACK_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="px-2.5 py-1 text-xs border border-gray-300 rounded-sm text-gray-700 hover:bg-gray-50"
+                  onClick={() =>
+                    setChangeItems((prev) => {
+                      const empty = prev.findIndex((i) => !i.trim());
+                      if (empty >= 0) return prev.map((i, idx) => (idx === empty ? preset.text : i));
+                      return prev.length < FEEDBACK_MAX_ITEMS ? [...prev, preset.text] : prev;
+                    })
+                  }
+                >
+                  + {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs font-semibold text-gray-600 mb-2">Comments for the writer</p>
+            <div className="space-y-2">
+              {changeItems.map((item, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <span className="text-xs text-gray-500 pt-2 w-4">{idx + 1}.</span>
+                  <textarea
+                    value={item}
+                    onChange={(e) =>
+                      setChangeItems((prev) => prev.map((i, n) => (n === idx ? e.target.value : i)))
+                    }
+                    rows={2}
+                    maxLength={1000}
+                    className="flex-1 border border-gray-300 rounded-sm px-3 py-2 text-sm"
+                    placeholder="What is missing or needs to change?"
+                  />
+                  {changeItems.length > 1 && (
+                    <button
+                      type="button"
+                      className="text-xs text-red-700 underline pt-2"
+                      onClick={() => setChangeItems((prev) => prev.filter((_, n) => n !== idx))}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {changeItems.length < FEEDBACK_MAX_ITEMS && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-blue-800 underline"
+                onClick={() => setChangeItems((prev) => [...prev, ''])}
+              >
+                Add another comment
+              </button>
+            )}
+
+            <p className="text-xs font-semibold text-gray-600 mt-4 mb-2">Optional note</p>
+            <textarea
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              rows={2}
+              maxLength={1000}
+              className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm"
+              placeholder="Anything else you want to say, for example what you would like to see in the next version."
+            />
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                className="px-3 py-2 text-sm border rounded-sm"
+                disabled={changesBusy}
+                onClick={() => setChangesArticle(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm bg-blue-900 text-white rounded-sm disabled:opacity-60"
+                disabled={changesBusy}
+                onClick={() => void sendChangeRequest()}
+              >
+                {changesBusy ? 'Sending...' : 'Send comments to writer'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1082,7 +1234,25 @@ export default function AdminDashboard() {
                           {cat.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{statusBadge(article.status)}</td>
+                      <td className="px-4 py-3">
+                        {statusBadge(article.status)}
+                        {feedbackByArticle[article.id] &&
+                          article.status !== 'published' &&
+                          article.status !== 'approved_pending_publish' && (
+                          <p
+                            className={`mt-1 text-xs font-semibold ${
+                              feedbackByArticle[article.id].resubmitted_at ? 'text-blue-800' : 'text-amber-800'
+                            }`}
+                          >
+                            {feedbackByArticle[article.id].resubmitted_at
+                              ? `Revised after feedback (round ${feedbackByArticle[article.id].round})`
+                              : `Changes requested (round ${feedbackByArticle[article.id].round}), waiting for the writer`}
+                            {!feedbackByArticle[article.id].email_sent && (
+                              <span className="block text-red-700">Email to the writer was not sent</span>
+                            )}
+                          </p>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
                         {article.published_at
                           ? formatDate(article.published_at)
@@ -1116,6 +1286,16 @@ export default function AdminDashboard() {
                               >
                                 Reject
                               </button>
+                              {article.author_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => openRequestChanges(article)}
+                                  title="Send comments to the writer and return the article to them"
+                                  className="px-2.5 py-1 text-xs font-semibold bg-amber-600 text-white rounded-sm hover:bg-amber-500 transition-colors"
+                                >
+                                  Request changes
+                                </button>
+                              )}
                               <Link
                                 href={`/admin/articles/edit/${article.id}`}
                                 className="p-1.5 rounded text-gray-400 hover:text-blue-700 hover:bg-blue-50 transition-colors"
@@ -1166,6 +1346,16 @@ export default function AdminDashboard() {
                                   className="px-2.5 py-1 text-xs font-semibold bg-green-700 text-white rounded-sm hover:bg-green-600 transition-colors"
                                 >
                                   {article.author_id ? 'Approve' : 'Publish'}
+                                </button>
+                              )}
+                              {article.author_id && article.status !== 'published' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openRequestChanges(article)}
+                                  title="Send comments to the writer and return the article to them"
+                                  className="px-2.5 py-1 text-xs font-semibold bg-amber-600 text-white rounded-sm hover:bg-amber-500 transition-colors"
+                                >
+                                  Request changes
                                 </button>
                               )}
                               <Link
