@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
-import { supabase } from '@/lib/supabase';
 import { getCategoryMeta } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import { FilePlus, Pencil, Trash2, Globe, TriangleAlert as AlertTriangle, RefreshCw, CircleCheck as CheckCircle2, Circle as XCircle, Megaphone, ExternalLink, ShieldCheck } from 'lucide-react';
@@ -123,16 +122,15 @@ export default function AdminDashboard() {
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('articles')
-      .select('id, title, slug, category, label, status, published_at, created_at, author_name, author_id')
-      .order('created_at', { ascending: false });
+    const res = await fetch('/api/admin/articles', { credentials: 'include' });
+    const payload = await res.json().catch(() => ({}));
+    const error = res.ok ? null : { message: String(payload.error || 'Request failed') };
 
     if (error) {
       showToast('error', `Failed to load articles: ${error.message}`);
       setDbStatus({ ok: false, publishedCount: 0, draftCount: 0, error: error.message });
     } else {
-      const rows = data as Article[];
+      const rows = (payload.articles || []) as Article[];
       setArticles(rows);
       setDbStatus({
         ok: true,
@@ -256,8 +254,24 @@ export default function AdminDashboard() {
     fetchAdvertisements();
   };
 
+  // Article changes run on the server behind the signed admin session, not from the browser with the public key.
+  const articleRequest = async (
+    method: 'POST' | 'DELETE',
+    body: Record<string, string>
+  ): Promise<{ message: string } | null> => {
+    const res = await fetch('/api/admin/articles', {
+      method,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return null;
+    const payload = await res.json().catch(() => ({}));
+    return { message: String(payload.error || 'Request failed') };
+  };
+
   const handleRejectArticle = async (article: Article) => {
-    const { error } = await supabase.from('articles').update({ status: 'rejected' }).eq('id', article.id);
+    const error = await articleRequest('POST', { action: 'reject', article_id: article.id });
 
     if (error) {
       showToast('error', `Failed to reject: ${error.message}`);
@@ -293,11 +307,7 @@ export default function AdminDashboard() {
   };
 
   const handlePublish = async (article: Article) => {
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from('articles')
-      .update({ status: 'published', published_at: article.published_at || now })
-      .eq('id', article.id);
+    const error = await articleRequest('POST', { action: 'publish', article_id: article.id });
 
     if (error) {
       showToast('error', `Failed to publish: ${error.message}`);
@@ -315,10 +325,7 @@ export default function AdminDashboard() {
   };
 
   const handleUnpublish = async (article: Article) => {
-    const { error } = await supabase
-      .from('articles')
-      .update({ status: 'draft' })
-      .eq('id', article.id);
+    const error = await articleRequest('POST', { action: 'unpublish', article_id: article.id });
 
     if (error) {
       showToast('error', 'Failed to unpublish.');
@@ -342,10 +349,7 @@ export default function AdminDashboard() {
     const article = articles.find((a) => a.id === deleteId);
     setDeleteId(null);
 
-    const { error } = await supabase
-      .from('articles')
-      .delete()
-      .eq('id', deleteId);
+    const error = await articleRequest('DELETE', { article_id: deleteId });
 
     if (error) {
       showToast('error', 'Failed to delete article.');

@@ -35,15 +35,30 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAdminAuthenticated()) {
-      router.replace('/admin');
-    } else {
+    let cancelled = false;
+    (async () => {
+      if (!isAdminAuthenticated()) {
+        router.replace('/admin');
+        return;
+      }
+      // The marker cookie is only a hint; confirm with the server that the signed session is valid.
+      const res = await fetch('/api/admin-auth/session', { credentials: 'include' }).catch(() => null);
+      const body = res && res.ok ? await res.json().catch(() => ({})) : {};
+      if (cancelled) return;
+      if (!body.authenticated) {
+        await clearAdminSession();
+        router.replace('/admin');
+        return;
+      }
       setChecked(true);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  const handleLogout = () => {
-    clearAdminSession();
+  const handleLogout = async () => {
+    await clearAdminSession();
     router.push('/admin');
   };
 

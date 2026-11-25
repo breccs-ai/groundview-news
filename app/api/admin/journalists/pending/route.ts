@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
-
-const ADMIN_COOKIE = 'gvn_admin_session';
-const ADMIN_COOKIE_VALUE = 'authenticated';
+import { isAdminServerSession } from '@/lib/admin-server';
 
 function isAdmin(): boolean {
-  const cookie = cookies().get(ADMIN_COOKIE);
-  return cookie?.value === ADMIN_COOKIE_VALUE;
+  return isAdminServerSession();
 }
 
 function getServiceSupabase() {

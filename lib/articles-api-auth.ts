@@ -1,22 +1,14 @@
 import { NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient, User } from '@supabase/supabase-js';
 import { getServiceSupabase } from '@/lib/supabase-service';
-
-const ADMIN_COOKIE = 'gvn_admin_session';
-const ADMIN_COOKIE_VALUE = 'authenticated';
+import { isAdminServerSession } from '@/lib/admin-server';
 
 export type ArticlesApiActor =
   | { kind: 'admin' }
   | { kind: 'journalist'; user: User; accessToken: string };
 
-function isAdminCookie(): boolean {
-  const cookie = cookies().get(ADMIN_COOKIE);
-  return cookie?.value === ADMIN_COOKIE_VALUE;
-}
-
 export async function resolveArticlesActor(req: NextRequest): Promise<ArticlesApiActor | null> {
-  if (isAdminCookie()) {
+  if (isAdminServerSession()) {
     return { kind: 'admin' };
   }
 

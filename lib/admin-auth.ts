@@ -1,18 +1,22 @@
+// ADMIN_COOKIE is the httpOnly, signed session token (see lib/admin-session.ts).
+// The browser cannot read it. ADMIN_MARKER_COOKIE is a non-secret flag the
+// browser can read, used only to decide whether to show admin buttons. The
+// server never trusts it: every admin route checks the signed cookie.
 export const ADMIN_COOKIE = 'gvn_admin_session';
-export const ADMIN_COOKIE_VALUE = 'authenticated';
+export const ADMIN_MARKER_COOKIE = 'gvn_admin_present';
 
 export function isAdminAuthenticated(): boolean {
   if (typeof document === 'undefined') return false;
   return document.cookie.split(';').some((c) => {
     const eq = c.indexOf('=');
-    const name = c.slice(0, eq).trim();
-    const value = c.slice(eq + 1).trim();
-    return name === ADMIN_COOKIE && value === ADMIN_COOKIE_VALUE;
+    return c.slice(0, eq).trim() === ADMIN_MARKER_COOKIE && c.slice(eq + 1).trim() === '1';
   });
 }
 
-export function clearAdminSession() {
-  document.cookie = `${ADMIN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+/** Clears the marker and asks the server to clear the real (httpOnly) session cookie. */
+export async function clearAdminSession(): Promise<void> {
+  document.cookie = `${ADMIN_MARKER_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  await fetch('/api/admin-auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
 }
 
 export function slugify(title: string): string {
