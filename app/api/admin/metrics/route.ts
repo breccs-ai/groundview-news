@@ -8,7 +8,7 @@ import type { SharePlatform } from '@/lib/article-shares';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

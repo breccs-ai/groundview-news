@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _req: NextRequest,
-  context: { params: { slug: string } }
+  context: { params: Promise<{ slug: string }> }
 ) {
-  const slug = decodeURIComponent(context.params.slug || '').trim();
+  const slug = decodeURIComponent((await context.params).slug || '').trim();
   if (!slug) {
     return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
   }

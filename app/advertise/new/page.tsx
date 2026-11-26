@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 
 type Props = {
-  searchParams: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function AdvertiseNewRedirectPage({ searchParams }: Props) {
-  const sp = searchParams instanceof Promise ? await searchParams : searchParams;
+  const sp = await searchParams;
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(sp)) {
     if (typeof value === 'string') qs.set(key, value);

@@ -18,7 +18,7 @@ import { parseArticleShares } from '@/lib/article-shares';
 import { getPublicSiteOrigin } from '@/lib/article-public-url';
 
 type Props = {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 };
 
 export async function generateStaticParams() {
@@ -26,18 +26,19 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const meta = getCategoryMeta(params.category);
+  const { category } = await params;
+  const meta = getCategoryMeta(category);
   return {
     title: `${meta.label} | Ground View News`,
     description: `Read the latest ${meta.label} articles from Ground View News, independent global commentary.`,
     alternates: {
-      canonical: `${getPublicSiteOrigin()}/category/${params.category}`,
+      canonical: `${getPublicSiteOrigin()}/category/${category}`,
     },
   };
 }
 
 export default async function CategoryPage({ params }: Props) {
-  const { category } = params;
+  const { category } = await params;
   const meta = getCategoryMeta(category);
   const articles = await getPublishedArticles({ category });
 

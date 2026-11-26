@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAdminServerSession } from '@/lib/admin-server';
 
-function isAdmin(): boolean {
+async function isAdmin(): Promise<boolean> {
   return isAdminServerSession();
 }
 
@@ -14,7 +14,7 @@ function getServiceSupabase() {
 }
 
 export async function GET() {
-  if (!isAdmin()) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

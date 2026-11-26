@@ -27,7 +27,7 @@ import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
 
 type Props = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 function normalizeArticleImages(value: unknown): ArticleImage[] {
@@ -60,7 +60,8 @@ function imageCaption(image: ArticleImage, imageCount: number, title: string): s
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const article = await getArticleBySlug(params.slug);
+  const { slug } = await params;
+  const article = await getArticleBySlug(slug);
   if (!article) return { title: 'Article not found | Ground View News' };
   const legacyFeaturedUrl =
     typeof article.featured_image_url === 'string' && article.featured_image_url.trim() !== ''
@@ -75,7 +76,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${article.title} | Ground View News`,
     description: article.excerpt || article.subtitle || '',
     alternates: {
-      canonical: articleCanonicalUrl(params.slug),
+      canonical: articleCanonicalUrl(slug),
     },
     openGraph: {
       title: article.title,
@@ -95,7 +96,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ArticlePage({ params }: Props) {
-  const article = await getArticleBySlug(params.slug);
+  const { slug } = await params;
+  const article = await getArticleBySlug(slug);
   if (!article) notFound();
 
   const legacyFeaturedImageUrl =

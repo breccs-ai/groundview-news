@@ -13,7 +13,7 @@ function stripePaymentUrl(paymentIntentId: string | null | undefined): string | 
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * the writer as an editable draft, and emails them what is missing.
  */
 export async function POST(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getServiceSupabase();
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
 
 /** GET: the latest feedback round for every article that has had feedback, for the admin dashboard badges. */
 export async function GET() {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getServiceSupabase();

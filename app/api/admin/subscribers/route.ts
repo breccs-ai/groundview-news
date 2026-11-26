@@ -37,7 +37,7 @@ const MONTHLY_PENCE = 499;
 const ANNUAL_PENCE = 3900;
 
 export async function GET(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

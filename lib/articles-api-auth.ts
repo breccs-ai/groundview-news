@@ -8,7 +8,7 @@ export type ArticlesApiActor =
   | { kind: 'journalist'; user: User; accessToken: string };
 
 export async function resolveArticlesActor(req: NextRequest): Promise<ArticlesApiActor | null> {
-  if (isAdminServerSession()) {
+  if ((await isAdminServerSession())) {
     return { kind: 'admin' };
   }
 

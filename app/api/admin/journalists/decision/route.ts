@@ -8,7 +8,7 @@ import {
   applicationRejectedEmail,
 } from '@/lib/writer-emails';
 
-function isAdmin(): boolean {
+async function isAdmin(): Promise<boolean> {
   return isAdminServerSession();
 }
 
@@ -20,7 +20,7 @@ function getServiceSupabase() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAdmin()) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

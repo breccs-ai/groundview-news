@@ -5,7 +5,7 @@ import { isAdminServerSession } from '@/lib/admin-server';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

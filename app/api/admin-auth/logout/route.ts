@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 // The session cookie is httpOnly, so only the server can clear it.
 export async function POST() {
-  cookies().set(ADMIN_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
-  cookies().set(ADMIN_MARKER_COOKIE, '', { path: '/', maxAge: 0 });
+  (await cookies()).set(ADMIN_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
+  (await cookies()).set(ADMIN_MARKER_COOKIE, '', { path: '/', maxAge: 0 });
   return NextResponse.json({ success: true });
 }

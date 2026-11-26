@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   failures.delete(key);
 
   const secure = process.env.NODE_ENV === 'production';
-  cookies().set(ADMIN_COOKIE, token, {
+  (await cookies()).set(ADMIN_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure,
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     path: '/',
   });
   // Non-secret flag so the browser can show admin buttons; never trusted by the server.
-  cookies().set(ADMIN_MARKER_COOKIE, '1', {
+  (await cookies()).set(ADMIN_MARKER_COOKIE, '1', {
     httpOnly: false,
     sameSite: 'lax',
     secure,

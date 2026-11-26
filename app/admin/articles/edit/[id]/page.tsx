@@ -2,13 +2,14 @@ import AdminShell from '@/components/AdminShell';
 import ArticleEditorForm from '@/components/ArticleEditorForm';
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
-export default function EditArticlePage({ params }: Props) {
+export default async function EditArticlePage({ params }: Props) {
+  const { id } = await params;
   return (
     <AdminShell>
-      <ArticleEditorForm articleId={params.id} />
+      <ArticleEditorForm articleId={id} />
     </AdminShell>
   );
 }

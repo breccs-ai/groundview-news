@@ -7,5 +7,5 @@ export const dynamic = 'force-dynamic';
 // Lets the admin screens confirm the signed session is genuinely valid, since
 // the browser can only see the non-secret marker cookie.
 export async function GET() {
-  return NextResponse.json({ authenticated: isAdminServerSession() });
+  return NextResponse.json({ authenticated: (await isAdminServerSession()) });
 }

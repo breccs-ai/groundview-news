@@ -3,6 +3,6 @@ import { ADMIN_COOKIE } from '@/lib/admin-auth';
 import { verifyAdminSessionToken } from '@/lib/admin-session';
 
 /** The one check every admin-only route uses. Fails closed if no secret is configured. */
-export function isAdminServerSession(): boolean {
-  return verifyAdminSessionToken(cookies().get(ADMIN_COOKIE)?.value);
+export async function isAdminServerSession(): Promise<boolean> {
+  return verifyAdminSessionToken((await cookies()).get(ADMIN_COOKIE)?.value);
 }

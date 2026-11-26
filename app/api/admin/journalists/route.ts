@@ -99,7 +99,7 @@ async function computePeriodShare(
 }
 
 export async function GET() {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

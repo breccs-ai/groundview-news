@@ -14,7 +14,7 @@ const LIST_COLUMNS =
  * could do them; they now run here, behind the signed admin session.
  */
 export async function GET() {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getServiceSupabase();
@@ -32,7 +32,7 @@ const ACTIONS = ['reject', 'publish', 'unpublish'] as const;
 type Action = (typeof ACTIONS)[number];
 
 export async function POST(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getServiceSupabase();
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!isAdminServerSession()) {
+  if (!(await isAdminServerSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getServiceSupabase();
