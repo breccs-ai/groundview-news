@@ -149,13 +149,14 @@ export default async function run() {
 
   // ---------- The unauthenticated review endpoint (found by this suite)
   const haveDb = (() => { try { return /SUPABASE_SERVICE_ROLE_KEY="[^"]{20,}"/.test(fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8')); } catch { return false; } })();
-  let sb = null, anon = null, env = '';
+  let sb = null, anon = null, env = '', makeAnon = null;
   if (haveDb) {
     env = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8');
     const { createClient } = require(path.join(ROOT, 'node_modules', '@supabase', 'supabase-js'));
     const url = env.match(/NEXT_PUBLIC_SUPABASE_URL="([^"]+)"/)[1];
     sb = createClient(url, env.match(/SUPABASE_SERVICE_ROLE_KEY="([^"]+)"/)[1], { auth: { persistSession: false } });
     anon = createClient(url, env.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/)[1], { auth: { persistSession: false } });
+    makeAnon = () => createClient(url, env.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="([^"]+)"/)[1], { auth: { persistSession: false, autoRefreshToken: false } });
   }
 
   if (sb) {
@@ -199,6 +200,36 @@ export default async function run() {
         const { data: row } = await sb.from('subscribers').select('email,confirmed').eq('email', email);
         assert(ins.error && row.length === 0, 'public key could INSERT a confirmed subscriber with only an email address');
       } finally { await sb.from('subscribers').delete().like('email', 'zz-anon-sub-%'); }
+    }, { severity: 'high' });
+    await test('a signed-in user cannot promote their own profile (role, writer approval, paid status) but can still read it', async () => {
+      const email = 'zz-profiles-test-' + Date.now() + '@example.com';
+      const password = Array.from({ length: 24 }, () => Math.random().toString(36)[2]).join('') + 'Aa1!';
+      let id = null;
+      try {
+        const created = await sb.auth.admin.createUser({ email, password, email_confirm: true });
+        assert(!created.error, 'could not create the disposable test user: ' + (created.error && created.error.message));
+        id = created.data.user.id;
+        const seeded = await sb.from('profiles').insert({ id, email, full_name: 'ZZ Test', role: 'advertiser', subscription_status: 'inactive', subscription_tier: 'free', application_status: 'pending_approval' });
+        assert(!seeded.error, 'could not seed the test profile: ' + (seeded.error && seeded.error.message));
+        const user = makeAnon();
+        const si = await user.auth.signInWithPassword({ email, password });
+        assert(!si.error, 'test user could not sign in');
+        const mine = await user.from('profiles').select('id,role').eq('id', id).maybeSingle();
+        assert(mine.data && mine.data.id === id, 'a signed-in user can no longer read their own profile');
+        const patches = [{ role: 'admin' }, { subscription_status: 'active' }, { application_status: 'approved' }, { subscription_tier: 'featured' }, { articles_limit: 9999 }, { roles: ['admin'] }];
+        const accepted = [];
+        for (const patch of patches) {
+          await user.from('profiles').update(patch).eq('id', id);
+          const { data: after } = await sb.from('profiles').select('*').eq('id', id).single();
+          const k = Object.keys(patch)[0];
+          if (JSON.stringify(after[k]) === JSON.stringify(patch[k])) accepted.push(k);
+        }
+        const other = await user.from('profiles').insert({ id: '00000000-0000-4000-8000-000000000000', email: 'zz-' + Date.now() + '@example.com', role: 'journalist', subscription_status: 'active' });
+        assert(accepted.length === 0 && other.error, 'user could change their own: ' + accepted.join(', ') + (other.error ? '' : ' / could insert a profile'));
+      } finally {
+        if (id) { await sb.from('profiles').delete().eq('id', id); await sb.auth.admin.deleteUser(id); }
+        await sb.from('profiles').delete().eq('id', '00000000-0000-4000-8000-000000000000');
+      }
     }, { severity: 'high' });
     await test('storage buckets refuse anonymous uploads', async () => {
       const { data: buckets } = await sb.storage.listBuckets();
