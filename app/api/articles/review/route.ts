@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/lib/article-markdown';
 import { CATEGORIES } from '@/lib/supabase';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
@@ -30,8 +31,20 @@ async function triggerRevalidate(req: NextRequest, slug?: string) {
   }).catch(() => {});
 }
 
+// Only articles waiting for review can be reviewed. Anything else (published,
+// approved, quarantined) must not be re-processed, or this endpoint could be
+// used to knock a live article back into the review queue.
+const REVIEWABLE_STATUSES = ['pending', 'pending_editorial'];
+
 export async function POST(req: NextRequest) {
   try {
+    // The submitting writer or an admin. This used to be open to anyone who knew
+    // an article id (they appear in public page source).
+    const actor = await resolveArticlesActor(req);
+    if (!actor) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const parsed = await req.json().catch(() => null);
     const article_id =
       parsed && typeof parsed === 'object' && 'article_id' in parsed
@@ -60,6 +73,13 @@ export async function POST(req: NextRequest) {
     }
     if (!article) {
       return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+    }
+
+    if (actor.kind === 'journalist' && article.author_id !== actor.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!REVIEWABLE_STATUSES.includes(String(article.status))) {
+      return NextResponse.json({ error: 'This article is not awaiting review.' }, { status: 409 });
     }
 
     const editorialCategory = normalizeEditorialCategory(

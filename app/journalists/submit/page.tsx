@@ -670,7 +670,7 @@ function JournalistSubmitInner() {
 
       const rev = await fetch('/api/articles/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonAuthHeaders(accessToken),
         body: JSON.stringify({ article_id: articlePk }),
       });
 
