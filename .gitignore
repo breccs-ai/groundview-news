@@ -36,3 +36,6 @@ yarn-error.log*
 next-env.d.ts
 groundview-news/
 .env*
+
+# regression suite output
+tests/regression/results/
