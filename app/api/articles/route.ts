@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { evaluateFoundingLeadEditorEligibility } from '@/lib/founding-lead-editor-program';
+import { revalidateSite } from '@/lib/revalidate-site';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { normalizeEditorialCategory, requiresHumanEditorialReview } from '@/lib/editorial-category';
 import { generateSlug, generateUniqueSlug } from '@/lib/slug';
@@ -63,13 +64,8 @@ async function resolveWriterByline(
   return fullName || null;
 }
 
-async function triggerRevalidate(req: NextRequest, slug?: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-  await fetch(`${baseUrl}/api/revalidate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slug }),
-  }).catch(() => {});
+async function triggerRevalidate(_req: NextRequest, slug?: string) {
+  revalidateSite(slug);
 }
 
 /** PATCH submit-for-review: route status by editorial_category before DB write. */

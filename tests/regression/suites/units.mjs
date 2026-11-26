@@ -120,6 +120,32 @@ export default async function run() {
     for (const bad of ['', 'deadbeef', 'z'.repeat(64), t.slice(0, 63)]) assert(!unsub.verifyUnsubscribeToken('person@example.com', bad));
   });
 
+  // ---- Newsletter links and digest
+  const nlTok = load('@/lib/newsletter-tokens');
+  const nlMail = load('@/lib/newsletter-emails');
+  await test('newsletter links: confirm and unsubscribe tokens are separate, per address, and case-insensitive', () => {
+    const c = nlTok.signNewsletterToken('confirm', 'Reader@Example.com');
+    assert(nlTok.verifyNewsletterToken('confirm', 'reader@example.com', c));
+    assert(!nlTok.verifyNewsletterToken('unsubscribe', 'reader@example.com', c), 'a confirm token worked as an unsubscribe token');
+    assert(!nlTok.verifyNewsletterToken('confirm', 'other@example.com', c));
+    assert(!nlTok.verifyNewsletterToken('confirm', 'reader@example.com', unsub.signUnsubscribeToken('reader@example.com')), 'an outreach token worked as a confirm token');
+    const u = new URL(nlTok.newsletterLink('unsubscribe', 'Reader@Example.com'));
+    assert(u.pathname === '/api/newsletter/unsubscribe' && u.searchParams.get('email') === 'reader@example.com');
+    assert(nlTok.verifyNewsletterToken('unsubscribe', 'reader@example.com', u.searchParams.get('token')));
+  });
+  await test('newsletter emails: confirmation asks before subscribing; digest has a personal unsubscribe link and one-click headers', () => {
+    const c = nlMail.newsletterConfirmationEmail('reader@example.com', '<img src=x onerror=1>');
+    assert(/Confirm your/.test(c.subject) && /\/api\/newsletter\/confirm\?email=reader%40example\.com&(amp;)?token=/.test(c.html) && !/<img src=x/i.test(c.html), 'confirmation email');
+    const html = nlMail.weeklyDigestHtml([{ title: 'T <b>', slug: 'a-b', category: 'x', excerpt: 'e' }], 'reader@example.com');
+    const m = html.match(/href="([^"]*\/api\/newsletter\/unsubscribe[^"]*)"/);
+    assert(m, 'no unsubscribe link in the digest');
+    const link = new URL(m[1].replace(/&amp;/g, '&'));
+    assert(nlTok.verifyNewsletterToken('unsubscribe', 'reader@example.com', link.searchParams.get('token')), 'digest unsubscribe token does not verify');
+    assert(!/\/unsubscribe"/.test(html), 'digest still links to the missing /unsubscribe page');
+    const h = nlMail.unsubscribeHeaders('reader@example.com');
+    assert(/api\/newsletter\/unsubscribe/.test(h['List-Unsubscribe']) && h['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click');
+  });
+
   // ---- Editorial routing
   const ed = load('@/lib/editorial-category');
   await test('editorial routing: sensitive categories need a human, others do not', () => {

@@ -213,9 +213,93 @@ export default async function run() {
       assert(p.status === 200 && (await flag()) === true, 'POST did not opt out');
     } finally { await sb.from('profiles').update({ writer_reminder_opt_out: original }).eq('id', prof.id); }
   });
+  // ---------- Cache purge endpoint and response headers
+  await test('/api/revalidate: refused without an admin session, works with one', async () => {
+    const body = JSON.stringify({ slug: 'zz-regression-probe' });
+    assert((await status('/api/revalidate', { method: 'POST', headers: JSON_H, body })) === 401, 'anonymous request was accepted');
+    const r = await fetch(BASE + '/api/revalidate', { method: 'POST', headers: A, body });
+    assert(r.status === 200 && (await r.json()).revalidated === true, 'admin request failed: ' + r.status);
+  });
+  await test('every response carries nosniff, frame protection and a referrer policy, and does not advertise Next.js', async () => {
+    for (const p of ['/', '/api/admin-auth/session']) {
+      const h = (await fetch(BASE + p)).headers;
+      assert(h.get('x-content-type-options') === 'nosniff', p + ': X-Content-Type-Options ' + h.get('x-content-type-options'));
+      assert(/sameorigin|deny/i.test(h.get('x-frame-options') || ''), p + ': X-Frame-Options ' + h.get('x-frame-options'));
+      assert(!!h.get('referrer-policy'), p + ': no Referrer-Policy');
+      assert(!h.get('x-powered-by'), p + ': X-Powered-By ' + h.get('x-powered-by'));
+    }
+  });
+
+  // ---------- Newsletter: double opt-in, unsubscribe and the weekly send list
+  const nlSign = (kind, email) => createHmac('sha256', UNSUB_SECRET).update('newsletter:' + kind + ':' + email).digest('hex');
+  const nlQ = (kind, email, tok) => '?email=' + encodeURIComponent(email) + '&token=' + (tok || nlSign(kind, email));
+  const nlEmail = 'zz-nl-' + Date.now() + '@example.com';
+  const nlSubscribe = (email, n) => fetch(BASE + '/api/newsletter', { method: 'POST', headers: { ...JSON_H, 'x-real-ip': '10.' + RUN + '.' + n + '.7' }, body: JSON.stringify({ email, first_name: 'Test', last_name: 'Reader' }) });
+  const nlRow = async (email) => (await sb.from('subscribers').select('confirmed,unsubscribed_at').eq('email', email).maybeSingle()).data;
+  const nlSupp = async (email) => (await sb.from('email_suppressions').select('reason,source').eq('email', email).maybeSingle()).data;
+  try {
+    await test('newsletter: signing up stores an UNCONFIRMED address and asks the reader to confirm (email reported honestly)', async () => {
+      const r = await nlSubscribe(nlEmail, 1);
+      const j = await r.json();
+      assert(r.status === 200 && j.ok === true, JSON.stringify(j));
+      assert(j.confirmation_sent === false, 'locally there is no email key, so confirmation_sent must be false, not faked');
+      const row = await nlRow(nlEmail);
+      assert(row && row.confirmed === false, 'row should exist and be unconfirmed: ' + JSON.stringify(row));
+      const again = await nlSubscribe(nlEmail, 2);
+      assert(again.status === 200, 'signing up again while unconfirmed should resend the confirmation, got ' + again.status);
+    });
+    await test('newsletter: the confirm link only shows a button on GET, rejects bad or wrong-purpose tokens, and POST confirms', async () => {
+      const g = await (await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail))).text();
+      assert(/Confirm my subscription/.test(g) && /method="post"/.test(g), 'no confirmation page');
+      assert((await nlRow(nlEmail)).confirmed === false, 'GET confirmed someone');
+      const bad = await (await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail, 'deadbeef'))).text();
+      assert(/invalid or has expired/.test(bad));
+      const wrongKind = await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail, nlSign('unsubscribe', nlEmail)), { method: 'POST' });
+      assert(/invalid or has expired/.test(await wrongKind.text()) && (await nlRow(nlEmail)).confirmed === false, 'an unsubscribe token confirmed a signup');
+      const p = await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail), { method: 'POST' });
+      assert(/subscription is confirmed/.test(await p.text()) && (await nlRow(nlEmail)).confirmed === true, 'POST did not confirm');
+      assert((await nlSubscribe(nlEmail, 3)).status === 409, 'a confirmed subscriber should get already_subscribed');
+    });
+    const recent = (await sb.from('articles').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('published_at', new Date(Date.now() - 7 * 864e5).toISOString())).count;
+    if (recent > 0) {
+      await test('newsletter: the weekly send list includes confirmed readers and leaves out unconfirmed and suppressed ones (dry run, nothing sent)', async () => {
+        const dry = async () => (await (await fetch(BASE + '/api/cron/weekly-newsletter?dry_run=1')).json());
+        const base = await dry();
+        assert(base.dry_run === true && typeof base.recipients_total === 'number', JSON.stringify(base));
+        // nlEmail is confirmed and already counted. An unconfirmed address and a confirmed-but-suppressed one must not change the total.
+        const extra = ['zz-nl-unconfirmed-' + Date.now() + '@example.com', 'zz-nl-suppressed-' + Date.now() + '@example.com'];
+        await sb.from('subscribers').insert([{ email: extra[0], first_name: 'T', last_name: 'R', confirmed: false }, { email: extra[1], first_name: 'T', last_name: 'R', confirmed: true }]);
+        await sb.from('email_suppressions').insert({ email: extra[1], reason: 'unsubscribed', source: 'newsletter' });
+        const after = await dry();
+        assert(after.recipients_total === base.recipients_total && after.skipped_suppressed === base.skipped_suppressed + 1, 'before ' + JSON.stringify(base) + ' after ' + JSON.stringify(after));
+      });
+    }
+    await test('newsletter: the unsubscribe link only asks on GET; POST removes the reader and suppresses the address; confirming again lifts it', async () => {
+      const g = await (await fetch(BASE + '/api/newsletter/unsubscribe' + nlQ('unsubscribe', nlEmail))).text();
+      assert(/Confirm unsubscribe/.test(g) && /method="post"/.test(g));
+      assert((await nlRow(nlEmail)) && !(await nlSupp(nlEmail)), 'GET unsubscribed someone');
+      const bad = await fetch(BASE + '/api/newsletter/unsubscribe' + nlQ('unsubscribe', nlEmail, 'deadbeef'), { method: 'POST' });
+      assert(/invalid or has expired/.test(await bad.text()) && (await nlRow(nlEmail)), 'POST with a bad token wrote');
+      const wrongKind = await fetch(BASE + '/api/newsletter/unsubscribe' + nlQ('unsubscribe', nlEmail, nlSign('confirm', nlEmail)), { method: 'POST' });
+      assert(/invalid or has expired/.test(await wrongKind.text()) && (await nlRow(nlEmail)), 'a confirm token unsubscribed a reader');
+      const p = await fetch(BASE + '/api/newsletter/unsubscribe' + nlQ('unsubscribe', nlEmail), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click' });
+      assert(/have been unsubscribed/.test(await p.text()), 'POST did not unsubscribe');
+      const sup = await nlSupp(nlEmail);
+      assert(!(await nlRow(nlEmail)) && sup && sup.reason === 'unsubscribed' && sup.source === 'newsletter', 'row or suppression wrong: ' + JSON.stringify(sup));
+      // Signing up and confirming again is a fresh opt-in
+      assert((await nlSubscribe(nlEmail, 4)).status === 200);
+      await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail), { method: 'POST' });
+      assert((await nlRow(nlEmail)).confirmed === true && !(await nlSupp(nlEmail)), 're-confirming did not lift the newsletter unsubscribe');
+    });
+  } finally {
+    await sb.from('subscribers').delete().like('email', 'zz-nl-%');
+    await sb.from('email_suppressions').delete().like('email', 'zz-nl-%');
+  }
+
   await test('cleanup: no test articles or suppression rows were left in the database', async () => {
     const left = (await sb.from('articles').select('id').like('slug', 'zz-%')).data.length;
     const supp = (await sb.from('email_suppressions').select('email').like('email', 'zz-%')).data.length;
-    assert(left === 0 && supp === 0, `${left} test articles, ${supp} test suppression rows left behind`);
+    const subs = (await sb.from('subscribers').select('email').like('email', 'zz-%')).data.length;
+    assert(left === 0 && supp === 0 && subs === 0, `${left} test articles, ${supp} test suppression rows, ${subs} test subscribers left behind`);
   });
 }

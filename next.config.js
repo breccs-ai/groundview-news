@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -19,6 +20,21 @@ const nextConfig = {
    */
   env: {
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  },
+  // Baseline browser protections on every response. A Content-Security-Policy is not
+  // set here yet: the site loads Stripe, ad and analytics scripts, so a policy needs
+  // to be built and trialled in report-only mode before it is enforced.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
   },
   async redirects() {
     return [

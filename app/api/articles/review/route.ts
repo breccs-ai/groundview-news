@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
+import { revalidateSite } from '@/lib/revalidate-site';
 import { resolveArticlesActor } from '@/lib/articles-api-auth';
 import { markdownPlainTextForApis, wordCountMarkdownExcludingSyntax } from '@/lib/article-markdown';
 import { CATEGORIES } from '@/lib/supabase';
@@ -18,17 +19,8 @@ function getServiceSupabase() {
   return createClient(url, key);
 }
 
-function getBaseUrl(req: NextRequest): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-}
-
-async function triggerRevalidate(req: NextRequest, slug?: string) {
-  const baseUrl = getBaseUrl(req);
-  await fetch(`${baseUrl}/api/revalidate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slug }),
-  }).catch(() => {});
+async function triggerRevalidate(_req: NextRequest, slug?: string) {
+  revalidateSite(slug);
 }
 
 // Only articles waiting for review can be reviewed. Anything else (published,

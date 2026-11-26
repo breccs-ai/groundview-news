@@ -25,7 +25,7 @@ const dynamic = (r) => r.includes('[');
 // Routes that are open to anonymous visitors by design.
 const PUBLIC = new Set([
   '/api/ads/display', '/api/ads/track', '/api/articles/view', '/api/newsletter', '/api/contact', '/api/advertise-enquiry',
-  '/api/writer/apply', '/api/journalist/register', '/api/advertiser/register', '/api/revalidate', '/api/outreach/unsubscribe',
+  '/api/writer/apply', '/api/journalist/register', '/api/advertiser/register', '/api/outreach/unsubscribe', '/api/newsletter/confirm', '/api/newsletter/unsubscribe',
   '/api/journalists/unsubscribe-reminders', '/api/admin-auth', '/api/admin-auth/logout', '/api/admin-auth/session',
   '/api/webhooks/stripe', '/api/advertiser/kyc/webhook', '/api/subscribe/success', '/api/advertiser/validate-ad',
   '/api/me/subscription',
@@ -210,5 +210,5 @@ export default async function run() {
   await test('/api/revalidate cannot be called by anonymous visitors (it purges the page cache)', async () => {
     const r = await req('/api/revalidate', { method: 'POST', headers: JSON_H, body: JSON.stringify({ slug: 'zz-regression-probe' }) });
     assert(r.status === 401 || r.status === 403, `anonymous request accepted: HTTP ${r.status}`);
-  }, { level: 'warn', severity: 'low' });
+  }, { severity: 'medium' });
 }
