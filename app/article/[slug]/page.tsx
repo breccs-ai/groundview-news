@@ -21,6 +21,7 @@ import EarlyAccessBanner from '@/components/EarlyAccessBanner';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import type { ArticleImage } from '@/lib/supabase';
 import { articleCanonicalUrl } from '@/lib/article-public-url';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-image';
 import { newsArticleJsonLd, jsonLdScript } from '@/lib/structured-data';
 import { parseArticleShares } from '@/lib/article-shares';
 import { formatDate } from '@/lib/utils';
@@ -61,10 +62,14 @@ function imageCaption(image: ArticleImage, imageCount: number, title: string): s
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = await getArticleBySlug(params.slug);
   if (!article) return { title: 'Article not found | Ground View News' };
-  const featuredImageUrl =
+  const legacyFeaturedUrl =
     typeof article.featured_image_url === 'string' && article.featured_image_url.trim() !== ''
       ? article.featured_image_url
       : '';
+  // Same order the article page uses for its hero image. Articles with no image
+  // of their own share with the branded default instead of a bare link preview.
+  const ownImageUrl = normalizeArticleImages(article.article_images)[0]?.url || legacyFeaturedUrl;
+  const shareImages = ownImageUrl ? [{ url: ownImageUrl }] : [DEFAULT_SHARE_IMAGE];
 
   return {
     title: `${article.title} | Ground View News`,
@@ -78,13 +83,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'article',
       publishedTime: article.published_at,
       authors: article.author_name ? [article.author_name] : undefined,
-      images: featuredImageUrl ? [{ url: featuredImageUrl }] : undefined,
+      images: shareImages,
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt || article.subtitle || '',
-      images: featuredImageUrl ? [featuredImageUrl] : undefined,
+      images: shareImages.map((i) => i.url),
     },
   };
 }

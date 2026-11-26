@@ -3,6 +3,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import CookieConsent from '@/components/CookieConsent';
 import { SubscriptionProvider } from '@/components/SubscriptionProvider';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-image';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://groundviewnews.com'),
@@ -13,9 +14,11 @@ export const metadata: Metadata = {
     siteName: 'Ground View News',
     type: 'website',
     locale: 'en_GB',
+    images: [DEFAULT_SHARE_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
+    images: [DEFAULT_SHARE_IMAGE.url],
   },
 };
 

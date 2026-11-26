@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { DEFAULT_SHARE_IMAGE } from '@/lib/share-image';
 
 const NAVY = '#0f1f3d';
 const GOLD = '#D4AF37';
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
     title: 'Write for Ground View News',
     description:
       'Join a growing community of writers covering global affairs, politics, business, sports, and more.',
+    images: [DEFAULT_SHARE_IMAGE],
   },
 };
 
