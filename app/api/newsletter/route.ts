@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isValidEmailFormat } from '@/lib/contact-spam-validation';
-import { enforceNewsletterRateLimit } from '@/lib/newsletter-rate-limit';
+import { consumeConfirmationEmailAllowance, enforceNewsletterRateLimit } from '@/lib/newsletter-rate-limit';
+import { isSuspiciousNewsletterEmail } from '@/lib/newsletter-email-checks';
 import { NEWSLETTER_FROM, newsletterConfirmationEmail } from '@/lib/newsletter-emails';
 
 export const runtime = 'nodejs';
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
   if (!isValidEmailFormat(email)) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
   }
+  if (isSuspiciousNewsletterEmail(email)) {
+    return NextResponse.json({ error: 'Please use a permanent email address.' }, { status: 400 });
+  }
   if (!isPlausibleName(first_name)) {
     return NextResponse.json({ error: 'Please enter a valid first name.' }, { status: 400 });
   }
@@ -81,6 +85,12 @@ export async function POST(req: NextRequest) {
     if (existing?.confirmed) {
       return NextResponse.json({ error: 'already_subscribed' }, { status: 409 });
     }
+  }
+
+  // One sign-up email plus one resend per address per day. Past that, answer as if it
+  // worked (the earlier email is still valid) but send nothing.
+  if (!(await consumeConfirmationEmailAllowance(email, supabase))) {
+    return NextResponse.json({ ok: true, confirmation_sent: false, throttled: true });
   }
 
   const confirmation = newsletterConfirmationEmail(email, first_name);

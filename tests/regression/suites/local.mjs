@@ -248,6 +248,23 @@ export default async function run() {
       const again = await nlSubscribe(nlEmail, 2);
       assert(again.status === 200, 'signing up again while unconfirmed should resend the confirmation, got ' + again.status);
     });
+    await test('newsletter: the nightly purge of unconfirmed sign-ups works as a dry run and leaves pre-double-opt-in readers alone', async () => {
+      const r = await (await fetch(BASE + '/api/cron/purge-unconfirmed-subscribers?dry_run=1')).json();
+      assert(r.ok === true && r.dry_run === true && r.would_delete === 0, JSON.stringify(r));
+    });
+    await test('newsletter: one address cannot trigger more than a sign-up and one resend per day; disposable and dot-padded addresses are refused', async () => {
+      const cool = 'zz-nl-cool-' + Date.now() + '@example.com';
+      const first = await (await nlSubscribe(cool, 5)).json();
+      const second = await (await nlSubscribe(cool, 6)).json();
+      const third = await (await nlSubscribe(cool, 7)).json();
+      assert(!first.throttled && !second.throttled, 'the first sign-up and one resend should not be throttled: ' + JSON.stringify([first, second]));
+      assert(third.ok === true && third.throttled === true && third.confirmation_sent === false, 'the third attempt in a day should be throttled: ' + JSON.stringify(third));
+      for (const [n, bad] of [[8, 'zz-nl-x@mailinator.com'], [9, 'a.b.c.d.e.f@gmail.com']]) {
+        const r = await nlSubscribe(bad, n);
+        assert(r.status === 400, bad + ' should be refused, got ' + r.status);
+      }
+      assert(!(await nlRow('zz-nl-x@mailinator.com')) && !(await nlRow('a.b.c.d.e.f@gmail.com')), 'a refused address was stored');
+    });
     await test('newsletter: the confirm link only shows a button on GET, rejects bad or wrong-purpose tokens, and POST confirms', async () => {
       const g = await (await fetch(BASE + '/api/newsletter/confirm' + nlQ('confirm', nlEmail))).text();
       assert(/Confirm my subscription/.test(g) && /method="post"/.test(g), 'no confirmation page');

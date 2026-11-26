@@ -146,6 +146,16 @@ export default async function run() {
     assert(/api\/newsletter\/unsubscribe/.test(h['List-Unsubscribe']) && h['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click');
   });
 
+  const nlChk = load('@/lib/newsletter-email-checks');
+  await test('newsletter form: disposable inboxes and dot-padded Gmail addresses are refused, real addresses are not', () => {
+    for (const bad of ['x@mailinator.com', 'x@sub.mailinator.com', 'a@YOPMAIL.com', 'kl.i.nema.s.a@gmail.com', 'a.b.c.d.e@googlemail.com']) {
+      assert(nlChk.isSuspiciousNewsletterEmail(bad), bad + ' should be refused');
+    }
+    for (const ok of ['jane@gmail.com', 'jane.doe@gmail.com', 'j.a.doe@gmail.com', 'first.m.last@gmail.com', 'a.b.c.d.e@company.com', 'reader@outlook.com', 'x@notmailinator.org', 'sspanos@exactsciences.com']) {
+      assert(!nlChk.isSuspiciousNewsletterEmail(ok), ok + ' should be allowed');
+    }
+  });
+
   // ---- Editorial routing
   const ed = load('@/lib/editorial-category');
   await test('editorial routing: sensitive categories need a human, others do not', () => {

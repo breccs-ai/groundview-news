@@ -39,6 +39,9 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
       const json = await res.json().catch(() => ({}));
       if (json.error === 'already_subscribed') {
         setErrorMsg('This email is already subscribed.');
+      } else if (res.status === 400 && typeof json.error === 'string' && json.error.startsWith('Please')) {
+        // The server's validation messages ("Please use a permanent email address.") are written for readers.
+        setErrorMsg(json.error);
       } else {
         setErrorMsg('Something went wrong. Please try again.');
       }

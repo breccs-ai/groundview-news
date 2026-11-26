@@ -31,6 +31,31 @@ type RateLimitRow = {
   retry_after_seconds: number;
 };
 
+/**
+ * Caps how many sign-up and confirmation emails one address can trigger. Without this,
+ * anyone could use the form to keep sending confirmation emails to someone else's
+ * inbox, and a burst to dead addresses would hurt our sending reputation. Reuses the
+ * same attempts table, keyed by a salted hash of the address instead of an IP:
+ * the first sign-up and one resend are allowed per 24 hours, then it goes quiet.
+ */
+export async function consumeConfirmationEmailAllowance(
+  email: string,
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('consume_newsletter_subscribe_attempt', {
+    p_ip_hash: hashSubmitterIp(`email:${email.trim().toLowerCase()}`),
+    p_limit: 2,
+    p_window: '24 hours',
+  });
+  if (error) {
+    console.error('[newsletter email cooldown]', error.message);
+    // If the limiter is down, do not send: a missing email is recoverable, a flood is not.
+    return false;
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as RateLimitRow | null;
+  return Boolean(row?.allowed);
+}
+
 export async function enforceNewsletterRateLimit(
   req: NextRequest,
   supabase: SupabaseClient
