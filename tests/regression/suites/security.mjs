@@ -192,6 +192,14 @@ export default async function run() {
         assert(still.length === 1, 'public key could DELETE an article');
       } finally { await sb.from('articles').delete().like('slug', 'zz-rls-%'); }
     });
+    await test('the public database key cannot add subscribers directly (it would skip the form checks and the email confirmation)', async () => {
+      const email = 'zz-anon-sub-' + Date.now() + '@example.com';
+      try {
+        const ins = await anon.from('subscribers').insert({ email, confirmed: true });
+        const { data: row } = await sb.from('subscribers').select('email,confirmed').eq('email', email);
+        assert(ins.error && row.length === 0, 'public key could INSERT a confirmed subscriber with only an email address');
+      } finally { await sb.from('subscribers').delete().like('email', 'zz-anon-sub-%'); }
+    }, { severity: 'high' });
     await test('storage buckets refuse anonymous uploads', async () => {
       const { data: buckets } = await sb.storage.listBuckets();
       const open = [];
