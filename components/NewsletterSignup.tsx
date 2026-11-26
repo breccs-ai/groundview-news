@@ -86,7 +86,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
           Get independent commentary on global affairs delivered to your inbox.
         </p>
         {status === 'success' ? (
-          <p className="text-sm text-green-700 font-medium">Thank you. You are now subscribed.</p>
+          <p className="text-sm text-green-700 font-medium">Almost done. Check your inbox and click the link to confirm your subscription.</p>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {honeypotField}
@@ -172,7 +172,7 @@ export default function NewsletterSignup({ variant = 'section' }: Props) {
 
         {status === 'success' ? (
           <div className="inline-flex items-center gap-2 bg-green-900/40 border border-green-700 text-green-300 px-6 py-3 rounded-sm text-sm">
-            You&apos;re subscribed. Welcome to Ground View News.
+            Almost done. Check your inbox and click the link to confirm your subscription.
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="max-w-md mx-auto flex flex-col gap-4">

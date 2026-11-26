@@ -237,7 +237,12 @@ export default function PrivacyPolicyPage() {
                 privacy@groundviewnews.com
               </a>
               . Upon unsubscribing, your email address will be deleted from our subscriber list
-              within 30 days.
+              within 30 days. We keep a record of the address on a suppression list for the sole
+              purpose of making sure we do not email you again.
+            </p>
+            <p>
+              We use double opt-in: after you sign up we send one email asking you to confirm, and
+              we only send you the newsletter once you have done so.
             </p>
             <p>
               We do not use your email address for any purpose other than sending the newsletter, and

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email';
 import { isPlausibleName, isValidEmailFormat } from '@/lib/contact-spam-validation';
 import { enforceNewsletterRateLimit } from '@/lib/newsletter-rate-limit';
-import { emailShell, escapeHtml } from '@/lib/email-branding';
+import { NEWSLETTER_FROM, newsletterConfirmationEmail } from '@/lib/newsletter-emails';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,29 +61,30 @@ export async function POST(req: NextRequest) {
   const rateLimitResponse = await enforceNewsletterRateLimit(req, supabase);
   if (rateLimitResponse) return rateLimitResponse;
 
+  // Double opt-in: the address is stored unconfirmed and nothing is sent to it until
+  // its owner clicks the link in the confirmation email.
   const { error } = await supabase
     .from('subscribers')
     .insert({ email, first_name, last_name, confirmed: false });
 
   if (error) {
-    if (error.code === '23505') {
+    if (error.code !== '23505') {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    // Already on the list. If they never confirmed, send the confirmation again so a
+    // lost or expired email is not a dead end; if they did, say so.
+    const { data: existing } = await supabase
+      .from('subscribers')
+      .select('confirmed')
+      .eq('email', email)
+      .maybeSingle();
+    if (existing?.confirmed) {
       return NextResponse.json({ error: 'already_subscribed' }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  await sendEmail(
-    email,
-    'Welcome to Ground View News',
-    emailShell(
-      `<p>Thank you for subscribing to Ground View News, ${escapeHtml(first_name)}.</p>
-<p>You will receive our latest commentary and analysis directly to your inbox.</p>`,
-      {
-        footerExtra:
-          'You\'re receiving this because you subscribed to the Ground View News newsletter at groundviewnews.com. To unsubscribe, reply to this email with "unsubscribe" in the subject line.',
-      }
-    )
-  );
+  const confirmation = newsletterConfirmationEmail(email, first_name);
+  const emailSent = await sendEmail(email, confirmation.subject, confirmation.html, NEWSLETTER_FROM);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, confirmation_sent: emailSent });
 }
