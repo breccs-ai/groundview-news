@@ -18,6 +18,7 @@ import ArticleReadersLine from '@/components/ArticleReadersLine';
 import ArticleShareSection from '@/components/ArticleShareSection';
 import SubscriptionPromptBanner from '@/components/SubscriptionPromptBanner';
 import EarlyAccessBanner from '@/components/EarlyAccessBanner';
+import { articleDescription } from '@/lib/article-description';
 import { getArticleBySlug, getPublishedArticles } from '@/lib/supabase';
 import type { ArticleImage } from '@/lib/supabase';
 import { articleCanonicalUrl } from '@/lib/article-public-url';
@@ -71,16 +72,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // of their own share with the branded default instead of a bare link preview.
   const ownImageUrl = normalizeArticleImages(article.article_images)[0]?.url || legacyFeaturedUrl;
   const shareImages = ownImageUrl ? [{ url: ownImageUrl }] : [DEFAULT_SHARE_IMAGE];
+  const description = articleDescription(article);
 
   return {
     title: `${article.title} | Ground View News`,
-    description: article.excerpt || article.subtitle || '',
+    description: description,
     alternates: {
       canonical: articleCanonicalUrl(slug),
     },
     openGraph: {
       title: article.title,
-      description: article.excerpt || article.subtitle || '',
+      description: description,
       type: 'article',
       publishedTime: article.published_at,
       authors: article.author_name ? [article.author_name] : undefined,
@@ -89,7 +91,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title: article.title,
-      description: article.excerpt || article.subtitle || '',
+      description: description,
       images: shareImages.map((i) => i.url),
     },
   };

@@ -2,6 +2,10 @@ import type { MetadataRoute } from 'next';
 import { getPublishedArticles, CATEGORIES } from '@/lib/supabase';
 import { articleCanonicalUrl, getPublicSiteOrigin } from '@/lib/article-public-url';
 
+// Rebuild at most hourly so newly published and unpublished articles reach the sitemap
+// without waiting for the next deploy.
+export const revalidate = 3600;
+
 const STATIC_PAGES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; priority: number }[] = [
   { path: '/', changeFrequency: 'hourly', priority: 1 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.5 },

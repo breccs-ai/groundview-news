@@ -156,6 +156,17 @@ export default async function run() {
     }
   });
 
+  const artDesc = load('@/lib/article-description');
+  await test('article description: excerpt, then subtitle, then the first real paragraph (no headings, bylines or markdown)', () => {
+    assert(artDesc.articleDescription({ excerpt: ' Written excerpt ', body: { markdown: 'Body.' } }) === 'Written excerpt');
+    assert(artDesc.articleDescription({ excerpt: '', subtitle: 'A subtitle' }) === 'A subtitle');
+    const body = { markdown: '# The Title\n\n**By Someone, The Editor | Ground View News**\n*Published: 27 June 2026*\n\n---\n\nWhen the **United Arab Emirates** announced it was [leaving OPEC](https://x.test)[^1], markets reacted. After more than five decades of membership the country chose an independent path and a new energy future for itself.\n\n## Next' };
+    const d = artDesc.articleDescription({ excerpt: '', subtitle: '', body });
+    assert(d.startsWith('When the United Arab Emirates announced it was leaving OPEC, markets reacted.'), d);
+    assert(d.length <= 165 && !/[*#\[\]]/.test(d) && d.endsWith('...'), 'length or syntax: ' + d);
+    assert(artDesc.articleDescription({ excerpt: '', subtitle: '', body: { markdown: '# Only a heading' } }) === '');
+  });
+
   // ---- Editorial routing
   const ed = load('@/lib/editorial-category');
   await test('editorial routing: sensitive categories need a human, others do not', () => {

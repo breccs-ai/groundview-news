@@ -34,8 +34,10 @@ function buildMarkdownComponents(
   imagePlacements: Array<{ afterParagraph: number; image: ArticleImage }> = []
 ): Components {
   return {
+    // The page already has its own h1 (the article title). A "# Heading" inside the body
+    // is rendered as a section heading, so the page never ends up with two h1 elements.
     h1: ({ children, ...props }) => (
-      <h1
+      <h2
         {...props}
         style={{
           ...PLAYFAIR,
@@ -47,7 +49,7 @@ function buildMarkdownComponents(
         }}
       >
         {children}
-      </h1>
+      </h2>
     ),
     h2: ({ children, ...props }) => (
       <h2
